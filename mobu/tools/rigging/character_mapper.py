@@ -266,7 +266,9 @@ class CharacterMapperUI(FBTool):
 
     def LoadSceneModels(self):
         """Load all scene models into the objects list"""
-        self.objects_list.Items.clear()
+        # Clear existing items (FBPropertyStringList doesn't have clear())
+        while len(self.objects_list.Items) > 0:
+            self.objects_list.Items.removeAt(0)
 
         # Get all models in scene
         app = FBApplication()

@@ -21,6 +21,40 @@ xMobu/
 └── config/                 # Configuration files
 ```
 
+## Fast Development Workflow (No Reinstall Required!)
+
+### Method 1: Use the Menu (Easiest)
+
+1. Make changes to your Python files
+2. In MotionBuilder: **xMobu > Reload xMobu**
+3. Test your changes immediately
+
+This reloads all modules and rebuilds the menu without restarting MotionBuilder.
+
+### Method 2: Python Console (Fastest)
+
+For rapid iteration, use the Python Console (View > Python Console):
+
+**First time setup:**
+```python
+exec(open(r'C:\Users\elementa\projects\xMobu\quick_reload.py').read())
+```
+
+**Subsequent reloads (after first run):**
+```python
+reload_xmobu()
+```
+
+This reloads all xMobu modules in seconds!
+
+### Method 3: Keyboard Shortcut (Advanced)
+
+1. Open MotionBuilder's Keyboard Editor
+2. Create a shortcut (e.g., Ctrl+Shift+R)
+3. Assign it to run: `exec(open(r'C:\Users\elementa\projects\xMobu\quick_reload.py').read())`
+
+Now press your shortcut to reload instantly!
+
 ## Adding New Tools
 
 ### 1. Create Tool File
@@ -57,13 +91,12 @@ def execute(control, event):
         FBMessageBox("Error", f"An error occurred: {str(e)}", "OK")
 ```
 
-### 3. Tool Discovery
+### 3. Test Your Tool
 
-Tools are automatically discovered by the menu system. The `menu_builder.py` scans tool folders and looks for:
-- `TOOL_NAME` constant (string): Display name in menu
-- `execute` function (callable): Function called on menu click
-
-No registration needed - just create the file and restart MotionBuilder!
+**No installation needed!** Just:
+1. Save your new tool file
+2. Run `reload_xmobu()` in Python Console (or use xMobu > Reload xMobu)
+3. Your tool appears in the menu automatically
 
 ## Creating Custom UIs
 
@@ -150,6 +183,8 @@ logger.error("Error occurred")
 logger.critical("Critical error")
 ```
 
+Console output is prefixed with `[xMobu]` for easy filtering.
+
 ## Best Practices
 
 1. **Error Handling**: Always wrap tool logic in try/except blocks
@@ -158,15 +193,35 @@ logger.critical("Critical error")
 4. **Undo Support**: Use MotionBuilder's undo system when modifying scene
 5. **Performance**: Log performance-critical operations
 6. **Documentation**: Add docstrings to functions and classes
+7. **Iterative Testing**: Use `reload_xmobu()` frequently during development
 
-## Testing
+## Debugging Tips
 
-Test your tools by:
+### Check Console Output
 
-1. Making changes to tool files
-2. In MotionBuilder, use xMobu > Reload xMobu menu
-3. Test the tool functionality
-4. Check the console for log output
+All xMobu messages start with `[xMobu]`:
+```
+[xMobu] Initialization completed successfully!
+[xMobu] Building category: Animation
+[xMobu]   Found 1 tool(s) in Animation
+```
+
+### Test Tool Directly
+
+You can test tool functions directly in the console:
+```python
+from mobu.tools.animation.keyframe_tools import execute
+execute(None, None)  # Test the tool
+```
+
+### Reload Specific Module
+
+For targeted testing:
+```python
+import importlib
+import mobu.tools.animation.keyframe_tools
+importlib.reload(mobu.tools.animation.keyframe_tools)
+```
 
 ## Future DCC Integration
 
@@ -195,20 +250,27 @@ def build_menu():
 
 ## Troubleshooting
 
-### Tools Not Appearing
+### Tools Not Appearing After Reload
 
 1. Check file naming (no underscores at start)
 2. Verify `TOOL_NAME` constant exists
 3. Verify `execute(control, event)` function exists
 4. Check console for import errors
-5. Use "Reload xMobu" from menu
+5. Look for Python syntax errors
+
+### Reload Fails
+
+1. Check console for full traceback
+2. Look for syntax errors in your code
+3. Ensure all imports are available
+4. Try restarting MotionBuilder if modules are corrupted
 
 ### Import Errors
 
-1. Ensure xMobu root is in Python path
+1. Ensure xMobu root is in Python path (check console on startup)
 2. Check for syntax errors in tool files
-3. Verify all required imports are available
-4. Check MotionBuilder Python version compatibility
+3. Verify all required imports are available in MotionBuilder
+4. Check MotionBuilder Python version compatibility (3.7+)
 
 ## Contributing
 
@@ -217,5 +279,63 @@ When contributing tools:
 1. Follow the tool structure template
 2. Add appropriate error handling
 3. Include docstrings
-4. Test thoroughly
-5. Update this documentation if needed
+4. Test with `reload_xmobu()` during development
+5. Test with fresh MotionBuilder startup
+6. Update this documentation if needed
+
+## Performance Tips
+
+- **Lazy imports**: Import heavy modules inside functions when possible
+- **Cache data**: Store expensive computations in class variables
+- **Profile**: Use Python's `time` module to identify bottlenecks
+- **Batch operations**: Process multiple items in one pass when possible
+
+## Common Patterns
+
+### Getting Selected Objects
+
+```python
+from pyfbsdk import FBModelList, FBGetSelectedModels
+
+selected = FBModelList()
+FBGetSelectedModels(selected)
+
+if len(selected) == 0:
+    FBMessageBox("Error", "Please select objects", "OK")
+    return
+
+for model in selected:
+    print(model.Name)
+```
+
+### Working with Animation
+
+```python
+from pyfbsdk import FBPlayerControl, FBTime
+
+player = FBPlayerControl()
+current_frame = player.GetEditCurrentTime().GetFrame()
+
+# Set keyframe
+model.Translation.SetAnimated(True)
+model.Translation.GetAnimationNode().KeyAdd(FBTime(0, 0, 0, current_frame))
+```
+
+### Scene File Operations
+
+```python
+from pyfbsdk import FBApplication
+
+app = FBApplication()
+current_file = app.FBXFileName
+
+# Save
+app.FileSave()
+
+# Open
+app.FileOpen("path/to/file.fbx")
+```
+
+---
+
+**Happy Development!** Remember: Use `reload_xmobu()` for instant testing - no MotionBuilder restart needed!

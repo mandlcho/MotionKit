@@ -215,22 +215,63 @@ class MenuBuilder:
 
     def _reload_xmobu(self, control, event):
         """Reload xMobu system"""
+        print("[xMobu] ========================================")
+        print("[xMobu] Reloading xMobu...")
+        print("[xMobu] ========================================")
         logger.info("Reloading xMobu...")
-        try:
-            # Reload core modules
-            import core
-            importlib.reload(core)
 
-            # Rebuild menu
-            self.build_menu()
+        try:
+            # Reload all xMobu modules in correct order
+            print("[xMobu] Reloading core modules...")
+
+            # Core modules
+            import core.logger
+            import core.config
+            import core.utils
+            importlib.reload(core.logger)
+            importlib.reload(core.config)
+            importlib.reload(core.utils)
+            print("[xMobu] Core modules reloaded")
+
+            # Reload tool modules
+            print("[xMobu] Reloading tool modules...")
+            import mobu.tools.animation.keyframe_tools
+            import mobu.tools.rigging.constraint_helper
+            import mobu.tools.pipeline.scene_manager
+            import mobu.tools.unreal.content_browser
+
+            importlib.reload(mobu.tools.animation.keyframe_tools)
+            importlib.reload(mobu.tools.rigging.constraint_helper)
+            importlib.reload(mobu.tools.pipeline.scene_manager)
+            importlib.reload(mobu.tools.unreal.content_browser)
+            print("[xMobu] Tool modules reloaded")
+
+            # Reload menu builder
+            print("[xMobu] Reloading menu builder...")
+            import mobu.menu_builder
+            importlib.reload(mobu.menu_builder)
+
+            # Rebuild menu with fresh MenuBuilder
+            print("[xMobu] Rebuilding menu...")
+            from mobu.menu_builder import MenuBuilder
+            new_builder = MenuBuilder()
+            new_builder.build_menu()
+
+            print("[xMobu] ========================================")
+            print("[xMobu] Reload completed successfully!")
+            print("[xMobu] ========================================")
 
             from pyfbsdk import FBMessageBox
-            FBMessageBox("xMobu", "xMobu reloaded successfully!", "OK")
+            FBMessageBox("xMobu", "xMobu reloaded successfully!\n\nAll changes applied.", "OK")
 
         except Exception as e:
+            print(f"[xMobu ERROR] Failed to reload: {str(e)}")
             logger.error(f"Failed to reload xMobu: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
             from pyfbsdk import FBMessageBox
-            FBMessageBox("xMobu Error", f"Failed to reload: {str(e)}", "OK")
+            FBMessageBox("xMobu Error", f"Failed to reload: {str(e)}\n\nCheck Python Console for details.", "OK")
 
     def _show_about(self, control, event):
         """Show about dialog"""

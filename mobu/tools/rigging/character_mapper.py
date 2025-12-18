@@ -8,7 +8,7 @@ from pyfbsdk import (
     FBAttachType, FBMessageBox, FBCharacter, FBBodyNodeId,
     FBModelList, FBGetSelectedModels, FBApplication,
     FBFilePopup, FBFilePopupStyle, FBAddRegionParam,
-    ShowTool, FBTextStyle
+    ShowTool, FBTextStyle, FBListStyle
 )
 from core.logger import logger
 from pathlib import Path

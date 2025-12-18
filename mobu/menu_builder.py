@@ -20,28 +20,40 @@ class MenuBuilder:
 
     def build_menu(self):
         """Build the complete xMobu menu structure"""
+        print(f"[xMobu] Building '{self.menu_name}' menu...")
         logger.info("Building xMobu menu...")
 
         # Create main menu
+        print(f"[xMobu] Creating main menu: {self.menu_name}")
         self.main_menu = self.menu_manager.GetMenu(self.menu_name)
         if not self.main_menu:
             self.main_menu = self.menu_manager.InsertLast(None, self.menu_name)
+            print(f"[xMobu] Main menu '{self.menu_name}' created")
+        else:
+            print(f"[xMobu] Main menu '{self.menu_name}' already exists")
 
         # Clear existing items (for reload scenarios)
         self._clear_menu(self.main_menu)
 
         # Get enabled categories from config
         categories = config.get('mobu.tool_categories', [])
+        print(f"[xMobu] Found {len(categories)} total categories")
+
+        enabled_categories = [c for c in categories if c.get('enabled', True)]
+        print(f"[xMobu] {len(enabled_categories)} categories enabled")
 
         # Build category submenus
         for category in categories:
             if category.get('enabled', True):
+                print(f"[xMobu] Building category: {category['name']}")
                 self._build_category_menu(category['name'])
 
         # Add separator and utilities
         self.menu_manager.InsertLast(self.main_menu, "")  # Separator
+        print("[xMobu] Adding utility menu items...")
         self._add_utility_items()
 
+        print(f"[xMobu] Menu '{self.menu_name}' built successfully")
         logger.info("xMobu menu built successfully")
 
     def _clear_menu(self, menu):
@@ -52,6 +64,7 @@ class MenuBuilder:
 
     def _build_category_menu(self, category_name):
         """Build a submenu for a specific tool category"""
+        print(f"[xMobu]   Creating submenu: {category_name}")
         category_menu = self.menu_manager.InsertLast(self.main_menu, category_name)
 
         # Dynamically load tools from the category folder
@@ -59,12 +72,14 @@ class MenuBuilder:
 
         if not tools:
             # Add placeholder if no tools found
+            print(f"[xMobu]   No tools found for: {category_name}")
             placeholder = self.menu_manager.InsertLast(
                 category_menu,
                 f"No {category_name} tools found"
             )
             placeholder.OnMenuActivate.Add(self._no_tools_callback)
         else:
+            print(f"[xMobu]   Found {len(tools)} tool(s) in {category_name}")
             # Add each tool to the menu
             for tool in tools:
                 tool_item = self.menu_manager.InsertLast(
@@ -73,6 +88,7 @@ class MenuBuilder:
                 )
                 # Bind the tool's execute function
                 tool_item.OnMenuActivate.Add(tool['callback'])
+                print(f"[xMobu]     - {tool['name']}")
 
     def _discover_tools(self, category_name):
         """
@@ -90,7 +106,10 @@ class MenuBuilder:
 
         tools_path = Path(__file__).parent / 'tools' / category_folder
 
+        print(f"[xMobu]   Scanning for tools in: {category_folder}/")
+
         if not tools_path.exists():
+            print(f"[xMobu]   WARNING: Tools folder not found: {tools_path}")
             logger.warning(f"Tools folder not found: {tools_path}")
             return tools
 
@@ -115,8 +134,11 @@ class MenuBuilder:
                         'callback': module.execute
                     })
                     logger.debug(f"Loaded tool: {module.TOOL_NAME}")
+                else:
+                    print(f"[xMobu]   WARNING: {tool_file.name} missing TOOL_NAME or execute")
 
             except Exception as e:
+                print(f"[xMobu]   ERROR: Failed to load {tool_file.name}: {str(e)}")
                 logger.error(f"Failed to load tool from {tool_file.name}: {str(e)}")
 
         return tools

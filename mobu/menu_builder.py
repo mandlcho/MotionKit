@@ -1,0 +1,188 @@
+"""
+Menu builder for MotionBuilder integration
+"""
+
+from pyfbsdk import FBMenuManager, FBGenericMenu
+from core.logger import logger
+from core.config import config
+import importlib
+import sys
+from pathlib import Path
+
+
+class MenuBuilder:
+    """Builds and manages the xMobu menu in MotionBuilder"""
+
+    def __init__(self):
+        self.menu_manager = FBMenuManager()
+        self.menu_name = config.get('mobu.menu_name', 'xMobu')
+        self.main_menu = None
+
+    def build_menu(self):
+        """Build the complete xMobu menu structure"""
+        logger.info("Building xMobu menu...")
+
+        # Create main menu
+        self.main_menu = self.menu_manager.GetMenu(self.menu_name)
+        if not self.main_menu:
+            self.main_menu = self.menu_manager.InsertLast(None, self.menu_name)
+
+        # Clear existing items (for reload scenarios)
+        self._clear_menu(self.main_menu)
+
+        # Get enabled categories from config
+        categories = config.get('mobu.tool_categories', [])
+
+        # Build category submenus
+        for category in categories:
+            if category.get('enabled', True):
+                self._build_category_menu(category['name'])
+
+        # Add separator and utilities
+        self.menu_manager.InsertLast(self.main_menu, "")  # Separator
+        self._add_utility_items()
+
+        logger.info("xMobu menu built successfully")
+
+    def _clear_menu(self, menu):
+        """Clear all items from a menu"""
+        # Note: MotionBuilder doesn't provide a direct way to clear menus
+        # This is a limitation we work around by rebuilding
+        pass
+
+    def _build_category_menu(self, category_name):
+        """Build a submenu for a specific tool category"""
+        category_menu = self.menu_manager.InsertLast(self.main_menu, category_name)
+
+        # Dynamically load tools from the category folder
+        tools = self._discover_tools(category_name)
+
+        if not tools:
+            # Add placeholder if no tools found
+            placeholder = self.menu_manager.InsertLast(
+                category_menu,
+                f"No {category_name} tools found"
+            )
+            placeholder.OnMenuActivate.Add(self._no_tools_callback)
+        else:
+            # Add each tool to the menu
+            for tool in tools:
+                tool_item = self.menu_manager.InsertLast(
+                    category_menu,
+                    tool['name']
+                )
+                # Bind the tool's execute function
+                tool_item.OnMenuActivate.Add(tool['callback'])
+
+    def _discover_tools(self, category_name):
+        """
+        Discover and load tools from a category folder
+
+        Returns:
+            list: List of tool dictionaries with 'name' and 'callback'
+        """
+        tools = []
+        category_folder = category_name.lower().replace(' ', '_')
+
+        # Handle special case for "Unreal Engine" category
+        if category_folder == 'unreal_engine':
+            category_folder = 'unreal'
+
+        tools_path = Path(__file__).parent / 'tools' / category_folder
+
+        if not tools_path.exists():
+            logger.warning(f"Tools folder not found: {tools_path}")
+            return tools
+
+        # Look for Python files in the category folder
+        for tool_file in tools_path.glob('*.py'):
+            if tool_file.name.startswith('_'):
+                continue
+
+            try:
+                # Import the tool module
+                module_name = f"mobu.tools.{category_folder}.{tool_file.stem}"
+                if module_name in sys.modules:
+                    # Reload if already imported
+                    module = importlib.reload(sys.modules[module_name])
+                else:
+                    module = importlib.import_module(module_name)
+
+                # Look for tool classes or functions
+                if hasattr(module, 'TOOL_NAME') and hasattr(module, 'execute'):
+                    tools.append({
+                        'name': module.TOOL_NAME,
+                        'callback': module.execute
+                    })
+                    logger.debug(f"Loaded tool: {module.TOOL_NAME}")
+
+            except Exception as e:
+                logger.error(f"Failed to load tool from {tool_file.name}: {str(e)}")
+
+        return tools
+
+    def _add_utility_items(self):
+        """Add utility menu items (settings, reload, about, etc.)"""
+        # Settings
+        settings_item = self.menu_manager.InsertLast(self.main_menu, "Settings...")
+        settings_item.OnMenuActivate.Add(self._open_settings)
+
+        # Reload
+        reload_item = self.menu_manager.InsertLast(self.main_menu, "Reload xMobu")
+        reload_item.OnMenuActivate.Add(self._reload_xmobu)
+
+        # Separator
+        self.menu_manager.InsertLast(self.main_menu, "")
+
+        # About
+        about_item = self.menu_manager.InsertLast(self.main_menu, "About xMobu")
+        about_item.OnMenuActivate.Add(self._show_about)
+
+    def _no_tools_callback(self, control, event):
+        """Callback for placeholder menu items"""
+        logger.info("No tools available in this category yet")
+
+    def _open_settings(self, control, event):
+        """Open settings dialog"""
+        from pyfbsdk import FBMessageBox
+        FBMessageBox(
+            "xMobu Settings",
+            "Settings dialog coming soon!\n\n"
+            "For now, edit config/config.json to customize xMobu.",
+            "OK"
+        )
+
+    def _reload_xmobu(self, control, event):
+        """Reload xMobu system"""
+        logger.info("Reloading xMobu...")
+        try:
+            # Reload core modules
+            import core
+            importlib.reload(core)
+
+            # Rebuild menu
+            self.build_menu()
+
+            from pyfbsdk import FBMessageBox
+            FBMessageBox("xMobu", "xMobu reloaded successfully!", "OK")
+
+        except Exception as e:
+            logger.error(f"Failed to reload xMobu: {str(e)}")
+            from pyfbsdk import FBMessageBox
+            FBMessageBox("xMobu Error", f"Failed to reload: {str(e)}", "OK")
+
+    def _show_about(self, control, event):
+        """Show about dialog"""
+        from pyfbsdk import FBMessageBox
+        from core import __version__
+
+        about_text = f"""xMobu Pipeline Toolset
+Version: {__version__}
+
+A comprehensive pipeline toolset for MotionBuilder
+with support for Animation, Rigging, Pipeline, and
+Unreal Engine integration.
+
+Visit github.com/yourorg/xMobu for more information.
+"""
+        FBMessageBox("About xMobu", about_text, "OK")

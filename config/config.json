@@ -1,0 +1,34 @@
+{
+    "version": "1.0.0",
+    "mobu": {
+        "menu_name": "xMobu",
+        "tool_categories": [
+            {
+                "name": "Animation",
+                "enabled": true
+            },
+            {
+                "name": "Rigging",
+                "enabled": true
+            },
+            {
+                "name": "Pipeline",
+                "enabled": true
+            },
+            {
+                "name": "Unreal Engine",
+                "enabled": true
+            }
+        ]
+    },
+    "unreal": {
+        "default_project_path": "",
+        "content_browser_path": "/Game/",
+        "import_animations": true,
+        "auto_save_before_export": true
+    },
+    "logging": {
+        "level": "INFO",
+        "log_to_file": false
+    }
+}

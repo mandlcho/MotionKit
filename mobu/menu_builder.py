@@ -49,7 +49,7 @@ class MenuBuilder:
                 self._build_category_menu(category['name'])
 
         # Add separator and utilities
-        self.menu_manager.InsertLast(self.main_menu, "")  # Separator
+        self.menu_manager.InsertLast(self.menu_name, "")  # Separator
         print("[xMobu] Adding utility menu items...")
         self._add_utility_items()
 
@@ -65,16 +65,20 @@ class MenuBuilder:
     def _build_category_menu(self, category_name):
         """Build a submenu for a specific tool category"""
         print(f"[xMobu]   Creating submenu: {category_name}")
-        category_menu = self.menu_manager.InsertLast(self.main_menu, category_name)
+        # InsertLast expects (parent_menu_name, item_name) - both strings
+        category_menu = self.menu_manager.InsertLast(self.menu_name, category_name)
 
         # Dynamically load tools from the category folder
         tools = self._discover_tools(category_name)
+
+        # Build the category menu path for sub-items
+        category_menu_path = f"{self.menu_name}/{category_name}"
 
         if not tools:
             # Add placeholder if no tools found
             print(f"[xMobu]   No tools found for: {category_name}")
             placeholder = self.menu_manager.InsertLast(
-                category_menu,
+                category_menu_path,
                 f"No {category_name} tools found"
             )
             placeholder.OnMenuActivate.Add(self._no_tools_callback)
@@ -83,7 +87,7 @@ class MenuBuilder:
             # Add each tool to the menu
             for tool in tools:
                 tool_item = self.menu_manager.InsertLast(
-                    category_menu,
+                    category_menu_path,
                     tool['name']
                 )
                 # Bind the tool's execute function
@@ -146,18 +150,18 @@ class MenuBuilder:
     def _add_utility_items(self):
         """Add utility menu items (settings, reload, about, etc.)"""
         # Settings
-        settings_item = self.menu_manager.InsertLast(self.main_menu, "Settings...")
+        settings_item = self.menu_manager.InsertLast(self.menu_name, "Settings...")
         settings_item.OnMenuActivate.Add(self._open_settings)
 
         # Reload
-        reload_item = self.menu_manager.InsertLast(self.main_menu, "Reload xMobu")
+        reload_item = self.menu_manager.InsertLast(self.menu_name, "Reload xMobu")
         reload_item.OnMenuActivate.Add(self._reload_xmobu)
 
         # Separator
-        self.menu_manager.InsertLast(self.main_menu, "")
+        self.menu_manager.InsertLast(self.menu_name, "")
 
         # About
-        about_item = self.menu_manager.InsertLast(self.main_menu, "About xMobu")
+        about_item = self.menu_manager.InsertLast(self.menu_name, "About xMobu")
         about_item.OnMenuActivate.Add(self._show_about)
 
     def _no_tools_callback(self, control, event):

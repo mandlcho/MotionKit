@@ -7,10 +7,8 @@ from pyfbsdk import (
     FBTool, FBLayout, FBButton, FBLabel, FBList, FBEdit,
     FBAttachType, FBMessageBox, FBCharacter, FBBodyNodeId,
     FBModelList, FBGetSelectedModels, FBApplication,
-    FBEditProperty, FBPropertyListComponent, FBFilePopup,
-    FBFilePopupStyle
+    FBFilePopup, FBFilePopupStyle
 )
-from pyfbsdk_additions import FBPropertyListComponentList
 from core.logger import logger
 from pathlib import Path
 import json

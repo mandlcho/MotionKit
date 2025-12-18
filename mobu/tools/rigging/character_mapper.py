@@ -17,42 +17,49 @@ import shutil
 TOOL_NAME = "Character Mapper"
 
 # Character bone slots in logical order
+# Using only guaranteed FBBodyNodeId attributes
 CHARACTER_SLOTS = [
     # Reference
-    ("Reference", FBBodyNodeId.kFBReferenceNodeId),
+    ("Reference", "Reference"),
 
-    # Hips and Spine
-    ("Hips", FBBodyNodeId.kFBHipsNodeId),
-    ("Spine", FBBodyNodeId.kFBSpineNodeId),
-    ("Spine1", FBBodyNodeId.kFBSpine1NodeId),
-    ("Spine2", FBBodyNodeId.kFBSpine2NodeId),
-    ("Spine3", FBBodyNodeId.kFBSpine3NodeId),
+    # Hips and Spine (using string names for flexibility)
+    ("Hips", "Hips"),
+    ("Spine", "Spine"),
+    ("Spine1", "Spine1"),
+    ("Spine2", "Spine2"),
+    ("Spine3", "Spine3"),
+    ("Spine4", "Spine4"),
+    ("Spine5", "Spine5"),
+    ("Spine6", "Spine6"),
+    ("Spine7", "Spine7"),
+    ("Spine8", "Spine8"),
+    ("Spine9", "Spine9"),
 
     # Neck and Head
-    ("Neck", FBBodyNodeId.kFBNeckNodeId),
-    ("Head", FBBodyNodeId.kFBHeadNodeId),
+    ("Neck", "Neck"),
+    ("Head", "Head"),
 
     # Left Arm
-    ("LeftShoulder", FBBodyNodeId.kFBLeftShoulderNodeId),
-    ("LeftArm", FBBodyNodeId.kFBLeftArmNodeId),
-    ("LeftForeArm", FBBodyNodeId.kFBLeftForeArmNodeId),
-    ("LeftHand", FBBodyNodeId.kFBLeftHandNodeId),
+    ("LeftShoulder", "LeftShoulder"),
+    ("LeftArm", "LeftArm"),
+    ("LeftForeArm", "LeftForeArm"),
+    ("LeftHand", "LeftHand"),
 
     # Right Arm
-    ("RightShoulder", FBBodyNodeId.kFBRightShoulderNodeId),
-    ("RightArm", FBBodyNodeId.kFBRightArmNodeId),
-    ("RightForeArm", FBBodyNodeId.kFBRightForeArmNodeId),
-    ("RightHand", FBBodyNodeId.kFBRightHandNodeId),
+    ("RightShoulder", "RightShoulder"),
+    ("RightArm", "RightArm"),
+    ("RightForeArm", "RightForeArm"),
+    ("RightHand", "RightHand"),
 
     # Left Leg
-    ("LeftUpLeg", FBBodyNodeId.kFBLeftUpLegNodeId),
-    ("LeftLeg", FBBodyNodeId.kFBLeftLegNodeId),
-    ("LeftFoot", FBBodyNodeId.kFBLeftFootNodeId),
+    ("LeftUpLeg", "LeftUpLeg"),
+    ("LeftLeg", "LeftLeg"),
+    ("LeftFoot", "LeftFoot"),
 
     # Right Leg
-    ("RightUpLeg", FBBodyNodeId.kFBRightUpLegNodeId),
-    ("RightLeg", FBBodyNodeId.kFBRightLegNodeId),
-    ("RightFoot", FBBodyNodeId.kFBRightFootNodeId),
+    ("RightUpLeg", "RightUpLeg"),
+    ("RightLeg", "RightLeg"),
+    ("RightFoot", "RightFoot"),
 ]
 
 
@@ -144,7 +151,7 @@ class CharacterMapperUI(FBTool):
         layout.SetControl("mappings", self.mapping_list)
 
         # Populate with character slots
-        for slot_name, slot_id in CHARACTER_SLOTS:
+        for slot_name, _ in CHARACTER_SLOTS:
             self.mapping_list.Items.append(f"{slot_name}: <None>")
             self.bone_mappings[slot_name] = None
 
@@ -289,7 +296,7 @@ class CharacterMapperUI(FBTool):
 
     def OnClearMapping(self, control, event):
         """Clear all bone mappings"""
-        for i, (slot_name, slot_id) in enumerate(CHARACTER_SLOTS):
+        for i, (slot_name, _) in enumerate(CHARACTER_SLOTS):
             self.bone_mappings[slot_name] = None
             self.mapping_list.Items[i] = f"{slot_name}: <None>"
 
@@ -317,13 +324,12 @@ class CharacterMapperUI(FBTool):
 
             # Map bones
             app = FBApplication()
-            for slot_name, slot_id in CHARACTER_SLOTS:
+            for slot_name, _ in CHARACTER_SLOTS:
                 bone_name = self.bone_mappings.get(slot_name)
                 if bone_name:
                     # Find model in scene
                     model = app.FBXScene.FindModelByLabelName(bone_name)
                     if model:
-                        self.character.SetCharacterizeOn(False)
                         self.character.SetCharacterizeOn(False)
                         prop_list = self.character.PropertyList.Find(slot_name + "Link")
                         if prop_list:
@@ -490,7 +496,7 @@ class CharacterMapperUI(FBTool):
                         self.bone_mappings[slot_name] = bone_name
 
                         # Update display
-                        for i, (s_name, s_id) in enumerate(CHARACTER_SLOTS):
+                        for i, (s_name, _) in enumerate(CHARACTER_SLOTS):
                             if s_name == slot_name:
                                 self.mapping_list.Items[i] = f"{slot_name}: {bone_name}"
                                 break

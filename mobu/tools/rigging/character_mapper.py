@@ -17,6 +17,9 @@ import shutil
 
 TOOL_NAME = "Character Mapper"
 
+# Global reference to the active tool instance
+_active_tool_instance = None
+
 # Character bone slots in logical order
 # Using only guaranteed FBBodyNodeId attributes
 CHARACTER_SLOTS = [
@@ -71,9 +74,42 @@ class CharacterMapperUI(FBTool):
         FBTool.__init__(self, name)
         self.character = None
         self.bone_mappings = {}  # slot_name -> model
+        self.all_models = []  # Store all scene models
+        self.filtered_models = []  # Store filtered models
         self.preset_path = self._get_preset_path()
+
+        # Register file callbacks for auto-refresh
+        self.app = FBApplication()
+        self.file_open_callback_id = None
+        self.file_merge_callback_id = None
+        self.file_new_callback_id = None
+
         self.BuildUI()
         self.LoadSceneModels()
+
+        # Register callbacks AFTER UI is built
+        self.file_open_callback_id = self.app.OnFileOpen.Add(self.OnFileOpenCallback)
+        self.file_merge_callback_id = self.app.OnFileMerge.Add(self.OnFileMergeCallback)
+        self.file_new_callback_id = self.app.OnFileNew.Add(self.OnFileNewCallback)
+
+        print("[Character Mapper] Tool initialized with auto-refresh enabled")
+        print("[Character Mapper] Registered callbacks: OnFileOpen, OnFileMerge, OnFileNew")
+
+    def __del__(self):
+        """Cleanup when tool is destroyed"""
+        try:
+            # Remove file callbacks
+            if hasattr(self, 'app') and self.app:
+                if hasattr(self, 'file_open_callback_id') and self.file_open_callback_id is not None:
+                    self.app.OnFileOpen.Remove(self.file_open_callback_id)
+                if hasattr(self, 'file_merge_callback_id') and self.file_merge_callback_id is not None:
+                    self.app.OnFileMerge.Remove(self.file_merge_callback_id)
+                if hasattr(self, 'file_new_callback_id') and self.file_new_callback_id is not None:
+                    self.app.OnFileNew.Remove(self.file_new_callback_id)
+            print("[Character Mapper] Tool destroyed and callbacks removed")
+        except Exception as e:
+            print(f"[Character Mapper] Cleanup error: {e}")
+            pass
 
     def _get_preset_path(self):
         """Get the path to the presets directory"""
@@ -171,11 +207,34 @@ class CharacterMapperUI(FBTool):
         layout.AddRegion("obj_title", "obj_title", x, y, w, h)
         layout.SetControl("obj_title", label)
 
+        # Search label
+        search_label = FBLabel()
+        search_label.Caption = "Search:"
+
+        y_search_label = FBAddRegionParam(30, FBAttachType.kFBAttachTop, "")
+        h_search_label = FBAddRegionParam(50, FBAttachType.kFBAttachTop, "")
+
+        layout.AddRegion("search_label", "search_label", x, y_search_label, w, h_search_label)
+        layout.SetControl("search_label", search_label)
+
+        # Search filter
+        y_search = FBAddRegionParam(55, FBAttachType.kFBAttachTop, "")
+        h_search = FBAddRegionParam(80, FBAttachType.kFBAttachTop, "")
+
+        self.search_filter = FBEdit()
+        self.search_filter.Text = ""
+        self.search_filter.OnChange.Add(self.OnFilterChanged)
+
+        layout.AddRegion("search_filter", "search_filter", x, y_search, w, h_search)
+        layout.SetControl("search_filter", self.search_filter)
+
         # Object list
-        y_list_top = FBAddRegionParam(30, FBAttachType.kFBAttachTop, "")
-        y_btn_top = FBAddRegionParam(-35, FBAttachType.kFBAttachBottom, "")
-        y_list_bottom = FBAddRegionParam(-40, FBAttachType.kFBAttachBottom, "")
-        y_btn_bottom = FBAddRegionParam(-5, FBAttachType.kFBAttachBottom, "")
+        y_list_top = FBAddRegionParam(85, FBAttachType.kFBAttachTop, "")
+        y_btn1_top = FBAddRegionParam(-70, FBAttachType.kFBAttachBottom, "")
+        y_btn1_bottom = FBAddRegionParam(-40, FBAttachType.kFBAttachBottom, "")
+        y_btn2_top = FBAddRegionParam(-35, FBAttachType.kFBAttachBottom, "")
+        y_list_bottom = FBAddRegionParam(-75, FBAttachType.kFBAttachBottom, "")
+        y_btn2_bottom = FBAddRegionParam(-5, FBAttachType.kFBAttachBottom, "")
 
         self.objects_list = FBList()
         self.objects_list.MultiSelect = False
@@ -184,12 +243,20 @@ class CharacterMapperUI(FBTool):
         layout.AddRegion("objects_list", "objects_list", x, y_list_top, w, y_list_bottom)
         layout.SetControl("objects_list", self.objects_list)
 
+        # Refresh button
+        refresh_btn = FBButton()
+        refresh_btn.Caption = "Refresh Scene"
+        refresh_btn.OnClick.Add(self.OnRefreshScene)
+
+        layout.AddRegion("refresh_btn", "refresh_btn", x, y_btn1_top, w, y_btn1_bottom)
+        layout.SetControl("refresh_btn", refresh_btn)
+
         # Assign button
         assign_btn = FBButton()
         assign_btn.Caption = "Assign to Selected Slot"
         assign_btn.OnClick.Add(self.OnAssignBone)
 
-        layout.AddRegion("assign_btn", "assign_btn", x, y_btn_top, w, y_btn_bottom)
+        layout.AddRegion("assign_btn", "assign_btn", x, y_btn2_top, w, y_btn2_bottom)
         layout.SetControl("assign_btn", assign_btn)
 
     def _build_actions_panel(self, layout):
@@ -266,9 +333,9 @@ class CharacterMapperUI(FBTool):
 
     def LoadSceneModels(self):
         """Load all scene models into the objects list"""
-        # Clear existing items (FBPropertyStringList doesn't have clear())
-        while len(self.objects_list.Items) > 0:
-            self.objects_list.Items.removeAt(0)
+        # Clear existing lists
+        self.all_models = []
+        self.filtered_models = []
 
         # Get all models in scene
         scene = FBSystem().Scene
@@ -276,38 +343,126 @@ class CharacterMapperUI(FBTool):
         for model in scene.RootModel.Children:
             self._add_model_recursive(model)
 
+        # Store filtered models (initially all)
+        self.filtered_models = self.all_models[:]
+
+        # Update display
+        self._update_objects_display()
+
     def _add_model_recursive(self, model):
         """Recursively add models to the list"""
-        self.objects_list.Items.append(model.LongName)
+        self.all_models.append(model)
         for child in model.Children:
             self._add_model_recursive(child)
 
+    def _update_objects_display(self):
+        """Update the objects list display with filtered models"""
+        # Clear existing items
+        while len(self.objects_list.Items) > 0:
+            self.objects_list.Items.removeAt(0)
+
+        # Add filtered models
+        for model in self.filtered_models:
+            self.objects_list.Items.append(model.LongName)
+
+    def OnFilterChanged(self, control, event):
+        """Filter the objects list based on search text"""
+        filter_text = self.search_filter.Text.lower()
+
+        if not filter_text:
+            # No filter, show all models
+            self.filtered_models = self.all_models[:]
+        else:
+            # Filter models by name
+            self.filtered_models = [
+                model for model in self.all_models
+                if filter_text in model.LongName.lower()
+            ]
+
+        # Update display
+        self._update_objects_display()
+
+    def OnRefreshScene(self, control, event):
+        """Refresh the scene models list"""
+        print("[Character Mapper] Refreshing scene models...")
+        self.LoadSceneModels()
+        # Reapply filter if there is one
+        if self.search_filter.Text:
+            self.OnFilterChanged(None, None)
+        print(f"[Character Mapper] Loaded {len(self.all_models)} models")
+
+    def OnFileOpenCallback(self, control, event):
+        """Callback when a file is opened - auto refresh scene"""
+        print("[Character Mapper] File opened detected - auto-refreshing scene...")
+        self.LoadSceneModels()
+        # Reapply filter if there is one
+        if hasattr(self, 'search_filter') and self.search_filter.Text:
+            self.OnFilterChanged(None, None)
+        print(f"[Character Mapper] Auto-refresh complete: {len(self.all_models)} models loaded")
+
+    def OnFileMergeCallback(self, control, event):
+        """Callback when a file is merged - auto refresh scene"""
+        print("[Character Mapper] File merge detected - auto-refreshing scene...")
+        self.LoadSceneModels()
+        # Reapply filter if there is one
+        if hasattr(self, 'search_filter') and self.search_filter.Text:
+            self.OnFilterChanged(None, None)
+        print(f"[Character Mapper] Auto-refresh complete: {len(self.all_models)} models loaded")
+
+    def OnFileNewCallback(self, control, event):
+        """Callback when a new file is created - auto refresh scene"""
+        print("[Character Mapper] File new detected - auto-refreshing scene...")
+        self.LoadSceneModels()
+        # Reapply filter if there is one
+        if hasattr(self, 'search_filter') and self.search_filter.Text:
+            self.OnFilterChanged(None, None)
+        print(f"[Character Mapper] Auto-refresh complete: {len(self.all_models)} models loaded")
+
     def OnAssignBone(self, control, event):
         """Assign selected object to selected bone slot"""
+        print("[Character Mapper] OnAssignBone called")
+
         if self.mapping_list.ItemIndex < 0:
+            print("[Character Mapper] No bone slot selected")
             FBMessageBox("Error", "Please select a bone slot first", "OK")
             return
 
         if self.objects_list.ItemIndex < 0:
+            print("[Character Mapper] No object selected")
             FBMessageBox("Error", "Please select an object", "OK")
             return
 
-        slot_name = CHARACTER_SLOTS[self.mapping_list.ItemIndex][0]
-        object_name = self.objects_list.Items[self.objects_list.ItemIndex]
+        slot_index = self.mapping_list.ItemIndex
+        slot_name = CHARACTER_SLOTS[slot_index][0]
 
-        # Store mapping
-        self.bone_mappings[slot_name] = object_name
+        print(f"[Character Mapper] Slot index: {slot_index}, Slot name: {slot_name}")
+        print(f"[Character Mapper] Object index: {self.objects_list.ItemIndex}")
+        print(f"[Character Mapper] Filtered models count: {len(self.filtered_models)}")
 
-        # Update display
-        self.mapping_list.Items[self.mapping_list.ItemIndex] = f"{slot_name}: {object_name}"
+        # Get the actual model object from filtered list
+        selected_model = self.filtered_models[self.objects_list.ItemIndex]
 
-        print(f"[Character Mapper] Mapped {slot_name} -> {object_name}")
+        print(f"[Character Mapper] Selected model: {selected_model.Name} ({selected_model.LongName})")
+
+        # Store mapping (store the model object, not the name)
+        self.bone_mappings[slot_name] = selected_model
+
+        # Update display - FBList requires removeAt then insert
+        self.mapping_list.Items.removeAt(slot_index)
+        self.mapping_list.Items.insert(slot_index, f"{slot_name}: {selected_model.Name}")
+
+        # Restore selection
+        self.mapping_list.ItemIndex = slot_index
+
+        print(f"[Character Mapper] Successfully mapped {slot_name} -> {selected_model.LongName}")
 
     def OnClearMapping(self, control, event):
         """Clear all bone mappings"""
         for i, (slot_name, _) in enumerate(CHARACTER_SLOTS):
             self.bone_mappings[slot_name] = None
-            self.mapping_list.Items[i] = f"{slot_name}: <None>"
+            # Update display - FBList requires removeAt then insert
+            self.mapping_list.Items.removeAt(i)
+            self.mapping_list.Items.insert(i, f"{slot_name}: <None>")
 
         print("[Character Mapper] Cleared all mappings")
 
@@ -333,16 +488,16 @@ class CharacterMapperUI(FBTool):
 
             # Map bones
             for slot_name, _ in CHARACTER_SLOTS:
-                bone_name = self.bone_mappings.get(slot_name)
-                if bone_name:
-                    # Find model in scene
-                    model = FBSystem().Scene.FindModelByLabelName(bone_name)
-                    if model:
-                        self.character.SetCharacterizeOn(False)
-                        prop_list = self.character.PropertyList.Find(slot_name + "Link")
-                        if prop_list:
-                            prop_list.append(model)
+                model = self.bone_mappings.get(slot_name)
+                if model:
+                    # Use the model object directly (no need to search)
+                    self.character.SetCharacterizeOn(False)
+                    prop_list = self.character.PropertyList.Find(slot_name + "Link")
+                    if prop_list:
+                        prop_list.append(model)
                         print(f"[Character Mapper] Linked {slot_name} -> {model.Name}")
+                    else:
+                        print(f"[Character Mapper WARNING] Could not find property {slot_name}Link")
 
             # Characterize
             self.character.SetCharacterizeOn(True)
@@ -376,9 +531,10 @@ class CharacterMapperUI(FBTool):
             "mappings": {}
         }
 
-        for slot_name, bone_name in self.bone_mappings.items():
-            if bone_name:
-                preset_data["mappings"][slot_name] = bone_name
+        # Save model names, not objects
+        for slot_name, model in self.bone_mappings.items():
+            if model:
+                preset_data["mappings"][slot_name] = model.LongName
 
         # Save to file
         preset_file = self.preset_path / f"{preset_name}.json"
@@ -418,15 +574,22 @@ class CharacterMapperUI(FBTool):
             # Apply mappings
             self.OnClearMapping(None, None)
 
+            # Find models by name and map them
             for slot_name, bone_name in preset_data.get("mappings", {}).items():
                 if slot_name in self.bone_mappings:
-                    self.bone_mappings[slot_name] = bone_name
+                    # Find the model in the scene
+                    model = self._find_model_by_name(bone_name)
+                    if model:
+                        self.bone_mappings[slot_name] = model
 
-                    # Update display
-                    for i, (s_name, s_id) in enumerate(CHARACTER_SLOTS):
-                        if s_name == slot_name:
-                            self.mapping_list.Items[i] = f"{slot_name}: {bone_name}"
-                            break
+                        # Update display
+                        for i, (s_name, _) in enumerate(CHARACTER_SLOTS):
+                            if s_name == slot_name:
+                                self.mapping_list.Items.removeAt(i)
+                                self.mapping_list.Items.insert(i, f"{slot_name}: {model.Name}")
+                                break
+                    else:
+                        print(f"[Character Mapper WARNING] Model '{bone_name}' not found in scene")
 
             FBMessageBox("Preset Loaded", f"Preset '{preset_name}' loaded successfully!", "OK")
             print(f"[Character Mapper] Loaded preset: {preset_file}")
@@ -434,6 +597,13 @@ class CharacterMapperUI(FBTool):
         except Exception as e:
             FBMessageBox("Error", f"Failed to load preset:\n{str(e)}", "OK")
             logger.error(f"Failed to load preset: {str(e)}")
+
+    def _find_model_by_name(self, name):
+        """Find a model by its LongName in the scene"""
+        for model in self.all_models:
+            if model.LongName == name:
+                return model
+        return None
 
     def OnExportPreset(self, control, event):
         """Export preset to external file"""
@@ -499,15 +669,22 @@ class CharacterMapperUI(FBTool):
                 # Load the preset
                 self.OnClearMapping(None, None)
 
+                # Find models by name and map them
                 for slot_name, bone_name in preset_data.get("mappings", {}).items():
                     if slot_name in self.bone_mappings:
-                        self.bone_mappings[slot_name] = bone_name
+                        # Find the model in the scene
+                        model = self._find_model_by_name(bone_name)
+                        if model:
+                            self.bone_mappings[slot_name] = model
 
-                        # Update display
-                        for i, (s_name, _) in enumerate(CHARACTER_SLOTS):
-                            if s_name == slot_name:
-                                self.mapping_list.Items[i] = f"{slot_name}: {bone_name}"
-                                break
+                            # Update display
+                            for i, (s_name, _) in enumerate(CHARACTER_SLOTS):
+                                if s_name == slot_name:
+                                    self.mapping_list.Items.removeAt(i)
+                                    self.mapping_list.Items.insert(i, f"{slot_name}: {model.Name}")
+                                    break
+                        else:
+                            print(f"[Character Mapper WARNING] Model '{bone_name}' not found in scene")
 
                 FBMessageBox(
                     "Import Successful",
@@ -523,7 +700,33 @@ class CharacterMapperUI(FBTool):
 
 def execute(control, event):
     """Show the Character Mapper tool"""
+    global _active_tool_instance
+
+    # Kill previous instance if it exists
+    if _active_tool_instance is not None:
+        try:
+            print("[Character Mapper] Closing previous instance...")
+            # Properly destroy the tool window
+            if hasattr(_active_tool_instance, 'OnDestroy'):
+                _active_tool_instance.OnDestroy()
+            # Clear the tool's parent to remove it from UI
+            _active_tool_instance.Parent = None
+            # Explicitly destroy
+            _active_tool_instance.Destroy()
+            print("[Character Mapper] Previous instance destroyed")
+        except Exception as e:
+            print(f"[Character Mapper] Warning during destroy: {e}")
+        finally:
+            _active_tool_instance = None
+
+    # Create new instance
+    print("[Character Mapper] Creating new instance...")
     tool = CharacterMapperUI("Character Mapper")
     tool.StartSizeX = 700
     tool.StartSizeY = 600
+
+    # Store global reference before showing (important for callbacks)
+    _active_tool_instance = tool
+
     ShowTool(tool)
+    print("[Character Mapper] New instance created and shown")

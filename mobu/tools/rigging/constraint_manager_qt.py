@@ -91,6 +91,11 @@ class ConstraintManagerDialog(QDialog):
         ui_path = Path(__file__).parent / "constraint_manager.ui"
         self.load_ui(str(ui_path))
 
+        # Setup auto-refresh timer
+        self.selection_timer = QtCore.QTimer(self)
+        self.selection_timer.timeout.connect(self.auto_refresh_selection)
+        self.selection_timer.start(500)  # Refresh every 500ms
+
     def _get_preset_path(self):
         """Get the path to the presets directory"""
         root = Path(__file__).parent.parent.parent.parent
@@ -167,6 +172,9 @@ class ConstraintManagerDialog(QDialog):
     def closeEvent(self, event):
         """Handle dialog close event"""
         global _constraint_manager_dialog
+        # Stop the timer
+        if hasattr(self, 'selection_timer'):
+            self.selection_timer.stop()
         _constraint_manager_dialog = None
         event.accept()
 
@@ -191,6 +199,20 @@ class ConstraintManagerDialog(QDialog):
         self.deleteTemplateButton.clicked.connect(self.on_delete_template)
 
         print("[Constraint Manager Qt] Signals connected")
+
+    def auto_refresh_selection(self):
+        """Auto-refresh selection from timer - only update if changed"""
+        # Get selected models
+        selected = FBModelList()
+        FBGetSelectedModels(selected)
+
+        # Build list of selected model names
+        new_selection = [model.Name for model in selected]
+        current_selection = [obj.Name for obj in self.selected_objects]
+
+        # Only update if selection changed
+        if new_selection != current_selection:
+            self.refresh_selection()
 
     def refresh_selection(self):
         """Refresh the selected objects list"""

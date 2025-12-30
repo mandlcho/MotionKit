@@ -37,11 +37,19 @@ def get_mobu_main_window():
     try:
         app = QApplication.instance()
         if app:
+            # Try to find MotionBuilder main window
             for widget in app.topLevelWidgets():
-                if widget.objectName() == "MotionBuilder":
+                if widget.objectName() == "MotionBuilder" or "MotionBuilder" in widget.windowTitle():
+                    print(f"[Constraint Manager Qt] Found parent window: {widget.windowTitle()}")
                     return widget
+            # Fallback: return first top-level widget
+            widgets = app.topLevelWidgets()
+            if widgets:
+                print(f"[Constraint Manager Qt] Using first top-level widget as parent: {widgets[0].windowTitle()}")
+                return widgets[0]
         return None
-    except:
+    except Exception as e:
+        print(f"[Constraint Manager Qt] Error finding parent: {str(e)}")
         return None
 
 
@@ -67,8 +75,13 @@ class ConstraintManagerDialog(QDialog):
 
     def __init__(self, parent=None):
         super(ConstraintManagerDialog, self).__init__(parent)
-        # Set window flags to make it a proper dialog
-        self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowTitleHint)
+        # Set window flags - don't use Qt.Window to allow proper parenting
+        if parent:
+            self.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint | Qt.WindowTitleHint)
+            print(f"[Constraint Manager Qt] Dialog created with parent: {parent.windowTitle()}")
+        else:
+            self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowTitleHint)
+            print("[Constraint Manager Qt] WARNING: No parent found, creating as standalone window")
         self.selected_objects = []
         self.constraint_sources = []
         self.constraint_weight = 100.0

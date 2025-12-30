@@ -209,13 +209,17 @@ class MenuBuilder:
 
     def _open_settings(self, control, event):
         """Open settings dialog"""
-        from pyfbsdk import FBMessageBox
-        FBMessageBox(
-            "xMobu Settings",
-            "Settings dialog coming soon!\n\n"
-            "For now, edit config/config.json to customize xMobu.",
-            "OK"
-        )
+        try:
+            from mobu.tools.pipeline.settings import execute
+            execute(control, event)
+        except Exception as e:
+            from pyfbsdk import FBMessageBox
+            print(f"[xMobu ERROR] Failed to open settings: {str(e)}")
+            FBMessageBox(
+                "Error",
+                f"Failed to open settings:\n{str(e)}",
+                "OK"
+            )
 
     def _reload_xmobu(self, control, event):
         """Reload xMobu system"""
@@ -231,9 +235,11 @@ class MenuBuilder:
             # Core modules
             import core.logger
             import core.config
+            import core.decorators
             import core.utils
             importlib.reload(core.logger)
             importlib.reload(core.config)
+            importlib.reload(core.decorators)
             importlib.reload(core.utils)
             print("[xMobu] Core modules reloaded")
 
@@ -241,12 +247,16 @@ class MenuBuilder:
             print("[xMobu] Reloading tool modules...")
             import mobu.tools.animation.keyframe_tools
             import mobu.tools.rigging.constraint_helper
+            import mobu.tools.rigging.character_mapper
             import mobu.tools.pipeline.scene_manager
+            import mobu.tools.pipeline.settings
             import mobu.tools.unreal.content_browser
 
             importlib.reload(mobu.tools.animation.keyframe_tools)
             importlib.reload(mobu.tools.rigging.constraint_helper)
+            importlib.reload(mobu.tools.rigging.character_mapper)
             importlib.reload(mobu.tools.pipeline.scene_manager)
+            importlib.reload(mobu.tools.pipeline.settings)
             importlib.reload(mobu.tools.unreal.content_browser)
             print("[xMobu] Tool modules reloaded")
 

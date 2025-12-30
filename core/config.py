@@ -60,6 +60,14 @@ class ConfigManager:
                     {"name": "Unreal Engine", "enabled": True}
                 ]
             },
+            "perforce": {
+                "server": "",
+                "user": "",
+                "workspace": ""
+            },
+            "export": {
+                "fbx_path": ""
+            },
             "unreal": {
                 "default_project_path": "",
                 "content_browser_path": "/Game/",

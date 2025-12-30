@@ -7,7 +7,7 @@ from pyfbsdk import (
     FBTool, FBLayout, FBButton, FBLabel, FBEdit, FBList,
     FBAttachType, FBMessageBox, FBAddRegionParam, ShowTool,
     FBTextStyle, FBListStyle, FBFilePopup, FBFilePopupStyle,
-    FBSystem
+    FBSystem, FBEditProperty
 )
 from core.decorators import CreateUniqueTool
 from core.config import config
@@ -31,6 +31,7 @@ class SettingsUI(FBTool):
 
     def __init__(self):
         FBTool.__init__(self, "SettingsUI")
+        self.workspaces = []  # Store available workspaces
         self.BuildUI()
         self.LoadSettings()
         print("[Settings] Tool initialized")
@@ -113,6 +114,7 @@ class SettingsUI(FBTool):
 
         self.p4_server_edit = FBEdit()
         self.p4_server_edit.Text = ""
+        self.p4_server_edit.OnChange.Add(self.OnP4CredentialsChanged)
         layout.AddRegion("p4_server", "p4_server", x_field, y1, w_field, y2)
         layout.SetControl("p4_server", self.p4_server_edit)
         y_offset += row_height + spacing
@@ -128,24 +130,26 @@ class SettingsUI(FBTool):
 
         self.p4_user_edit = FBEdit()
         self.p4_user_edit.Text = ""
+        self.p4_user_edit.OnChange.Add(self.OnP4CredentialsChanged)
         layout.AddRegion("p4_user", "p4_user", x_field, y1, w_field, y2)
         layout.SetControl("p4_user", self.p4_user_edit)
         y_offset += row_height + spacing
 
-        # P4 Workspace
+        # P4 Workspace (dropdown list)
         p4_workspace_label = FBLabel()
         p4_workspace_label.Caption = "Workspace:"
 
         y1 = FBAddRegionParam(y_offset, FBAttachType.kFBAttachTop, "")
-        y2 = FBAddRegionParam(y_offset + row_height, FBAttachType.kFBAttachTop, "")
+        y2 = FBAddRegionParam(y_offset + 80, FBAttachType.kFBAttachTop, "")
         layout.AddRegion("p4_workspace_label", "p4_workspace_label", x_label, y1, x_field, y2)
         layout.SetControl("p4_workspace_label", p4_workspace_label)
 
-        self.p4_workspace_edit = FBEdit()
-        self.p4_workspace_edit.Text = ""
+        self.p4_workspace_list = FBList()
+        self.p4_workspace_list.Style = FBListStyle.kFBVerticalList
+        self.p4_workspace_list.MultiSelect = False
         layout.AddRegion("p4_workspace", "p4_workspace", x_field, y1, w_field, y2)
-        layout.SetControl("p4_workspace", self.p4_workspace_edit)
-        y_offset += row_height + spacing
+        layout.SetControl("p4_workspace", self.p4_workspace_list)
+        y_offset += 85
 
         # P4 Connection Status
         self.p4_status_label = FBLabel()
@@ -270,12 +274,119 @@ class SettingsUI(FBTool):
         # Load P4 settings
         self.p4_server_edit.Text = config.get('perforce.server', '')
         self.p4_user_edit.Text = config.get('perforce.user', '')
-        self.p4_workspace_edit.Text = config.get('perforce.workspace', '')
+
+        saved_workspace = config.get('perforce.workspace', '')
 
         # Load export settings
         self.fbx_path_edit.Text = config.get('export.fbx_path', '')
 
+        # Try to load workspaces if server and user are set
+        if self.p4_server_edit.Text and self.p4_user_edit.Text:
+            self.LoadWorkspaces()
+            # Select the saved workspace if it exists in the list
+            if saved_workspace:
+                for i in range(len(self.p4_workspace_list.Items)):
+                    if saved_workspace in self.p4_workspace_list.Items[i]:
+                        self.p4_workspace_list.ItemIndex = i
+                        break
+
         print("[Settings] Loaded settings from config")
+
+    def OnP4CredentialsChanged(self, control, event):
+        """Called when server or user fields change - load workspaces"""
+        server = self.p4_server_edit.Text
+        user = self.p4_user_edit.Text
+
+        # Only load workspaces if both server and user are filled
+        if server and user:
+            print(f"[Settings] P4 credentials changed, loading workspaces...")
+            self.LoadWorkspaces()
+
+    def LoadWorkspaces(self):
+        """Query P4 for available workspaces"""
+        server = self.p4_server_edit.Text
+        user = self.p4_user_edit.Text
+
+        if not server or not user:
+            return
+
+        # Clear existing workspace list
+        while len(self.p4_workspace_list.Items) > 0:
+            self.p4_workspace_list.Items.removeAt(0)
+
+        print(f"[Settings] Querying workspaces for {user}@{server}...")
+        self.p4_status_label.Caption = "Status: Loading workspaces..."
+
+        try:
+            import subprocess
+            import os
+
+            # Set P4 environment
+            env = os.environ.copy()
+            env['P4PORT'] = server
+            env['P4USER'] = user
+
+            # Query P4 for workspaces
+            # Using 'p4 clients -u <user>' to get workspaces for this user
+            result = subprocess.run(
+                ['p4', '-p', server, '-u', user, 'clients', '-u', user],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                env=env
+            )
+
+            if result.returncode == 0:
+                # Parse output - each line is like: "Client <workspace> <date> root <path> '<description>'"
+                workspaces = []
+                for line in result.stdout.strip().split('\n'):
+                    if line.startswith('Client '):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            workspace_name = parts[1]
+                            workspaces.append(workspace_name)
+
+                if workspaces:
+                    self.workspaces = workspaces
+                    for ws in workspaces:
+                        self.p4_workspace_list.Items.append(ws)
+
+                    self.p4_status_label.Caption = f"Status: Found {len(workspaces)} workspace(s)"
+                    print(f"[Settings] Found {len(workspaces)} workspaces: {', '.join(workspaces)}")
+                else:
+                    self.p4_workspace_list.Items.append("(No workspaces found)")
+                    self.p4_status_label.Caption = "Status: No workspaces found"
+                    print("[Settings] No workspaces found for this user")
+
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "Unknown error"
+                self.p4_workspace_list.Items.append("(Error loading workspaces)")
+                self.p4_status_label.Caption = f"Status: Error - {error_msg[:30]}..."
+                print(f"[Settings] P4 error: {error_msg}")
+                logger.error(f"P4 query failed: {error_msg}")
+
+        except FileNotFoundError:
+            self.p4_workspace_list.Items.append("(P4 command not found)")
+            self.p4_status_label.Caption = "Status: P4 CLI not installed"
+            print("[Settings] P4 command-line tool not found in PATH")
+            FBMessageBox(
+                "P4 Not Found",
+                "Perforce command-line tool (p4) not found.\n\n"
+                "Please install P4 CLI and ensure it's in your PATH.\n"
+                "You can manually enter your workspace name.",
+                "OK"
+            )
+
+        except subprocess.TimeoutExpired:
+            self.p4_workspace_list.Items.append("(Connection timeout)")
+            self.p4_status_label.Caption = "Status: Connection timeout"
+            print("[Settings] P4 query timed out")
+
+        except Exception as e:
+            self.p4_workspace_list.Items.append("(Error loading workspaces)")
+            self.p4_status_label.Caption = f"Status: Error - {str(e)[:30]}..."
+            print(f"[Settings] Error loading workspaces: {str(e)}")
+            logger.error(f"Failed to load workspaces: {str(e)}")
 
     def OnTestP4Connection(self, control, event):
         """Test Perforce connection using MotionBuilder's version control API"""
@@ -283,9 +394,13 @@ class SettingsUI(FBTool):
 
         server = self.p4_server_edit.Text
         user = self.p4_user_edit.Text
-        workspace = self.p4_workspace_edit.Text
 
-        if not server or not user or not workspace:
+        # Get selected workspace from list
+        workspace = ""
+        if self.p4_workspace_list.ItemIndex >= 0:
+            workspace = self.p4_workspace_list.Items[self.p4_workspace_list.ItemIndex]
+
+        if not server or not user or not workspace or workspace.startswith("("):
             FBMessageBox(
                 "Missing Information",
                 "Please fill in Server, User, and Workspace fields",
@@ -380,7 +495,16 @@ class SettingsUI(FBTool):
             # Save P4 settings
             config.set('perforce.server', self.p4_server_edit.Text)
             config.set('perforce.user', self.p4_user_edit.Text)
-            config.set('perforce.workspace', self.p4_workspace_edit.Text)
+
+            # Get selected workspace from list
+            workspace = ""
+            if self.p4_workspace_list.ItemIndex >= 0:
+                workspace = self.p4_workspace_list.Items[self.p4_workspace_list.ItemIndex]
+                # Don't save error messages
+                if workspace.startswith("("):
+                    workspace = ""
+
+            config.set('perforce.workspace', workspace)
 
             # Save export settings
             fbx_path = self.fbx_path_edit.Text
@@ -426,7 +550,11 @@ class SettingsUI(FBTool):
         if result == 1:  # Yes
             self.p4_server_edit.Text = ""
             self.p4_user_edit.Text = ""
-            self.p4_workspace_edit.Text = ""
+
+            # Clear workspace list
+            while len(self.p4_workspace_list.Items) > 0:
+                self.p4_workspace_list.Items.removeAt(0)
+
             self.fbx_path_edit.Text = ""
             self.p4_status_label.Caption = "Status: Not connected"
             print("[Settings] Settings reset to defaults")

@@ -154,6 +154,10 @@ class ConstraintManagerDialog(QDialog):
                 self.loadTemplateButton = ui_widget.findChild(QtWidgets.QPushButton, "loadTemplateButton")
                 self.deleteTemplateButton = ui_widget.findChild(QtWidgets.QPushButton, "deleteTemplateButton")
 
+                # Debug: Print widget references
+                print(f"[Constraint Manager Qt] selectionList: {self.selectionList}")
+                print(f"[Constraint Manager Qt] refreshButton: {self.refreshButton}")
+
                 # Connect signals
                 self.connect_signals()
                 # Refresh selection
@@ -185,8 +189,16 @@ class ConstraintManagerDialog(QDialog):
             return
 
         # Selection
-        self.refreshButton.clicked.connect(self.on_refresh_selection)
-        self.setSourceButton.clicked.connect(self.on_set_sources)
+        if self.refreshButton:
+            self.refreshButton.clicked.connect(self.on_refresh_selection)
+            print("[Constraint Manager Qt] Refresh button signal connected")
+        else:
+            print("[Constraint Manager Qt] WARNING: Refresh button not found!")
+
+        if self.setSourceButton:
+            self.setSourceButton.clicked.connect(self.on_set_sources)
+        else:
+            print("[Constraint Manager Qt] WARNING: Set source button not found!")
 
         # Constraint creation
         self.weightSlider.valueChanged.connect(self.on_weight_changed)
@@ -231,6 +243,7 @@ class ConstraintManagerDialog(QDialog):
 
     def on_refresh_selection(self):
         """Refresh button callback"""
+        print("[Constraint Manager Qt] Refresh button clicked")
         self.refresh_selection()
 
     def on_set_sources(self):

@@ -10,21 +10,20 @@ from pyfbsdk import (
     ShowTool, FBTextStyle, FBListStyle, FBSlider, FBConstraintManager,
     FBTextJustify
 )
+from core.decorators import CreateUniqueTool
 from core.logger import logger
 from pathlib import Path
 import json
 
 TOOL_NAME = "Constraint Manager"
 
-# Global reference to the active tool instance
-_active_tool_instance = None
 
-
+@CreateUniqueTool
 class ConstraintManagerUI(FBTool):
     """Visual constraint management tool with preset functionality"""
 
-    def __init__(self, name):
-        FBTool.__init__(self, name)
+    def __init__(self):
+        FBTool.__init__(self, "ConstraintManagerUI")
         self.selected_objects = []
         self.constraint_sources = []
         self.constraint_target = None
@@ -715,30 +714,7 @@ class ConstraintManagerUI(FBTool):
 
 def execute(control, event):
     """Show the Constraint Manager tool"""
-    global _active_tool_instance
-
-    tool_name = "Constraint Manager"
-
-    # Check if we already have an instance
-    if _active_tool_instance is not None:
-        print(f"[Constraint Manager] Instance already exists, destroying it...")
-        try:
-            # Try to destroy the tool using FBDestroy
-            from pyfbsdk import FBDestroy
-            FBDestroy(_active_tool_instance)
-            print("[Constraint Manager] Previous instance destroyed")
-        except Exception as e:
-            print(f"[Constraint Manager] Could not destroy: {e}")
-        finally:
-            _active_tool_instance = None
-
-    # Always create a fresh instance
-    print("[Constraint Manager] Creating new instance...")
-    tool = ConstraintManagerUI(tool_name)
+    tool = ConstraintManagerUI()
     tool.StartSizeX = 750
     tool.StartSizeY = 600
-
-    _active_tool_instance = tool
-
-    ShowTool(tool)
-    print("[Constraint Manager] Tool shown")
+    return tool

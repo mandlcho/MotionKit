@@ -10,6 +10,7 @@ from pyfbsdk import (
     FBFilePopup, FBFilePopupStyle, FBAddRegionParam,
     ShowTool, FBTextStyle, FBListStyle
 )
+from core.decorators import CreateUniqueTool
 from core.logger import logger
 from pathlib import Path
 import json
@@ -17,8 +18,13 @@ import shutil
 
 TOOL_NAME = "Character Mapper"
 
-# Global reference to the active tool instance
-_active_tool_instance = None
+def execute(control, event):
+    """Execute the Character Mapper tool"""
+    tool = CharacterMapperUI()
+    tool.StartSizeX = 700
+    tool.StartSizeY = 600
+    return tool
+
 
 # Character bone slots in logical order
 # Using only guaranteed FBBodyNodeId attributes
@@ -67,11 +73,12 @@ CHARACTER_SLOTS = [
 ]
 
 
+@CreateUniqueTool
 class CharacterMapperUI(FBTool):
     """Visual character mapping tool with preset management"""
 
-    def __init__(self, name):
-        FBTool.__init__(self, name)
+    def __init__(self):
+        FBTool.__init__(self, "CharacterMapperUI")
         self.character = None
         self.bone_mappings = {}  # slot_name -> model
         self.all_models = []  # Store all scene models
@@ -696,35 +703,3 @@ class CharacterMapperUI(FBTool):
             except Exception as e:
                 FBMessageBox("Error", f"Failed to import preset:\n{str(e)}", "OK")
                 logger.error(f"Failed to import preset: {str(e)}")
-
-
-def execute(control, event):
-    """Show the Character Mapper tool"""
-    global _active_tool_instance
-
-    tool_name = "Character Mapper"
-
-    # Check if we already have an instance
-    if _active_tool_instance is not None:
-        print(f"[Character Mapper] Instance already exists, destroying it...")
-        try:
-            # Try to destroy the tool using FBDestroy
-            from pyfbsdk import FBDestroy
-            FBDestroy(_active_tool_instance)
-            print("[Character Mapper] Previous instance destroyed")
-        except Exception as e:
-            print(f"[Character Mapper] Could not destroy: {e}")
-        finally:
-            _active_tool_instance = None
-
-    # Create new instance
-    print("[Character Mapper] Creating new instance...")
-    tool = CharacterMapperUI(tool_name)
-    tool.StartSizeX = 700
-    tool.StartSizeY = 600
-
-    # Store global reference before showing (important for callbacks)
-    _active_tool_instance = tool
-
-    ShowTool(tool)
-    print("[Character Mapper] New instance created and shown")

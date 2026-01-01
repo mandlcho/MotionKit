@@ -90,7 +90,7 @@ class SettingsDialog(QDialog):
         """Load UI from .ui file"""
         try:
             # Set window properties
-            self.setWindowTitle("xMobu Settings")
+            self.setWindowTitle("P4 Settings")
             self.resize(480, 340)
             self.setMinimumSize(480, 340)
             self.setMaximumSize(600, 450)

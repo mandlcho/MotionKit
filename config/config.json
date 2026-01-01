@@ -12,10 +12,6 @@
                 "enabled": true
             },
             {
-                "name": "Pipeline",
-                "enabled": true
-            },
-            {
                 "name": "Unreal Engine",
                 "enabled": true
             }

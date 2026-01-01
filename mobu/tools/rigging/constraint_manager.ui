@@ -38,7 +38,7 @@
       <item>
        <widget class="QLabel" name="infoLabel">
         <property name="text">
-         <string>Select source(s) then target(s)</string>
+         <string>Select Child then Parent</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
@@ -46,35 +46,35 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="selectionLabel">
-        <property name="text">
-         <string>Selected Objects:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QListWidget" name="selectionList">
-        <property name="maximumSize">
-         <size>
-          <width>16777215</width>
-          <height>80</height>
-         </size>
-        </property>
-       </widget>
+       <widget class="QListWidget" name="selectionList"/>
       </item>
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
          <widget class="QPushButton" name="refreshButton">
           <property name="text">
-           <string>Refresh Selection</string>
+           <string>Refresh List</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="setSourceButton">
+         <widget class="QPushButton" name="setParentButton">
           <property name="text">
-           <string>Set as Source(s)</string>
+           <string>Set as Parent</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="setChildButton">
+          <property name="text">
+           <string>Set as Child</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="clearSelectionButton">
+          <property name="text">
+           <string>Clear Selection</string>
           </property>
          </widget>
         </item>
@@ -126,110 +126,25 @@
        </widget>
       </item>
       <item row="1" column="0">
-       <widget class="QLabel" name="weightLabel">
+       <widget class="QLabel" name="activeLabel">
         <property name="text">
-         <string>Weight:</string>
+         <string>Active:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QCheckBox" name="activeCheckbox">
+        <property name="checked">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
       <item row="2" column="1">
-       <layout class="QHBoxLayout" name="horizontalLayout_2">
-        <item>
-         <widget class="QSlider" name="weightSlider">
-          <property name="minimum">
-           <number>0</number>
-          </property>
-          <property name="maximum">
-           <number>100</number>
-          </property>
-          <property name="value">
-           <number>100</number>
-          </property>
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="weightValueLabel">
-          <property name="minimumSize">
-           <size>
-            <width>50</width>
-            <height>0</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>100%</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item row="3" column="1">
-       <widget class="QPushButton" name="createConstraintButton">
-        <property name="text">
-         <string>Create Constraint</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="1">
        <widget class="QPushButton" name="snapButton">
         <property name="text">
-         <string>Snap (Active)</string>
+         <string>Snap</string>
         </property>
        </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="templatesGroup">
-     <property name="title">
-      <string>Constraint Templates</string>
-     </property>
-     <layout class="QVBoxLayout" name="verticalLayout_3">
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_3">
-        <item>
-         <widget class="QLabel" name="templateNameLabel">
-          <property name="text">
-           <string>Template Name:</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLineEdit" name="templateNameEdit">
-          <property name="text">
-           <string>MyConstraintSetup</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_4">
-        <item>
-         <widget class="QPushButton" name="saveTemplateButton">
-          <property name="text">
-           <string>Save Template</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="loadTemplateButton">
-          <property name="text">
-           <string>Apply Template</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="deleteTemplateButton">
-          <property name="text">
-           <string>Delete Template</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
       </item>
      </layout>
     </widget>

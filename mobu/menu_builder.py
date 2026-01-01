@@ -172,13 +172,13 @@ class MenuBuilder:
         # Build utility callbacks dictionary
         utility_callbacks = {}
 
-        # Settings
-        self.menu_manager.InsertLast(self.menu_name, "Settings...")
-        utility_callbacks["Settings..."] = self._open_settings
-
         # Random Objects Generator (Debug)
         self.menu_manager.InsertLast(self.menu_name, "Random Objects Generator")
         utility_callbacks["Random Objects Generator"] = self._random_objects
+
+        # Settings (right above Reload)
+        self.menu_manager.InsertLast(self.menu_name, "Settings")
+        utility_callbacks["Settings"] = self._open_settings
 
         # Reload
         self.menu_manager.InsertLast(self.menu_name, "Reload xMobu")
@@ -214,7 +214,7 @@ class MenuBuilder:
     def _open_settings(self, control, event):
         """Open settings dialog (Qt Designer version)"""
         try:
-            from mobu.tools.pipeline.settings_qt import execute
+            from mobu.tools.pipeline._settings_qt import execute
             execute(control, event)
         except Exception as e:
             from pyfbsdk import FBMessageBox
@@ -270,7 +270,7 @@ class MenuBuilder:
             import mobu.tools.animation.keyframe_tools
             import mobu.tools.rigging.character_mapper
             import mobu.tools.pipeline.scene_manager
-            import mobu.tools.pipeline.settings_qt
+            import mobu.tools.pipeline._settings_qt
             import mobu.tools.rigging.constraint_manager_qt
             import mobu.tools.unreal.content_browser
             import mobu.tools.debug.random_objects
@@ -279,7 +279,7 @@ class MenuBuilder:
             importlib.reload(mobu.tools.rigging.character_mapper)
             importlib.reload(mobu.tools.rigging.constraint_manager_qt)
             importlib.reload(mobu.tools.pipeline.scene_manager)
-            importlib.reload(mobu.tools.pipeline.settings_qt)
+            importlib.reload(mobu.tools.pipeline._settings_qt)
             importlib.reload(mobu.tools.unreal.content_browser)
             importlib.reload(mobu.tools.debug.random_objects)
             print("[xMobu] Tool modules reloaded")

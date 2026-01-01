@@ -4,7 +4,6 @@ Create and manage constraints easily in MotionBuilder
 """
 
 from pathlib import Path
-import json
 
 try:
     from PySide2 import QtWidgets, QtCore, QtUiTools
@@ -21,10 +20,10 @@ except ImportError:
         QtWidgets = None
 
 from pyfbsdk import (
-    FBMessageBox, FBModelList, FBGetSelectedModels,
-    FBSystem, FBConstraintManager
+    FBMessageBox, FBSystem, FBConstraintManager, FBApplication
 )
 from core.logger import logger
+from mobu.utils import get_all_models, SceneEventManager
 
 TOOL_NAME = "Constraint Manager"
 
@@ -82,26 +81,20 @@ class ConstraintManagerDialog(QDialog):
         else:
             self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint | Qt.WindowTitleHint)
             print("[Constraint Manager Qt] WARNING: No parent found, creating as standalone window")
-        self.selected_objects = []
-        self.constraint_sources = []
-        self.constraint_weight = 100.0
-        self.preset_path = self._get_preset_path()
+        self.all_scene_objects = []  # All objects in scene
+        self.selected_objects = []    # Objects selected through the list (tracks order)
+        self.constraint_parents = []  # Parent objects for constraint
+        self.constraint_children = []  # Child objects for constraint
+        self._is_closing = False      # Flag to prevent callback execution during close
 
         # Load the UI file
         ui_path = Path(__file__).parent / "constraint_manager.ui"
         self.load_ui(str(ui_path))
 
-        # Setup auto-refresh timer
-        self.selection_timer = QtCore.QTimer(self)
-        self.selection_timer.timeout.connect(self.auto_refresh_selection)
-        self.selection_timer.start(500)  # Refresh every 500ms
-
-    def _get_preset_path(self):
-        """Get the path to the presets directory"""
-        root = Path(__file__).parent.parent.parent.parent
-        preset_dir = root / "presets" / "constraints"
-        preset_dir.mkdir(parents=True, exist_ok=True)
-        return preset_dir
+        # Setup event-based auto-refresh using utility
+        self.event_manager = SceneEventManager()
+        self.event_manager.register_file_events(self.on_file_event, events=['new', 'open', 'merge'])
+        self.event_manager.register_scene_changes(self.on_scene_change)
 
     def load_ui(self, ui_file):
         """Load UI from .ui file"""
@@ -126,42 +119,47 @@ class ConstraintManagerDialog(QDialog):
 
             file.open(QFile.ReadOnly)
             print(f"[Constraint Manager Qt] Loading UI from: {ui_file}")
-            ui_widget = loader.load(file, self)
+            # Load with None as parent first, then reparent via layout
+            ui_widget = loader.load(file, None)
             file.close()
 
             if ui_widget:
                 print(f"[Constraint Manager Qt] UI widget loaded")
 
+                # IMPORTANT: Store ui_widget as instance variable to prevent garbage collection
+                self.ui_widget = ui_widget
+
                 # Create layout and add the loaded widget
-                layout = QtWidgets.QVBoxLayout()
-                layout.setContentsMargins(0, 0, 0, 0)
-                layout.addWidget(ui_widget)
-                self.setLayout(layout)
+                # QVBoxLayout(self) automatically sets this as the dialog's layout
+                # addWidget automatically reparents ui_widget to have proper ownership
+                self.main_layout = QtWidgets.QVBoxLayout(self)
+                self.main_layout.setContentsMargins(0, 0, 0, 0)
+                self.main_layout.addWidget(self.ui_widget)
 
                 # Store references to UI elements using findChild
-                self.selectionList = ui_widget.findChild(QtWidgets.QListWidget, "selectionList")
-                self.refreshButton = ui_widget.findChild(QtWidgets.QPushButton, "refreshButton")
-                self.setSourceButton = ui_widget.findChild(QtWidgets.QPushButton, "setSourceButton")
+                self.selectionList = self.ui_widget.findChild(QtWidgets.QListWidget, "selectionList")
+                self.refreshButton = self.ui_widget.findChild(QtWidgets.QPushButton, "refreshButton")
+                self.setParentButton = self.ui_widget.findChild(QtWidgets.QPushButton, "setParentButton")
+                self.setChildButton = self.ui_widget.findChild(QtWidgets.QPushButton, "setChildButton")
+                self.clearSelectionButton = self.ui_widget.findChild(QtWidgets.QPushButton, "clearSelectionButton")
 
-                self.constraintTypeCombo = ui_widget.findChild(QtWidgets.QComboBox, "constraintTypeCombo")
-                self.weightSlider = ui_widget.findChild(QtWidgets.QSlider, "weightSlider")
-                self.weightValueLabel = ui_widget.findChild(QtWidgets.QLabel, "weightValueLabel")
-                self.createConstraintButton = ui_widget.findChild(QtWidgets.QPushButton, "createConstraintButton")
-                self.snapButton = ui_widget.findChild(QtWidgets.QPushButton, "snapButton")
-
-                self.templateNameEdit = ui_widget.findChild(QtWidgets.QLineEdit, "templateNameEdit")
-                self.saveTemplateButton = ui_widget.findChild(QtWidgets.QPushButton, "saveTemplateButton")
-                self.loadTemplateButton = ui_widget.findChild(QtWidgets.QPushButton, "loadTemplateButton")
-                self.deleteTemplateButton = ui_widget.findChild(QtWidgets.QPushButton, "deleteTemplateButton")
+                self.constraintTypeCombo = self.ui_widget.findChild(QtWidgets.QComboBox, "constraintTypeCombo")
+                self.activeCheckbox = self.ui_widget.findChild(QtWidgets.QCheckBox, "activeCheckbox")
+                self.snapButton = self.ui_widget.findChild(QtWidgets.QPushButton, "snapButton")
 
                 # Debug: Print widget references
                 print(f"[Constraint Manager Qt] selectionList: {self.selectionList}")
                 print(f"[Constraint Manager Qt] refreshButton: {self.refreshButton}")
 
+                # Verify widgets are valid right after creation
+                try:
+                    test_count = self.selectionList.count()
+                    print(f"[Constraint Manager Qt] Widget validation at creation: SUCCESS (count={test_count})")
+                except RuntimeError as e:
+                    print(f"[Constraint Manager Qt] Widget validation at creation: FAILED - {e}")
+
                 # Connect signals
                 self.connect_signals()
-                # Refresh selection
-                self.refresh_selection()
 
                 print("[Constraint Manager Qt] UI loaded successfully")
             else:
@@ -173,12 +171,20 @@ class ConstraintManagerDialog(QDialog):
             import traceback
             traceback.print_exc()
 
+        # Populate scene objects AFTER UI is fully loaded
+        self.update_list_widget()
+
     def closeEvent(self, event):
         """Handle dialog close event"""
         global _constraint_manager_dialog
-        # Stop the timer
-        if hasattr(self, 'selection_timer'):
-            self.selection_timer.stop()
+
+        # Set closing flag FIRST to prevent callbacks
+        self._is_closing = True
+
+        # Unregister event callbacks using utility
+        if hasattr(self, 'event_manager'):
+            self.event_manager.unregister_all()
+
         _constraint_manager_dialog = None
         event.accept()
 
@@ -188,100 +194,274 @@ class ConstraintManagerDialog(QDialog):
             print("[Constraint Manager Qt] WARNING: Widgets not found")
             return
 
-        # Selection
+        # List widget - click to select object in viewport
+        self.selectionList.itemClicked.connect(self.on_list_item_clicked)
+
+        # Selection buttons
         if self.refreshButton:
-            self.refreshButton.clicked.connect(self.on_refresh_selection)
+            # Use lambda to ensure clean call without Qt's bool parameter
+            self.refreshButton.clicked.connect(self.on_refresh_clicked)
             print("[Constraint Manager Qt] Refresh button signal connected")
         else:
             print("[Constraint Manager Qt] WARNING: Refresh button not found!")
 
-        if self.setSourceButton:
-            self.setSourceButton.clicked.connect(self.on_set_sources)
+        if self.setParentButton:
+            self.setParentButton.clicked.connect(self.on_set_parent)
         else:
-            print("[Constraint Manager Qt] WARNING: Set source button not found!")
+            print("[Constraint Manager Qt] WARNING: Set parent button not found!")
 
-        # Constraint creation
-        self.weightSlider.valueChanged.connect(self.on_weight_changed)
-        self.createConstraintButton.clicked.connect(self.on_create_constraint)
-        self.snapButton.clicked.connect(self.on_snap_constraints)
+        if self.setChildButton:
+            self.setChildButton.clicked.connect(self.on_set_child)
+        else:
+            print("[Constraint Manager Qt] WARNING: Set child button not found!")
 
-        # Templates
-        self.saveTemplateButton.clicked.connect(self.on_save_template)
-        self.loadTemplateButton.clicked.connect(self.on_load_template)
-        self.deleteTemplateButton.clicked.connect(self.on_delete_template)
+        if self.clearSelectionButton:
+            self.clearSelectionButton.clicked.connect(self.on_clear_selection)
+        else:
+            print("[Constraint Manager Qt] WARNING: Clear selection button not found!")
+
+        # Constraint controls - Active checkbox triggers constraint creation
+        if self.activeCheckbox:
+            self.activeCheckbox.stateChanged.connect(self.on_active_changed)
+
+        if self.snapButton:
+            self.snapButton.clicked.connect(self.on_snap_constraints)
 
         print("[Constraint Manager Qt] Signals connected")
 
-    def auto_refresh_selection(self):
-        """Auto-refresh selection from timer - only update if changed"""
-        # Check if widgets still exist before accessing them
-        try:
-            if not self.selectionList:
-                return
-            # Try to access the widget to see if it's still valid
-            _ = self.selectionList.count()
-        except RuntimeError:
-            # Widget has been deleted, stop the timer
-            if hasattr(self, 'selection_timer'):
-                self.selection_timer.stop()
+    def on_file_event(self, pCaller, pEvent):
+        """Callback for file operations (new/open/merge)"""
+        # Safety check: Don't execute if dialog is closing or widgets deleted
+        if self._is_closing:
+            return  # Silently skip when closing (expected behavior)
+
+        if not self._is_widget_valid():
+            if not self._is_closing:
+                print("[Constraint Manager Qt] File event callback skipped - widgets invalid")
             return
 
-        # Get selected models
-        selected = FBModelList()
-        FBGetSelectedModels(selected)
-
-        # Build list of selected model names
-        new_selection = [model.Name for model in selected]
-        current_selection = [obj.Name for obj in self.selected_objects]
-
-        # Only update if selection changed
-        if new_selection != current_selection:
-            self.refresh_selection()
-
-    def refresh_selection(self):
-        """Refresh the selected objects list"""
+        print(f"[Constraint Manager Qt] File event detected, refreshing scene list")
+        self.update_list_widget()
+        # Clear selections on file operations
         self.selected_objects = []
-        self.selectionList.clear()
+        self.constraint_parents = []
+        self.constraint_children = []
 
-        # Get selected models
-        selected = FBModelList()
-        FBGetSelectedModels(selected)
+    def on_scene_change(self, pCaller, pEvent):
+        """Callback for scene changes (object add/delete)"""
+        from pyfbsdk import FBSceneChangeType
 
-        for model in selected:
-            self.selected_objects.append(model)
-            self.selectionList.addItem(model.Name)
+        print("[Constraint Manager Qt] ===== SCENE CHANGE EVENT FIRED =====")
+        print(f"[Constraint Manager Qt] Event type: {pEvent.Type}")
 
-        print(f"[Constraint Manager Qt] Selected {len(self.selected_objects)} objects")
+        # Safety check: Don't execute if dialog is closing or widgets deleted
+        if self._is_closing:
+            print("[Constraint Manager Qt] Skipping - dialog is closing")
+            return  # Silently skip when closing (expected behavior)
 
-    def on_refresh_selection(self):
-        """Refresh button callback"""
-        print("[Constraint Manager Qt] Refresh button clicked")
-        self.refresh_selection()
+        # Filter events - only refresh on relevant changes
+        relevant_events = [
+            FBSceneChangeType.kFBSceneChangeAddChild,      # Object added
+            FBSceneChangeType.kFBSceneChangeRemoveChild,   # Object removed
+            FBSceneChangeType.kFBSceneChangeDestroy,       # Object destroyed
+            FBSceneChangeType.kFBSceneChangeRenamed        # Object renamed
+        ]
 
-    def on_set_sources(self):
-        """Set selected objects as constraint sources"""
+        if pEvent.Type not in relevant_events:
+            # Skip irrelevant events (parent changes, selections, etc.)
+            return
+
+        if not self._is_widget_valid():
+            # Only log if NOT closing (unexpected)
+            if not self._is_closing:
+                print("[Constraint Manager Qt] Scene change callback skipped - widgets invalid")
+            return
+
+        print(f"[Constraint Manager Qt] Relevant scene change detected, refreshing list")
+        self.update_list_widget()
+
+        # Clean up selected_objects list - remove any deleted objects
+        self.selected_objects = [obj for obj in self.selected_objects
+                                if obj in self.all_scene_objects]
+        print("[Constraint Manager Qt] ===== SCENE CHANGE COMPLETE =====")
+
+    def _is_widget_valid(self):
+        """Check if widgets still exist and are valid"""
+        try:
+            if not hasattr(self, 'selectionList'):
+                if not self._is_closing:
+                    print("[Constraint Manager Qt] Widget validation: selectionList attribute missing")
+                return False
+
+            if self.selectionList is None:
+                if not self._is_closing:
+                    print("[Constraint Manager Qt] Widget validation: selectionList is None")
+                return False
+
+            # Try to access the widget to see if it's still valid
+            try:
+                count = self.selectionList.count()
+                # Only log success when NOT closing (reduces noise)
+                if not self._is_closing:
+                    print(f"[Constraint Manager Qt] Widget validation: SUCCESS (count={count})")
+                return True
+            except RuntimeError as e:
+                if not self._is_closing:
+                    print(f"[Constraint Manager Qt] Widget validation: RuntimeError - {e}")
+                return False
+
+        except Exception as e:
+            # Widget has been deleted
+            if not self._is_closing:
+                print(f"[Constraint Manager Qt] Widget validation: Exception - {e}")
+            return False
+
+    def update_list_widget(self):
+        """
+        Dedicated function to update the list widget with current scene objects.
+        Handles clearing, repopulating, and forcing UI refresh.
+        """
+        print("[Constraint Manager Qt] update_list_widget() called")
+
+        # Safety check: Don't execute if widgets are invalid
+        if not self._is_widget_valid():
+            print("[Constraint Manager Qt] Widget validation failed, skipping update")
+            return
+
+        try:
+            # Clear the list
+            self.selectionList.clear()
+
+            # Get all models from the scene
+            self.all_scene_objects = get_all_models()
+
+            # Sort by name for easier finding
+            self.all_scene_objects.sort(key=lambda x: x.Name)
+
+            # Populate the list widget
+            for model in self.all_scene_objects:
+                self.selectionList.addItem(model.Name)
+
+            print(f"[Constraint Manager Qt] List updated with {len(self.all_scene_objects)} objects")
+
+            # Force Qt widget updates
+            self.selectionList.update()
+            self.selectionList.repaint()
+
+            # Force MotionBuilder UI update
+            FBApplication().UpdateAllWidgets()
+
+            print(f"[Constraint Manager Qt] UI refresh complete")
+
+        except RuntimeError as e:
+            print(f"[Constraint Manager Qt] RuntimeError during update: {e}")
+            return
+        except Exception as e:
+            print(f"[Constraint Manager Qt] ERROR in update_list_widget: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+
+    def on_refresh_clicked(self):
+        """Handle refresh button click"""
+        print("[Constraint Manager Qt] ===== REFRESH BUTTON CLICKED =====")
+        self.update_list_widget()
+        print("[Constraint Manager Qt] ===== REFRESH COMPLETE =====")
+
+    def populate_scene_objects(self, silent=False):
+        """Populate list with all objects in the scene (legacy method - calls update_list_widget)"""
+        if not silent:
+            print(f"[Constraint Manager Qt] populate_scene_objects called (redirecting to update_list_widget)")
+        self.update_list_widget()
+
+    def on_list_item_clicked(self, item):
+        """Handle clicking on list item - select object in viewport"""
+        # Get the model name from the clicked item
+        model_name = item.text()
+
+        # Find the corresponding model
+        model = None
+        for obj in self.all_scene_objects:
+            if obj.Name == model_name:
+                model = obj
+                break
+
+        if not model:
+            print(f"[Constraint Manager Qt] WARNING: Model '{model_name}' not found")
+            return
+
+        # Check if Ctrl or Shift is pressed for multi-selection
+        modifiers = QApplication.keyboardModifiers()
+
+        if modifiers == Qt.ControlModifier:
+            # Ctrl: Toggle selection (add/remove from selection)
+            if model in self.selected_objects:
+                self.selected_objects.remove(model)
+                model.Selected = False
+                print(f"[Constraint Manager Qt] Removed from selection: {model.Name}")
+            else:
+                self.selected_objects.append(model)
+                model.Selected = True
+                print(f"[Constraint Manager Qt] Added to selection: {model.Name}")
+        else:
+            # No modifier: Clear selection and select only this object
+            # Clear all selections first
+            for obj in self.selected_objects:
+                obj.Selected = False
+
+            self.selected_objects = [model]
+            model.Selected = True
+            print(f"[Constraint Manager Qt] Selected: {model.Name}")
+
+        print(f"[Constraint Manager Qt] Selection order: {[obj.Name for obj in self.selected_objects]}")
+
+    def on_clear_selection(self):
+        """Clear all selections in viewport"""
+        for obj in self.selected_objects:
+            obj.Selected = False
+
+        self.selected_objects = []
+        print("[Constraint Manager Qt] Cleared all selections")
+
+    def on_set_parent(self):
+        """Set selected objects as constraint parents"""
         if not self.selected_objects:
             QMessageBox.warning(self, "No Selection", "Please select objects first")
             return
 
-        self.constraint_sources = self.selected_objects[:]
-        names = [obj.Name for obj in self.constraint_sources]
+        self.constraint_parents = self.selected_objects[:]
+        names = [obj.Name for obj in self.constraint_parents]
 
         QMessageBox.information(
             self,
-            "Sources Set",
-            f"Set {len(self.constraint_sources)} source(s):\n" + "\n".join(names)
+            "Parent Set",
+            f"Set {len(self.constraint_parents)} parent(s):\n" + "\n".join(names)
         )
-        print(f"[Constraint Manager Qt] Set {len(self.constraint_sources)} sources")
+        print(f"[Constraint Manager Qt] Set {len(self.constraint_parents)} parents")
 
-    def on_weight_changed(self, value):
-        """Update weight label when slider changes"""
-        self.constraint_weight = float(value)
-        self.weightValueLabel.setText(f"{value}%")
+    def on_set_child(self):
+        """Set selected objects as constraint children"""
+        if not self.selected_objects:
+            QMessageBox.warning(self, "No Selection", "Please select objects first")
+            return
 
-    def on_create_constraint(self):
-        """Create constraint based on selected type"""
+        self.constraint_children = self.selected_objects[:]
+        names = [obj.Name for obj in self.constraint_children]
+
+        QMessageBox.information(
+            self,
+            "Child Set",
+            f"Set {len(self.constraint_children)} child(ren):\n" + "\n".join(names)
+        )
+        print(f"[Constraint Manager Qt] Set {len(self.constraint_children)} children")
+
+    def on_active_changed(self, state):
+        """Toggle constraint active state or create new constraint"""
+        is_active = (state == 2)  # Qt.Checked = 2
+
         if not self._validate_constraint_setup():
+            # Reset checkbox if validation fails
+            self.activeCheckbox.setChecked(False)
             return
 
         constraint_type = self.constraintTypeCombo.currentText()
@@ -298,6 +478,7 @@ class ConstraintManagerDialog(QDialog):
         mb_type = constraint_map.get(constraint_type)
         if not mb_type:
             QMessageBox.warning(self, "Error", f"Unknown constraint type: {constraint_type}")
+            self.activeCheckbox.setChecked(False)
             return
 
         if mb_type == "Relation":
@@ -305,30 +486,35 @@ class ConstraintManagerDialog(QDialog):
             return
 
         try:
-            for target in self.selected_objects:
+            # Use children if set, otherwise fall back to selected objects
+            targets = self.constraint_children if self.constraint_children else self.selected_objects
+
+            for target in targets:
                 constraint = FBConstraintManager().TypeCreateConstraint(mb_type)
                 if constraint:
                     constraint.Name = f"{constraint_type}_{target.Name}"
                     constraint.ReferenceAdd(0, target)
 
-                    for source in self.constraint_sources:
-                        constraint.ReferenceAdd(1, source)
+                    for parent in self.constraint_parents:
+                        constraint.ReferenceAdd(1, parent)
 
-                    constraint.Weight = self.constraint_weight
-                    constraint.Active = True
-                    constraint.Snap()
+                    constraint.Weight = 100.0
+                    constraint.Active = is_active
+                    if is_active:
+                        constraint.Snap()
 
-                    print(f"[Constraint Manager Qt] Created {constraint_type} for {target.Name}")
+                    print(f"[Constraint Manager Qt] Created {constraint_type} for {target.Name} (Active={is_active})")
 
             QMessageBox.information(
                 self,
                 "Success",
-                f"Created {len(self.selected_objects)} {constraint_type} constraint(s)"
+                f"Created {len(targets)} {constraint_type} constraint(s)"
             )
 
         except Exception as e:
             logger.error(f"Failed to create constraint: {str(e)}")
             QMessageBox.critical(self, "Error", f"Failed to create constraint:\n{str(e)}")
+            self.activeCheckbox.setChecked(False)
 
     def _create_relation_constraint(self):
         """Create relation constraint"""
@@ -385,135 +571,31 @@ class ConstraintManagerDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to snap constraints:\n{str(e)}")
 
     def _validate_constraint_setup(self):
-        """Validate that we have source and target objects"""
-        if not self.constraint_sources:
+        """Validate that we have parent and child objects"""
+        if not self.constraint_parents:
             QMessageBox.warning(
                 self,
-                "No Sources",
-                "Please set source object(s) first:\n"
-                "1. Select source object(s)\n"
-                "2. Click 'Set as Source(s)'\n"
-                "3. Select target object(s)\n"
-                "4. Create constraint"
+                "No Parent",
+                "Please set parent object(s) first:\n"
+                "1. Select parent object(s)\n"
+                "2. Click 'Set as Parent'\n"
+                "3. Select child object(s)\n"
+                "4. Click 'Set as Child'\n"
+                "5. Check 'Active' to create constraint"
             )
             return False
 
-        if not self.selected_objects:
+        # Use children if set, otherwise check selected objects
+        targets = self.constraint_children if self.constraint_children else self.selected_objects
+
+        if not targets:
             QMessageBox.warning(
                 self,
-                "No Targets",
-                "Please select target object(s) to constrain"
+                "No Child",
+                "Please select child object(s):\n"
+                "1. Select child object(s)\n"
+                "2. Click 'Set as Child'"
             )
             return False
 
         return True
-
-    def on_save_template(self):
-        """Save current constraint setup as a template"""
-        template_name = self.templateNameEdit.text() or "ConstraintSetup"
-
-        if not self.selected_objects:
-            QMessageBox.warning(self, "No Selection", "Please select objects with constraints to save")
-            return
-
-        try:
-            template_data = {
-                "name": template_name,
-                "version": "1.0",
-                "constraints": []
-            }
-
-            for model in self.selected_objects:
-                for constraint in FBSystem().Scene.Constraints:
-                    is_constrained = False
-                    for i in range(constraint.ReferenceGroupGetCount(0)):
-                        if constraint.ReferenceGet(0, i) == model:
-                            is_constrained = True
-                            break
-
-                    if is_constrained:
-                        constraint_info = {
-                            "type": constraint.ClassName().replace("FB", "").replace("Constraint", ""),
-                            "name": constraint.Name,
-                            "weight": constraint.Weight,
-                            "active": constraint.Active
-                        }
-                        template_data["constraints"].append(constraint_info)
-
-            if not template_data["constraints"]:
-                QMessageBox.warning(self, "No Constraints", "No constraints found on selected objects")
-                return
-
-            # Save to file
-            template_file = self.preset_path / f"{template_name}.json"
-            with open(template_file, 'w') as f:
-                json.dump(template_data, f, indent=2)
-
-            QMessageBox.information(
-                self,
-                "Template Saved",
-                f"Saved {len(template_data['constraints'])} constraint(s) to:\n{template_file}"
-            )
-            print(f"[Constraint Manager Qt] Saved template: {template_file}")
-
-        except Exception as e:
-            logger.error(f"Failed to save template: {str(e)}")
-            QMessageBox.critical(self, "Error", f"Failed to save template:\n{str(e)}")
-
-    def on_load_template(self):
-        """Load and show template info"""
-        template_name = self.templateNameEdit.text() or "ConstraintSetup"
-        template_file = self.preset_path / f"{template_name}.json"
-
-        if not template_file.exists():
-            QMessageBox.warning(
-                self,
-                "Template Not Found",
-                f"Template '{template_name}' not found in:\n{self.preset_path}"
-            )
-            return
-
-        try:
-            with open(template_file, 'r') as f:
-                template_data = json.load(f)
-
-            info = f"Template: {template_data.get('name', 'Unknown')}\n"
-            info += f"Constraints: {len(template_data.get('constraints', []))}\n\n"
-
-            for c in template_data.get('constraints', []):
-                info += f"- {c.get('type')} ({c.get('weight', 100)}%)\n"
-
-            info += "\nNote: This shows template info.\n"
-            info += "Create constraints manually using the buttons above."
-
-            QMessageBox.information(self, "Template Info", info)
-
-        except Exception as e:
-            logger.error(f"Failed to load template: {str(e)}")
-            QMessageBox.critical(self, "Error", f"Failed to load template:\n{str(e)}")
-
-    def on_delete_template(self):
-        """Delete a constraint template"""
-        template_name = self.templateNameEdit.text() or "ConstraintSetup"
-        template_file = self.preset_path / f"{template_name}.json"
-
-        if not template_file.exists():
-            QMessageBox.warning(self, "Template Not Found", f"Template '{template_name}' not found")
-            return
-
-        reply = QMessageBox.question(
-            self,
-            "Confirm Delete",
-            f"Delete template '{template_name}'?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
-            try:
-                template_file.unlink()
-                QMessageBox.information(self, "Deleted", f"Template '{template_name}' deleted")
-                print(f"[Constraint Manager Qt] Deleted template: {template_file}")
-
-            except Exception as e:
-                logger.error(f"Failed to delete template: {str(e)}")
-                QMessageBox.critical(self, "Error", f"Failed to delete template:\n{str(e)}")

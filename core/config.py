@@ -55,7 +55,7 @@ class ConfigManager:
                 "menu_name": "xMobu",
                 "tool_categories": [
                     {"name": "Animation", "enabled": True},
-                    {"name": "Rigging", "enabled": True},
+                    {"name": "Character", "enabled": True},
                     {"name": "Unreal Engine", "enabled": True},
                     {"name": "Debug", "enabled": True}
                 ]

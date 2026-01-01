@@ -41,10 +41,12 @@ def reload_xmobu():
         except ImportError:
             pass
 
-        # Rigging tools
+        # Character tools
         try:
-            import mobu.tools.rigging.constraint_helper
-            tool_modules.append(mobu.tools.rigging.constraint_helper)
+            import mobu.tools.character.constraint_manager_qt
+            tool_modules.append(mobu.tools.character.constraint_manager_qt)
+            import mobu.tools.character.character_mapper_qt
+            tool_modules.append(mobu.tools.character.character_mapper_qt)
         except ImportError:
             pass
 

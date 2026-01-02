@@ -430,20 +430,11 @@ class CharacterMapperDialog(QDialog):
         # Sort by name for easier finding
         self.all_models.sort(key=lambda x: x.Name)
 
-        # Use utility function to refresh the list widget
-        success = refresh_list_widget(
-            parent_widget=self,
-            list_widget_name="objectsList",
-            models=self.all_models,
-            selected_objects=self.selected_objects,
-            tool_name="Character Mapper Qt"
-        )
+        # Apply search filter to show filtered results (or all if no filter)
+        self.apply_filter()
 
-        if success:
-            print(f"[Character Mapper Qt] List updated with {len(self.all_models)} objects (cameras filtered)")
-            print(f"[Character Mapper Qt] UI refresh complete")
-        else:
-            print("[Character Mapper Qt] Failed to refresh list widget")
+        print(f"[Character Mapper Qt] List updated with {len(self.all_models)} objects (cameras filtered)")
+        print(f"[Character Mapper Qt] UI refresh complete")
 
     def apply_filter(self):
         """Apply search filter to objects list"""
@@ -462,6 +453,11 @@ class CharacterMapperDialog(QDialog):
             for model in self.all_models:
                 if filter_text in model.Name.lower():
                     self.objectsList.addItem(model.Name)
+
+        # Clean up selected_objects list - remove any deleted objects
+        if hasattr(self, 'selected_objects') and self.selected_objects:
+            self.selected_objects = [obj for obj in self.selected_objects
+                                    if obj in self.all_models]
 
     def on_search_changed(self, text):
         """Handle search text change"""

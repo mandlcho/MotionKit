@@ -27,6 +27,7 @@ from pyfbsdk import (
 )
 from core.logger import logger
 from mobu.utils import get_all_models, get_children, SceneEventManager, refresh_list_widget
+from mobu.tools.character.skeleton_mapper_widget import SkeletonMapperWidget
 
 TOOL_NAME = "Character Mapper"
 
@@ -277,12 +278,10 @@ class CharacterMapperDialog(QDialog):
                             original_mapping_list.setParent(None)
                             original_mapping_list.deleteLater()
 
-                            # Add custom droppable widget
-                            self.mappingList = DroppableListWidget(parent_widget)
-                            self.mappingList.setObjectName("mappingList")
-                            self.mappingList.setAlternatingRowColors(True)
-                            self.mappingList.parent_dialog = self
-                            layout.insertWidget(i, self.mappingList)
+                            # Add visual skeleton mapper widget
+                            self.skeletonMapper = SkeletonMapperWidget(parent_widget)
+                            self.skeletonMapper.setObjectName("skeletonMapper")
+                            layout.insertWidget(i, self.skeletonMapper)
                             break
 
                 if original_objects_list:
@@ -317,13 +316,16 @@ class CharacterMapperDialog(QDialog):
                 self.importPresetButton = self.findChild(QtWidgets.QPushButton, "importPresetButton")
                 self.forceTposeCheckbox = self.findChild(QtWidgets.QCheckBox, "forceTposeCheckbox")
 
-                # Populate mapping list with character slots
+                # Initialize bone mappings
                 for slot_name, _ in CHARACTER_SLOTS:
-                    self.mappingList.addItem(f"{slot_name}: <None>")
                     self.bone_mappings[slot_name] = None
 
                 # Connect signals
                 self.connect_signals()
+
+                # Connect skeleton mapper signal
+                if hasattr(self, 'skeletonMapper'):
+                    self.skeletonMapper.bone_mapped.connect(self.on_bone_mapped_to_skeleton)
 
                 # Load scene objects
                 self.update_scene_objects()
@@ -570,14 +572,9 @@ class CharacterMapperDialog(QDialog):
         print(f"[Character Mapper Qt] Showing {len(children)} children of {selected_object.Name}")
         print("[Character Mapper Qt] ===== LIST CHILDREN COMPLETE =====")
 
-    def on_bone_dropped(self, target_item, dropped_model_name):
-        """Handle a bone being dropped onto a character slot"""
-        # Get the slot index
-        slot_index = self.mappingList.row(target_item)
-        if slot_index < 0 or slot_index >= len(CHARACTER_SLOTS):
-            return
-
-        slot_name = CHARACTER_SLOTS[slot_index][0]
+    def on_bone_mapped_to_skeleton(self, bone_slot_name, dropped_model_name):
+        """Handle a bone being dropped onto the visual skeleton"""
+        print(f"[Character Mapper Qt] Bone dropped: {dropped_model_name} -> {bone_slot_name}")
 
         # Find the model
         model = None
@@ -591,20 +588,22 @@ class CharacterMapperDialog(QDialog):
             return
 
         # Store mapping
-        self.bone_mappings[slot_name] = model
+        self.bone_mappings[bone_slot_name] = model
 
-        # Update display
-        target_item.setText(f"{slot_name}: {model.Name}")
+        # Update visual skeleton display
+        if hasattr(self, 'skeletonMapper'):
+            self.skeletonMapper.set_bone_mapping(bone_slot_name, model)
 
-        print(f"[Character Mapper Qt] Mapped {slot_name} -> {model.Name}")
+        print(f"[Character Mapper Qt] Mapped {bone_slot_name} -> {model.Name}")
 
     def on_clear_mapping(self):
         """Clear all bone mappings"""
-        for i, (slot_name, _) in enumerate(CHARACTER_SLOTS):
+        for slot_name, _ in CHARACTER_SLOTS:
             self.bone_mappings[slot_name] = None
-            item = self.mappingList.item(i)
-            if item:
-                item.setText(f"{slot_name}: <None>")
+
+        # Clear visual skeleton
+        if hasattr(self, 'skeletonMapper'):
+            self.skeletonMapper.clear_all_mappings()
 
         print("[Character Mapper Qt] Cleared all mappings")
 
@@ -756,13 +755,9 @@ class CharacterMapperDialog(QDialog):
                     if model:
                         self.bone_mappings[slot_name] = model
 
-                        # Update display
-                        for i, (s_name, _) in enumerate(CHARACTER_SLOTS):
-                            if s_name == slot_name:
-                                item = self.mappingList.item(i)
-                                if item:
-                                    item.setText(f"{slot_name}: {model.Name}")
-                                break
+                        # Update visual skeleton display
+                        if hasattr(self, 'skeletonMapper'):
+                            self.skeletonMapper.set_bone_mapping(slot_name, model)
                     else:
                         print(f"[Character Mapper Qt WARNING] Model '{bone_name}' not found in scene")
 
@@ -852,13 +847,9 @@ class CharacterMapperDialog(QDialog):
                         if model:
                             self.bone_mappings[slot_name] = model
 
-                            # Update display
-                            for i, (s_name, _) in enumerate(CHARACTER_SLOTS):
-                                if s_name == slot_name:
-                                    item = self.mappingList.item(i)
-                                    if item:
-                                        item.setText(f"{slot_name}: {model.Name}")
-                                    break
+                            # Update visual skeleton display
+                            if hasattr(self, 'skeletonMapper'):
+                                self.skeletonMapper.set_bone_mapping(slot_name, model)
                         else:
                             print(f"[Character Mapper Qt WARNING] Model '{bone_name}' not found in scene")
 

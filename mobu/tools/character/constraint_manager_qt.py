@@ -29,6 +29,7 @@ TOOL_NAME = "Constraint Manager"
 
 # Global reference to prevent garbage collection
 _constraint_manager_dialog = None
+_q_application_instance = None # Global reference to the QApplication instance
 
 
 def get_mobu_main_window():
@@ -55,6 +56,7 @@ def get_mobu_main_window():
 def execute(control, event):
     """Execute the Constraint Manager tool"""
     global _constraint_manager_dialog
+    global _q_application_instance  # Ensure QApplication instance is kept alive
 
     if _constraint_manager_dialog is not None:
         print("[Constraint Manager Qt] Bringing existing dialog to front")
@@ -64,6 +66,10 @@ def execute(control, event):
         return
 
     print("[Constraint Manager Qt] Creating new dialog")
+
+    # Store QApplication instance globally to prevent premature garbage collection
+    _q_application_instance = QApplication.instance()
+
     parent = get_mobu_main_window()
     _constraint_manager_dialog = ConstraintManagerDialog(parent)
     _constraint_manager_dialog.show()
@@ -119,21 +125,20 @@ class ConstraintManagerDialog(QDialog):
 
             file.open(QFile.ReadOnly)
             print(f"[Constraint Manager Qt] Loading UI from: {ui_file}")
-            # Load with `self` as parent. The loaded widget is returned.
-            ui_widget = loader.load(file, self)
+            # Load with `self` as parent and store a reference
+            self.ui_widget = loader.load(file, self)
             file.close()
 
-            if ui_widget:
+            if self.ui_widget:
                 print(f"[Constraint Manager Qt] UI widget loaded")
 
                 # The loaded widget is now a child of the dialog.
                 # We add it to a layout to make it fill the dialog.
                 self.main_layout = QtWidgets.QVBoxLayout(self)
                 self.main_layout.setContentsMargins(0, 0, 0, 0)
-                self.main_layout.addWidget(ui_widget)
+                self.main_layout.addWidget(self.ui_widget)
 
                 # Store references to UI elements using findChild on `self`.
-                # Since ui_widget is now a child of `self`, findChild on `self` will find them.
                 self.selectionList = self.findChild(QtWidgets.QListWidget, "selectionList")
                 self.refreshButton = self.findChild(QtWidgets.QPushButton, "refreshButton")
                 self.setParentButton = self.findChild(QtWidgets.QPushButton, "setParentButton")
@@ -174,6 +179,7 @@ class ConstraintManagerDialog(QDialog):
     def closeEvent(self, event):
         """Handle dialog close event"""
         global _constraint_manager_dialog
+        global _q_application_instance
 
         # Set closing flag FIRST to prevent callbacks
         self._is_closing = True
@@ -183,6 +189,7 @@ class ConstraintManagerDialog(QDialog):
             self.event_manager.unregister_all()
 
         _constraint_manager_dialog = None
+        _q_application_instance = None # Clear global QApplication reference
         event.accept()
 
     def connect_signals(self):
@@ -248,28 +255,24 @@ class ConstraintManagerDialog(QDialog):
         """Callback for scene changes (object add/delete)"""
         from pyfbsdk import FBSceneChangeType
 
-        print("[Constraint Manager Qt] ===== SCENE CHANGE EVENT FIRED =====")
-        print(f"[Constraint Manager Qt] Event type: {pEvent.Type}")
-
         # Safety check: Don't execute if dialog is closing or widgets deleted
         if self._is_closing:
-            print("[Constraint Manager Qt] Skipping - dialog is closing")
-            return  # Silently skip when closing (expected behavior)
+            return
 
         # Filter events - only refresh on relevant changes
         relevant_events = [
-            FBSceneChangeType.kFBSceneChangeAddChild,      # Object added
-            FBSceneChangeType.kFBSceneChangeRemoveChild,   # Object removed
-            FBSceneChangeType.kFBSceneChangeDestroy,       # Object destroyed
-            FBSceneChangeType.kFBSceneChangeRenamed        # Object renamed
+            FBSceneChangeType.kFBSceneChangeAddChild,
+            FBSceneChangeType.kFBSceneChangeRemoveChild,
+            FBSceneChangeType.kFBSceneChangeDestroy,
+            FBSceneChangeType.kFBSceneChangeRenamed,
+            FBSceneChangeType.kFBSceneChangeAttach,
+            FBSceneChangeType.kFBSceneChangeDetach
         ]
 
         if pEvent.Type not in relevant_events:
-            # Skip irrelevant events (parent changes, selections, etc.)
             return
 
         if not self._is_widget_valid():
-            # Only log if NOT closing (unexpected)
             if not self._is_closing:
                 print("[Constraint Manager Qt] Scene change callback skipped - widgets invalid")
             return
@@ -280,7 +283,6 @@ class ConstraintManagerDialog(QDialog):
         # Clean up selected_objects list - remove any deleted objects
         self.selected_objects = [obj for obj in self.selected_objects
                                 if obj in self.all_scene_objects]
-        print("[Constraint Manager Qt] ===== SCENE CHANGE COMPLETE =====")
 
     def _is_widget_valid(self):
         """Check if widgets still exist and are valid"""

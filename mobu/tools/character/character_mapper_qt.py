@@ -23,10 +23,10 @@ except ImportError:
         QtWidgets = None
 
 from pyfbsdk import (
-    FBMessageBox, FBSystem, FBCharacter, FBBodyNodeId
+    FBMessageBox, FBSystem, FBCharacter, FBBodyNodeId, FBVector3d, FBCamera, FBApplication
 )
 from core.logger import logger
-from mobu.utils import get_all_models, SceneEventManager
+from mobu.utils import get_all_models, get_children, SceneEventManager
 
 TOOL_NAME = "Character Mapper"
 
@@ -207,6 +207,7 @@ class CharacterMapperDialog(QDialog):
         self.bone_mappings = {}  # slot_name -> model
         self.all_models = []  # Store all scene models
         self.filtered_models = []  # Store filtered models
+        self.selected_objects = []  # Track selected objects in objectsList (tracks order)
         self.preset_path = self._get_preset_path()
         self._is_closing = False
 
@@ -306,6 +307,7 @@ class CharacterMapperDialog(QDialog):
                 # Find other UI elements
                 self.searchEdit = self.findChild(QtWidgets.QLineEdit, "searchEdit")
                 self.refreshButton = self.findChild(QtWidgets.QPushButton, "refreshButton")
+                self.listChildrenButton = self.findChild(QtWidgets.QPushButton, "listChildrenButton")
                 self.createCharacterButton = self.findChild(QtWidgets.QPushButton, "createCharacterButton")
                 self.clearMappingButton = self.findChild(QtWidgets.QPushButton, "clearMappingButton")
                 self.presetNameEdit = self.findChild(QtWidgets.QLineEdit, "presetNameEdit")
@@ -313,6 +315,7 @@ class CharacterMapperDialog(QDialog):
                 self.loadPresetButton = self.findChild(QtWidgets.QPushButton, "loadPresetButton")
                 self.exportPresetButton = self.findChild(QtWidgets.QPushButton, "exportPresetButton")
                 self.importPresetButton = self.findChild(QtWidgets.QPushButton, "importPresetButton")
+                self.forceTposeCheckbox = self.findChild(QtWidgets.QCheckBox, "forceTposeCheckbox")
 
                 # Populate mapping list with character slots
                 for slot_name, _ in CHARACTER_SLOTS:
@@ -340,8 +343,14 @@ class CharacterMapperDialog(QDialog):
         if self.searchEdit:
             self.searchEdit.textChanged.connect(self.on_search_changed)
 
+        if self.objectsList:
+            self.objectsList.itemClicked.connect(self.on_object_list_item_clicked)
+
         if self.refreshButton:
             self.refreshButton.clicked.connect(self.on_refresh_clicked)
+
+        if self.listChildrenButton:
+            self.listChildrenButton.clicked.connect(self.on_list_children_clicked)
 
         if self.createCharacterButton:
             self.createCharacterButton.clicked.connect(self.on_create_character)
@@ -377,13 +386,14 @@ class CharacterMapperDialog(QDialog):
         event.accept()
 
     def on_file_event(self, pCaller, pEvent):
-        """Callback for file operations"""
+        """Callback for file operations (new/open/merge)"""
         if self._is_closing:
             return
 
         print(f"[Character Mapper Qt] File event detected, refreshing scene list")
         self.update_scene_objects()
-        # Clear mappings on file operations
+        # Clear selections and mappings on file operations
+        self.selected_objects = []
         self.on_clear_mapping()
 
     def on_scene_change(self, pCaller, pEvent):
@@ -408,25 +418,59 @@ class CharacterMapperDialog(QDialog):
         self.update_scene_objects()
 
     def update_scene_objects(self):
-        """Update the objects list with current scene objects"""
+        """
+        Dedicated function to update the list widget with current scene objects.
+        Handles clearing, repopulating, and forcing UI refresh.
+        """
         print("[Character Mapper Qt] update_scene_objects() called")
 
-        try:
-            # Get all models from scene
-            self.all_models = get_all_models()
+        # DEBUG: Re-find the widget each time to ensure we have a valid reference
+        objects_list = self.findChild(QtWidgets.QListWidget, "objectsList")
 
-            # Sort by name
+        if not objects_list:
+            print("[Character Mapper Qt] FATAL: Could not find 'objectsList' in UI on refresh.")
+            return
+
+        try:
+            # Clear the list
+            objects_list.clear()
+
+            # Get all models from scene
+            all_models = get_all_models()
+
+            # Filter out cameras
+            self.all_models = [model for model in all_models if not isinstance(model, FBCamera)]
+
+            # Sort by name for easier finding
             self.all_models.sort(key=lambda x: x.Name)
 
-            # Apply filter
-            self.apply_filter()
+            # Populate the list widget
+            for model in self.all_models:
+                objects_list.addItem(model.Name)
 
-            print(f"[Character Mapper Qt] Loaded {len(self.all_models)} objects")
+            print(f"[Character Mapper Qt] List updated with {len(self.all_models)} objects (cameras filtered)")
 
+            # Force Qt widget updates
+            objects_list.update()
+            objects_list.repaint()
+
+            # Force MotionBuilder UI update
+            FBApplication().UpdateAllWidgets()
+
+            print(f"[Character Mapper Qt] UI refresh complete")
+
+            # Clean up selected_objects list - remove any deleted objects
+            self.selected_objects = [obj for obj in self.selected_objects
+                                    if obj in self.all_models]
+
+        except RuntimeError as e:
+            print(f"[Character Mapper Qt] RuntimeError during update: {e}")
+            return
         except Exception as e:
             print(f"[Character Mapper Qt] ERROR in update_scene_objects: {e}")
             import traceback
             traceback.print_exc()
+            return
 
     def apply_filter(self):
         """Apply search filter to objects list"""
@@ -452,8 +496,106 @@ class CharacterMapperDialog(QDialog):
 
     def on_refresh_clicked(self):
         """Handle refresh button click"""
-        print("[Character Mapper Qt] Refresh button clicked")
+        print("[Character Mapper Qt] ===== REFRESH BUTTON CLICKED =====")
         self.update_scene_objects()
+        print("[Character Mapper Qt] ===== REFRESH COMPLETE =====")
+
+    def on_object_list_item_clicked(self, item):
+        """Handle clicking on list item - select object in viewport"""
+        # Get the model name from the clicked item
+        model_name = item.text()
+
+        # Find the corresponding model
+        model = None
+        for obj in self.all_models:
+            if obj.Name == model_name:
+                model = obj
+                break
+
+        if not model:
+            print(f"[Character Mapper Qt] WARNING: Model '{model_name}' not found")
+            return
+
+        # Check if Ctrl or Shift is pressed for multi-selection
+        modifiers = QApplication.keyboardModifiers()
+
+        if modifiers == Qt.ControlModifier:
+            # Ctrl: Toggle selection (add/remove from selection)
+            if model in self.selected_objects:
+                self.selected_objects.remove(model)
+                model.Selected = False
+                print(f"[Character Mapper Qt] Removed from selection: {model.Name}")
+            else:
+                self.selected_objects.append(model)
+                model.Selected = True
+                print(f"[Character Mapper Qt] Added to selection: {model.Name}")
+        else:
+            # No modifier: Clear selection and select only this object
+            # Clear all selections first
+            for obj in self.selected_objects:
+                obj.Selected = False
+
+            self.selected_objects = [model]
+            model.Selected = True
+            print(f"[Character Mapper Qt] Selected: {model.Name}")
+
+        print(f"[Character Mapper Qt] Selection order: {[obj.Name for obj in self.selected_objects]}")
+
+    def on_list_children_clicked(self):
+        """List children of the selected object in the objects list"""
+        if not self.selected_objects:
+            QMessageBox.warning(
+                self,
+                "No Selection",
+                "Please select an object from the Scene Objects list first."
+            )
+            return
+
+        # Use the first selected object
+        selected_object = self.selected_objects[0]
+
+        print(f"[Character Mapper Qt] ===== LISTING CHILDREN OF {selected_object.Name} =====")
+
+        # Get children of selected object
+        children = get_children(selected_object, recursive=False)
+
+        if not children:
+            QMessageBox.information(
+                self,
+                "No Children",
+                f"'{selected_object.Name}' has no children."
+            )
+            print(f"[Character Mapper Qt] No children found for {selected_object.Name}")
+            return
+
+        # Filter out cameras from children
+        children = [child for child in children if not isinstance(child, FBCamera)]
+
+        if not children:
+            QMessageBox.information(
+                self,
+                "No Children",
+                f"'{selected_object.Name}' has no non-camera children."
+            )
+            print(f"[Character Mapper Qt] No non-camera children found for {selected_object.Name}")
+            return
+
+        # Update the all_models list to only show children
+        self.all_models = children
+        self.all_models.sort(key=lambda x: x.Name)
+
+        # Clear selections when listing children
+        for obj in self.selected_objects:
+            obj.Selected = False
+        self.selected_objects = []
+
+        # Clear search filter and apply
+        if self.searchEdit:
+            self.searchEdit.clear()
+        self.apply_filter()
+
+        print(f"[Character Mapper Qt] Showing {len(children)} children of {selected_object.Name}")
+        print("[Character Mapper Qt] ===== LIST CHILDREN COMPLETE =====")
 
     def on_bone_dropped(self, target_item, dropped_model_name):
         """Handle a bone being dropped onto a character slot"""
@@ -493,6 +635,34 @@ class CharacterMapperDialog(QDialog):
 
         print("[Character Mapper Qt] Cleared all mappings")
 
+    def apply_tpose(self):
+        """Apply T-pose rotations to arm bones"""
+        print("[Character Mapper Qt] Applying T-pose to arm bones...")
+
+        # Define T-pose rotations for arm bones (in degrees)
+        # These values assume a standard rig orientation
+        tpose_rotations = {
+            "LeftShoulder": FBVector3d(0, 0, 0),
+            "LeftArm": FBVector3d(0, 0, 90),
+            "LeftForeArm": FBVector3d(0, 0, 0),
+            "RightShoulder": FBVector3d(0, 0, 0),
+            "RightArm": FBVector3d(0, 0, -90),
+            "RightForeArm": FBVector3d(0, 0, 0),
+        }
+
+        # Apply rotations to mapped arm bones
+        for slot_name, rotation in tpose_rotations.items():
+            model = self.bone_mappings.get(slot_name)
+            if model:
+                # Store original rotation for potential undo
+                original_rotation = model.Rotation
+
+                # Apply T-pose rotation
+                model.Rotation = rotation
+                print(f"[Character Mapper Qt] Set {slot_name} ({model.Name}) rotation to {rotation}")
+            else:
+                print(f"[Character Mapper Qt] Skipping {slot_name} (not mapped)")
+
     def on_create_character(self):
         """Create character from current mapping"""
         print("[Character Mapper Qt] Creating character...")
@@ -509,6 +679,11 @@ class CharacterMapperDialog(QDialog):
                     f"Please map these required bones:\n{', '.join(missing)}"
                 )
                 return
+
+            # Apply T-pose if checkbox is enabled
+            if self.forceTposeCheckbox and self.forceTposeCheckbox.isChecked():
+                print("[Character Mapper Qt] Force T-pose enabled, applying T-pose...")
+                self.apply_tpose()
 
             # Create character
             char_name = self.presetNameEdit.text() or "Character"

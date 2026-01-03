@@ -660,12 +660,21 @@ class CharacterMapperDialog(QDialog):
                 return
 
             # Apply T-pose if checkbox is enabled
-            if self.forceTposeCheckbox and self.forceTposeCheckbox.isChecked():
-                print("[Character Mapper Qt] Force T-pose enabled, applying T-pose...")
-                self.apply_tpose()
+            try:
+                if self.forceTposeCheckbox and self.forceTposeCheckbox.isChecked():
+                    print("[Character Mapper Qt] Force T-pose enabled, applying T-pose...")
+                    self.apply_tpose()
+            except RuntimeError:
+                # Checkbox widget was deleted - skip T-pose application
+                print("[Character Mapper Qt] Warning: Force T-pose checkbox no longer accessible, skipping T-pose")
+                pass
 
             # Create character
-            char_name = self.presetNameEdit.text() or "Character"
+            try:
+                char_name = self.presetNameEdit.text() if self.presetNameEdit else "Character"
+            except RuntimeError:
+                char_name = "Character"
+
             self.character = FBCharacter(char_name)
 
             # Map bones

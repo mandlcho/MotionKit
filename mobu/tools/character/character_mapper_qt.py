@@ -787,6 +787,14 @@ class CharacterMapperDialog(QDialog):
 
             # Step 6: Create character and map bones
             print(f"[Character Mapper Qt] Creating character: {char_name} (Biped: {is_biped}, IK/FK: {create_ik_fk})")
+
+            # Debug: Show what's in bone_mappings
+            mapped_slots = [slot for slot, model in self.bone_mappings.items() if model is not None]
+            print(f"[Character Mapper Qt] Current bone_mappings has {len(mapped_slots)} mapped slots:")
+            for slot in mapped_slots:
+                model = self.bone_mappings[slot]
+                print(f"  - {slot}: {model.Name if model else 'None'}")
+
             self.character = FBCharacter(char_name)
 
             # Ensure characterization is off before mapping
@@ -801,11 +809,11 @@ class CharacterMapperDialog(QDialog):
                     if prop_list:
                         prop_list.append(model)
                         mapped_count += 1
-                        print(f"[Character Mapper Qt] Linked {slot_name} -> {model.Name}")
+                        print(f"[Character Mapper Qt] ✓ Linked {slot_name} -> {model.Name}")
                     else:
-                        print(f"[Character Mapper Qt WARNING] Could not find property {slot_name}Link")
+                        print(f"[Character Mapper Qt] ✗ Could not find property {slot_name}Link")
 
-            print(f"[Character Mapper Qt] Mapped {mapped_count} bones total")
+            print(f"[Character Mapper Qt] Successfully mapped {mapped_count} bones to character")
 
             # Step 7: Characterize (with biped/quadruped flag)
             print(f"[Character Mapper Qt] Characterizing as {'Biped' if is_biped else 'Quadruped'}...")
@@ -931,12 +939,16 @@ class CharacterMapperDialog(QDialog):
             self.on_clear_mapping()
 
             # Find models by name and map them
+            loaded_count = 0
             for slot_name, bone_name in preset_data.get("mappings", {}).items():
+                print(f"[Character Mapper Qt] Looking for {slot_name} -> '{bone_name}'")
                 if slot_name in self.bone_mappings:
                     # Find the model
                     model = self._find_model_by_name(bone_name)
                     if model:
                         self.bone_mappings[slot_name] = model
+                        loaded_count += 1
+                        print(f"[Character Mapper Qt] ✓ Found and mapped {slot_name} -> {model.Name} (LongName: {model.LongName})")
 
                         # Update display
                         for i, (s_name, _) in enumerate(CHARACTER_SLOTS):
@@ -946,7 +958,12 @@ class CharacterMapperDialog(QDialog):
                                     item.setText(f"{slot_name}: {model.Name}")
                                 break
                     else:
-                        print(f"[Character Mapper Qt WARNING] Model '{bone_name}' not found in scene")
+                        print(f"[Character Mapper Qt] ✗ Model '{bone_name}' not found in scene")
+                        print(f"[Character Mapper Qt]   Available models: {[m.Name for m in self.all_models[:5]]}...")
+                else:
+                    print(f"[Character Mapper Qt] ✗ Slot '{slot_name}' not in bone_mappings dict")
+
+            print(f"[Character Mapper Qt] Loaded {loaded_count} bone mappings from preset")
 
             QMessageBox.information(self, "Preset Loaded", f"Preset '{preset_name}' loaded successfully!")
             print(f"[Character Mapper Qt] Loaded preset: {preset_file}")

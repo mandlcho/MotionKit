@@ -850,9 +850,12 @@ class CharacterMapperDialog(QDialog):
 
                 preset_name = preset_data.get("name", import_path.stem)
 
-                # Copy to presets directory
+                # Copy to presets directory (skip if already there)
                 dest_file = self.preset_path / f"{preset_name}.json"
-                shutil.copy2(import_path, dest_file)
+                if import_path.resolve() != dest_file.resolve():
+                    shutil.copy2(import_path, dest_file)
+                else:
+                    print(f"[Character Mapper Qt] File already in presets directory, skipping copy")
 
                 # Update preset name field
                 self.presetNameEdit.setText(preset_name)

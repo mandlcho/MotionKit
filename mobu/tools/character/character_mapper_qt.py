@@ -986,11 +986,12 @@ class CharacterMapperDialog(QDialog):
             )
             return
 
-        # Show file save dialog
+        # Show file save dialog starting in presets directory
+        default_path = str(self.preset_path / f"{preset_name}.json")
         export_path, _ = QFileDialog.getSaveFileName(
             self,
             "Export Character Preset",
-            f"{preset_name}.json",
+            default_path,
             "JSON Files (*.json)"
         )
 
@@ -1010,11 +1011,11 @@ class CharacterMapperDialog(QDialog):
 
     def on_import_preset(self):
         """Import preset from external file"""
-        # Show file open dialog
+        # Show file open dialog starting in presets directory
         import_path, _ = QFileDialog.getOpenFileName(
             self,
             "Import Character Preset",
-            "",
+            str(self.preset_path),
             "JSON Files (*.json)"
         )
 

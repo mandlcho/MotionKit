@@ -23,7 +23,8 @@ except ImportError:
         QtWidgets = None
 
 from pyfbsdk import (
-    FBMessageBox, FBSystem, FBCharacter, FBBodyNodeId, FBVector3d, FBCamera
+    FBMessageBox, FBSystem, FBCharacter, FBBodyNodeId, FBVector3d, FBCamera,
+    FBMatrix, FBModelNull, FBConstraintManager, FBModelTransformationType
 )
 from core.logger import logger
 from mobu.utils import get_all_models, get_children, SceneEventManager, refresh_list_widget
@@ -613,8 +614,6 @@ class CharacterMapperDialog(QDialog):
 
     def apply_tpose(self):
         """Apply T-pose using IK-based method (based on Mocappys tutorial)"""
-        from pyfbsdk import FBModelNull, FBConstraintManager, FBModelTransformationType, FBMatrix
-
         print("[Character Mapper Qt] Applying T-pose using IK method...")
 
         # Step 1: Center character (move hips to X=0, Z=0)
@@ -645,8 +644,6 @@ class CharacterMapperDialog(QDialog):
 
     def _tpose_limb(self, first_slot, mid_slot, end_slot, is_arm=True):
         """T-pose a limb using IK constraints"""
-        from pyfbsdk import FBModelNull, FBConstraintManager, FBModelTransformationType
-
         first_joint = self.bone_mappings.get(first_slot)
         mid_joint = self.bone_mappings.get(mid_slot)
         end_joint = self.bone_mappings.get(end_slot)

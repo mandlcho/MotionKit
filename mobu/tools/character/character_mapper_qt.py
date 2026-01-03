@@ -839,11 +839,19 @@ class CharacterMapperDialog(QDialog):
 
             self.character = FBCharacter(char_name)
 
+            # Debug: List available Link properties
+            print(f"[Character Mapper Qt] Available Link properties on FBCharacter:")
+            for i in range(self.character.PropertyList.GetCount()):
+                prop = self.character.PropertyList[i]
+                if "Link" in prop.Name:
+                    print(f"  - {prop.Name}")
+
             # Ensure characterization is off before mapping
             self.character.SetCharacterizeOn(False)
 
             # Map bones to character
             mapped_count = 0
+            failed_count = 0
             for slot_name, _ in CHARACTER_SLOTS:
                 model = self.bone_mappings.get(slot_name)
                 if model:
@@ -853,7 +861,8 @@ class CharacterMapperDialog(QDialog):
                         mapped_count += 1
                         print(f"[Character Mapper Qt] ✓ Linked {slot_name} -> {model.Name}")
                     else:
-                        print(f"[Character Mapper Qt] ✗ Could not find property {slot_name}Link")
+                        failed_count += 1
+                        print(f"[Character Mapper Qt] ✗ Could not find property '{slot_name}Link'")
 
             print(f"[Character Mapper Qt] Successfully mapped {mapped_count} bones to character")
 

@@ -35,22 +35,25 @@ _character_mapper_dialog = None
 
 
 # Character bone slots in logical order
+# REQUIRED bones: Hips, Spine, LeftUpLeg, RightUpLeg
+# OPTIONAL bones: All other bones including Spine1-9, arms, hands, feet, neck, head, etc.
+# Note: Only ONE Spine bone is required. Additional spine bones provide more control.
 CHARACTER_SLOTS = [
     # Reference
     ("Reference", "Reference"),
 
     # Hips and Spine
-    ("Hips", "Hips"),
-    ("Spine", "Spine"),
-    ("Spine1", "Spine1"),
-    ("Spine2", "Spine2"),
-    ("Spine3", "Spine3"),
-    ("Spine4", "Spine4"),
-    ("Spine5", "Spine5"),
-    ("Spine6", "Spine6"),
-    ("Spine7", "Spine7"),
-    ("Spine8", "Spine8"),
-    ("Spine9", "Spine9"),
+    ("Hips", "Hips"),                    # REQUIRED
+    ("Spine", "Spine"),                  # REQUIRED (only this one, not Spine1-9)
+    ("Spine1", "Spine1"),                # Optional
+    ("Spine2", "Spine2"),                # Optional
+    ("Spine3", "Spine3"),                # Optional
+    ("Spine4", "Spine4"),                # Optional
+    ("Spine5", "Spine5"),                # Optional
+    ("Spine6", "Spine6"),                # Optional
+    ("Spine7", "Spine7"),                # Optional
+    ("Spine8", "Spine8"),                # Optional
+    ("Spine9", "Spine9"),                # Optional
 
     # Neck and Head
     ("Neck", "Neck"),
@@ -641,7 +644,9 @@ class CharacterMapperDialog(QDialog):
         print("[Character Mapper Qt] Creating character...")
 
         try:
-            # Check required bones
+            # Check required bones (minimum for MotionBuilder characterization)
+            # Note: Only ONE Spine bone is required (not Spine1, Spine2, etc.)
+            # Additional spine bones are optional for more detailed spine control
             required = ["Hips", "LeftUpLeg", "RightUpLeg", "Spine"]
             missing = [slot for slot in required if not self.bone_mappings.get(slot)]
 
@@ -649,7 +654,8 @@ class CharacterMapperDialog(QDialog):
                 QMessageBox.warning(
                     self,
                     "Missing Required Bones",
-                    f"Please map these required bones:\n{', '.join(missing)}"
+                    f"Please map these required bones:\n{', '.join(missing)}\n\n"
+                    f"Note: Only 'Spine' is required. Additional spine bones (Spine1-9) are optional."
                 )
                 return
 

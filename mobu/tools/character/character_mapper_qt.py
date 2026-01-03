@@ -838,9 +838,12 @@ class CharacterMapperDialog(QDialog):
                 print(f"  - {slot}: {model.Name if model else 'None'}")
 
             print(f"[Character Mapper Qt] Creating FBCharacter object...")
+            import sys
+            sys.stdout.flush()
             try:
                 self.character = FBCharacter(char_name)
                 print(f"[Character Mapper Qt] FBCharacter created successfully: {self.character.Name}")
+                sys.stdout.flush()
             except Exception as e:
                 print(f"[Character Mapper Qt] ERROR creating FBCharacter: {e}")
                 raise

@@ -735,17 +735,23 @@ class CharacterMapperDialog(QDialog):
             print(f"[Character Mapper Qt] Creating character: {char_name} (Biped: {is_biped}, IK/FK: {create_ik_fk})")
             self.character = FBCharacter(char_name)
 
+            # Ensure characterization is off before mapping
+            self.character.SetCharacterizeOn(False)
+
             # Map bones to character
+            mapped_count = 0
             for slot_name, _ in CHARACTER_SLOTS:
                 model = self.bone_mappings.get(slot_name)
                 if model:
-                    self.character.SetCharacterizeOn(False)
                     prop_list = self.character.PropertyList.Find(slot_name + "Link")
                     if prop_list:
                         prop_list.append(model)
+                        mapped_count += 1
                         print(f"[Character Mapper Qt] Linked {slot_name} -> {model.Name}")
                     else:
                         print(f"[Character Mapper Qt WARNING] Could not find property {slot_name}Link")
+
+            print(f"[Character Mapper Qt] Mapped {mapped_count} bones total")
 
             # Step 7: Characterize (with biped/quadruped flag)
             print(f"[Character Mapper Qt] Characterizing as {'Biped' if is_biped else 'Quadruped'}...")

@@ -612,86 +612,131 @@ class CharacterMapperDialog(QDialog):
         print("[Character Mapper Qt] Cleared all mappings")
 
     def apply_tpose(self):
-        """Apply T-pose by calculating proper arm rotations based on skeleton structure"""
-        print("[Character Mapper Qt] Applying intelligent T-pose to arm bones...")
+        """Apply T-pose using IK-based method (based on Mocappys tutorial)"""
+        from pyfbsdk import FBModelNull, FBConstraintManager, FBModelTransformationType, FBMatrix
 
-        # Process left and right arms
-        for side in ["Left", "Right"]:
-            shoulder = self.bone_mappings.get(f"{side}Shoulder")
-            arm = self.bone_mappings.get(f"{side}Arm")
-            forearm = self.bone_mappings.get(f"{side}ForeArm")
+        print("[Character Mapper Qt] Applying T-pose using IK method...")
 
-            if not arm or not forearm:
-                print(f"[Character Mapper Qt] Skipping {side} arm - bones not mapped")
-                continue
+        # Step 1: Center character (move hips to X=0, Z=0)
+        hips = self.bone_mappings.get("Hips")
+        if hips:
+            hips_vec = FBVector3d()
+            hips.GetVector(hips_vec, FBModelTransformationType.kModelTranslation, True)
+            centered_hips = FBVector3d(0.0, hips_vec[1], 0.0)
+            hips.SetVector(centered_hips, FBModelTransformationType.kModelTranslation, True)
+            print(f"[Character Mapper Qt] Centered character: Hips moved from ({hips_vec[0]:.1f}, {hips_vec[1]:.1f}, {hips_vec[2]:.1f}) to (0, {hips_vec[1]:.1f}, 0)")
 
-            # Get world positions
-            arm_pos = arm.Translation
-            forearm_pos = forearm.Translation
+        # Step 2: Zero all skeleton rotations
+        print("[Character Mapper Qt] Zeroing all skeleton rotations...")
+        for slot_name, model in self.bone_mappings.items():
+            if model:
+                model.Rotation = FBVector3d(0, 0, 0)
+        FBSystem().Scene.Evaluate()
+        print("[Character Mapper Qt] All rotations zeroed")
 
-            # Calculate the vector from shoulder/arm to forearm (arm direction)
-            arm_vec = FBVector3d(
-                forearm_pos[0] - arm_pos[0],
-                forearm_pos[1] - arm_pos[1],
-                forearm_pos[2] - arm_pos[2]
-            )
+        # Step 3: T-pose limbs using IK
+        self._tpose_limb("LeftArm", "LeftForeArm", "LeftHand", is_arm=True)
+        self._tpose_limb("RightArm", "RightForeArm", "RightHand", is_arm=True)
+        self._tpose_limb("LeftUpLeg", "LeftLeg", "LeftFoot", is_arm=False)
+        self._tpose_limb("RightUpLeg", "RightLeg", "RightFoot", is_arm=False)
 
-            # Normalize the vector
-            length = (arm_vec[0]**2 + arm_vec[1]**2 + arm_vec[2]**2)**0.5
-            if length > 0.001:
-                arm_vec = FBVector3d(
-                    arm_vec[0] / length,
-                    arm_vec[1] / length,
-                    arm_vec[2] / length
-                )
+        FBSystem().Scene.Evaluate()
+        print("[Character Mapper Qt] T-pose complete!")
 
-            # Calculate the angle needed to make arm horizontal (parallel to ground)
-            # We want the arm to point along +X (right) or -X (left) axis
-            # Current Y component tells us how much it's angled up/down
+    def _tpose_limb(self, first_slot, mid_slot, end_slot, is_arm=True):
+        """T-pose a limb using IK constraints"""
+        from pyfbsdk import FBModelNull, FBConstraintManager, FBModelTransformationType
 
-            # Target: Y component should be ~0 (horizontal)
-            # We'll rotate around Z axis to achieve this
+        first_joint = self.bone_mappings.get(first_slot)
+        mid_joint = self.bone_mappings.get(mid_slot)
+        end_joint = self.bone_mappings.get(end_slot)
 
-            current_y = arm_vec[1]
-            current_x = arm_vec[0]
+        if not (first_joint and mid_joint and end_joint):
+            print(f"[Character Mapper Qt] Skipping {first_slot} - bones not fully mapped")
+            return
 
-            # Calculate angle from horizontal
-            # atan2(y, x) gives us the angle in the XY plane
-            import math
-            current_angle = math.atan2(current_y, abs(current_x)) * (180.0 / math.pi)
+        # Create IK effector at end joint
+        effector_name = f"TempIK_{end_joint.Name}_Effector"
+        effector = FBModelNull(effector_name)
+        effector.Show = True
+        effector.Size = 50
 
-            # For T-pose, we want arms horizontal (0 degrees from horizontal)
-            # So we need to rotate by negative of current angle
-            correction_angle = -current_angle
+        end_vec = FBVector3d()
+        end_joint.GetVector(end_vec, FBModelTransformationType.kModelTranslation, True)
+        effector.SetVector(end_vec, FBModelTransformationType.kModelTranslation, True)
 
-            print(f"[Character Mapper Qt] {side} arm current angle from horizontal: {current_angle:.1f}°")
-            print(f"[Character Mapper Qt] {side} arm applying correction: {correction_angle:.1f}° on Z-axis")
+        # Create pole vector at mid joint
+        pv_name = f"TempIK_{end_joint.Name}_PoleVector"
+        pv = FBModelNull(pv_name)
+        pv.Show = True
+        pv.Size = 50
 
-            # Get current rotation
-            current_rot = arm.Rotation
+        mid_matrix = FBMatrix()
+        mid_joint.GetMatrix(mid_matrix)
+        pv.SetMatrix(mid_matrix)
 
-            # Apply correction on Z-axis for T-pose
-            # For left arm: positive Z rotation lifts arm
-            # For right arm: negative Z rotation lifts arm
-            sign = 1 if side == "Left" else -1
-            new_rotation = FBVector3d(
-                current_rot[0],  # X - keep current
-                current_rot[1],  # Y - keep current
-                current_rot[2] + (correction_angle * sign)  # Z - apply correction
-            )
+        # Create Chain IK constraint
+        constraint_mgr = FBConstraintManager()
+        chain_ik = None
 
-            arm.Rotation = new_rotation
-            print(f"[Character Mapper Qt] {side}Arm ({arm.Name}) rotation: {current_rot} -> {new_rotation}")
+        for i in range(constraint_mgr.TypeGetCount()):
+            if constraint_mgr.TypeGetName(i) == "Chain IK":
+                chain_ik = constraint_mgr.TypeCreateConstraint(i)
+                chain_ik.Name = f"TempIK_{end_joint.Name}"
+                break
 
-            # Straighten forearm (remove bend)
-            if forearm:
-                forearm.Rotation = FBVector3d(0, 0, 0)
-                print(f"[Character Mapper Qt] {side}ForeArm ({forearm.Name}) straightened")
+        if chain_ik:
+            # Add references
+            for ref_idx in range(chain_ik.ReferenceGroupGetCount()):
+                group_name = chain_ik.ReferenceGroupGetName(ref_idx)
+                if group_name == "First Joint":
+                    chain_ik.ReferenceAdd(ref_idx, first_joint)
+                elif group_name == "End Joint":
+                    chain_ik.ReferenceAdd(ref_idx, end_joint)
+                elif group_name == "Effector":
+                    chain_ik.ReferenceAdd(ref_idx, effector)
+                elif group_name == "Pole Vector Object":
+                    chain_ik.ReferenceAdd(ref_idx, pv)
 
-            # Zero shoulder rotation if present
-            if shoulder:
-                shoulder.Rotation = FBVector3d(0, 0, 0)
-                print(f"[Character Mapper Qt] {side}Shoulder ({shoulder.Name}) zeroed")
+            chain_ik.Snap()
+
+            # Calculate limb length
+            limb_length = abs(mid_joint.Translation[1]) + abs(end_joint.Translation[1])
+
+            # Get first joint world position
+            first_vec = FBVector3d()
+            first_joint.GetVector(first_vec, FBModelTransformationType.kModelTranslation, True)
+
+            # Position effector for T-pose
+            if is_arm:
+                # Arms: extend horizontally along X-axis
+                if first_vec[0] < 0:  # Left arm
+                    x_offset = first_vec[0] - limb_length
+                else:  # Right arm
+                    x_offset = first_vec[0] + limb_length
+
+                ik_offset = FBVector3d(x_offset, first_vec[1], first_vec[2])
+                pv_offset = FBVector3d(first_vec[0], first_vec[1], -50)
+            else:
+                # Legs: extend down along Y-axis
+                y_offset = first_vec[1] - limb_length
+                ik_offset = FBVector3d(first_vec[0], y_offset, first_vec[2])
+                pv_offset = FBVector3d(first_vec[0], first_vec[1], 50)
+
+            # Apply positions
+            effector.SetVector(ik_offset, FBModelTransformationType.kModelTranslation, True)
+            pv.SetVector(pv_offset, FBModelTransformationType.kModelTranslation, True)
+            pv.SetVector(FBVector3d(0, 0, 0), FBModelTransformationType.kModelRotation, True)
+
+            FBSystem().Scene.Evaluate()
+
+            # Clean up IK helpers
+            chain_ik.Active = False
+            chain_ik.FBDelete()
+            effector.FBDelete()
+            pv.FBDelete()
+
+            print(f"[Character Mapper Qt] T-posed {first_slot} using IK")
 
     def check_tpose_vs_apose(self):
         """Check if arms are in T-pose or A-pose by checking shoulder rotation"""

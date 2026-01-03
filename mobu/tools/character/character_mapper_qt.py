@@ -841,8 +841,8 @@ class CharacterMapperDialog(QDialog):
 
             # Debug: List available Link properties
             print(f"[Character Mapper Qt] Available Link properties on FBCharacter:")
-            for i in range(self.character.PropertyList.GetCount()):
-                prop = self.character.PropertyList[i]
+            prop_list = self.character.PropertyList
+            for prop in prop_list:
                 if "Link" in prop.Name:
                     print(f"  - {prop.Name}")
 

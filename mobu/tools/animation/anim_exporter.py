@@ -311,49 +311,43 @@ class AddAnimationDialog(QDialog):
         super(AddAnimationDialog, self).__init__(parent)
 
         self.setWindowTitle("Add Animation")
-        self.setFixedSize(650, 180)  # Fixed size - no resizing
+        self.setFixedSize(650, 120)  # Fixed size - no resizing
 
         # Store the input values
         self.animation_data = None
 
         # Create main layout
         layout = QVBoxLayout(self)
-        layout.setSpacing(10)
+        layout.setSpacing(0)
         layout.setContentsMargins(10, 10, 10, 10)
 
         # Top row - Animation Name and Frame Range
         top_row = QHBoxLayout()
-
+        top_row.setSpacing(5)
         top_row.addWidget(QLabel("Animation Name:"))
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g., Idle, Walk, Run")
         top_row.addWidget(self.name_input, stretch=1)
-
-        top_row.addSpacing(20)
-
         top_row.addWidget(QLabel("Start:"))
         self.start_frame_input = QLineEdit()
         self.start_frame_input.setText(str(default_start))
         self.start_frame_input.setAlignment(Qt.AlignCenter)
         self.start_frame_input.setMaximumWidth(60)
         top_row.addWidget(self.start_frame_input)
-
         top_row.addWidget(QLabel("End:"))
         self.end_frame_input = QLineEdit()
         self.end_frame_input.setText(str(default_end))
         self.end_frame_input.setAlignment(Qt.AlignCenter)
         self.end_frame_input.setMaximumWidth(60)
         top_row.addWidget(self.end_frame_input)
-
         layout.addLayout(top_row)
 
         # Middle row - Take and Namespace
         middle_row = QHBoxLayout()
-
+        middle_row.setSpacing(5)
         middle_row.addWidget(QLabel("Take:"))
         self.take_combo = QComboBox()
         self.take_combo.setEditable(False)  # Not editable - dropdown only
-        self.take_combo.addItem("")  # Empty default
         self.take_combo.setMinimumWidth(150)
 
         # Populate with scene takes
@@ -362,9 +356,6 @@ class AddAnimationDialog(QDialog):
             self.take_combo.addItem(take)
 
         middle_row.addWidget(self.take_combo)
-
-        middle_row.addSpacing(20)
-
         middle_row.addWidget(QLabel("Namespace:"))
         self.namespace_combo = QComboBox()
         self.namespace_combo.setEditable(False)  # Not editable - dropdown only
@@ -378,24 +369,7 @@ class AddAnimationDialog(QDialog):
 
         middle_row.addWidget(self.namespace_combo)
         middle_row.addStretch()
-
         layout.addLayout(middle_row)
-
-        # Bottom row - Path
-        bottom_row = QHBoxLayout()
-
-        bottom_row.addWidget(QLabel("Path:"))
-        self.path_input = QLineEdit()
-        self.path_input.setPlaceholderText("Export path (optional)")
-        bottom_row.addWidget(self.path_input, stretch=1)
-
-        self.browse_btn = QPushButton("[...]")
-        self.browse_btn.setObjectName("browseBtn")
-        self.browse_btn.setMaximumWidth(40)
-        self.browse_btn.clicked.connect(self.on_browse_path)
-        bottom_row.addWidget(self.browse_btn)
-
-        layout.addLayout(bottom_row)
 
         # Add buttons
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -441,18 +415,6 @@ class AddAnimationDialog(QDialog):
 
         return sorted(characters)
 
-    def on_browse_path(self):
-        """Open file browser to select export path"""
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Select Export Path",
-            "",
-            "FBX Files (*.fbx);;All Files (*.*)"
-        )
-
-        if file_path:
-            self.path_input.setText(file_path)
-
     def on_accept(self):
         """Validate and accept the dialog"""
         # Validate animation name
@@ -482,7 +444,7 @@ class AddAnimationDialog(QDialog):
             'start_frame': start_frame,
             'end_frame': end_frame,
             'namespace': self.namespace_combo.currentText().strip(),
-            'path': self.path_input.text().strip()
+            'path': ''
         }
 
         self.accept()
@@ -518,8 +480,8 @@ class AnimExporterDialog(QDialog):
     def setup_ui(self):
         """Setup the user interface"""
         self.setWindowTitle("Anim Exporter")
-        self.resize(800, 500)
-        self.setMinimumSize(800, 400)
+        self.resize(960, 500)
+        self.setMinimumSize(960, 400)
 
         # Main layout
         main_layout = QHBoxLayout(self)

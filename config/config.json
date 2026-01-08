@@ -17,6 +17,16 @@
             }
         ]
     },
+    "perforce": {
+        "server": "",
+        "user": "",
+        "workspace": ""
+    },
+    "export": {
+        "fbx_path": "",
+        "character_rigs_path": "",
+        "character_animations_path": ""
+    },
     "unreal": {
         "default_project_path": "",
         "content_browser_path": "/Game/",

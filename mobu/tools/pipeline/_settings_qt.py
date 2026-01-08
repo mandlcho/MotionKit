@@ -178,6 +178,8 @@ class SettingsDialog(QDialog):
         # Buttons
         self.testP4Button.clicked.connect(self.on_test_p4_connection)
         self.browseFbxButton.clicked.connect(self.on_browse_fbx_path)
+        self.browseCharRigsButton.clicked.connect(self.on_browse_char_rigs_path)
+        self.browseCharAnimsButton.clicked.connect(self.on_browse_char_anims_path)
         self.saveButton.clicked.connect(self.on_save_settings)
         self.resetButton.clicked.connect(self.on_reset_settings)
         self.applyCloseButton.clicked.connect(self.on_apply_and_close)
@@ -198,6 +200,8 @@ class SettingsDialog(QDialog):
 
         # Load export settings
         self.fbxPathEdit.setText(config.get('export.fbx_path', ''))
+        self.charRigsPathEdit.setText(config.get('export.character_rigs_path', ''))
+        self.charAnimsPathEdit.setText(config.get('export.character_animations_path', ''))
 
         # Try to load workspaces if server and user are set
         if self.p4ServerEdit.text() and self.p4UserEdit.text():
@@ -347,6 +351,34 @@ class SettingsDialog(QDialog):
             self.fbxPathEdit.setText(directory)
             print(f"[Settings Qt] FBX export path set to: {directory}")
 
+    def on_browse_char_rigs_path(self):
+        """Browse for Character Rigs export directory"""
+        current_path = self.charRigsPathEdit.text() or ""
+
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Character Rigs Export Directory",
+            current_path
+        )
+
+        if directory:
+            self.charRigsPathEdit.setText(directory)
+            print(f"[Settings Qt] Character Rigs export path set to: {directory}")
+
+    def on_browse_char_anims_path(self):
+        """Browse for Character Animations export directory"""
+        current_path = self.charAnimsPathEdit.text() or ""
+
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Select Character Animations Export Directory",
+            current_path
+        )
+
+        if directory:
+            self.charAnimsPathEdit.setText(directory)
+            print(f"[Settings Qt] Character Animations export path set to: {directory}")
+
     def on_save_settings(self):
         """Save settings to config"""
         try:
@@ -386,6 +418,8 @@ class SettingsDialog(QDialog):
                         return
 
             config.set('export.fbx_path', fbx_path)
+            config.set('export.character_rigs_path', self.charRigsPathEdit.text())
+            config.set('export.character_animations_path', self.charAnimsPathEdit.text())
 
             # Save to file
             config.save()

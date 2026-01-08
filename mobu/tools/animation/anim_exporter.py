@@ -367,6 +367,13 @@ class AddAnimationDialog(QDialog):
         for take in takes:
             self.take_combo.addItem(take)
 
+        # Set current take as default selection
+        if current_take_name and current_take_name in takes:
+            index = self.take_combo.findText(current_take_name)
+            if index >= 0:
+                self.take_combo.setCurrentIndex(index)
+                print(f"[AddAnimationDialog] Set current take to: {current_take_name}")
+
         middle_row.addWidget(self.take_combo)
         middle_row.addWidget(QLabel("Namespace:"))
         self.namespace_combo = QComboBox()
@@ -401,12 +408,14 @@ class AddAnimationDialog(QDialog):
         """Get the name of the current take"""
         from pyfbsdk import FBSystem
         try:
-            scene = FBSystem().Scene
-            current_take = scene.CurrentTake
+            system = FBSystem()
+            current_take = system.CurrentTake
             if current_take:
                 return current_take.Name
         except Exception as e:
-            print(f"[Anim Exporter] Error getting current take: {str(e)}")
+            print(f"[AddAnimationDialog] Error getting current take: {str(e)}")
+            import traceback
+            traceback.print_exc()
         return ""
 
     def get_scene_takes(self):
@@ -416,12 +425,12 @@ class AddAnimationDialog(QDialog):
 
         try:
             scene = FBSystem().Scene
-            for i in range(scene.Takes.GetCount()):
-                take = scene.Takes[i]
+            # FBPropertyListTake is iterable - iterate directly
+            for take in scene.Takes:
                 takes.append(take.Name)
-            print(f"[Anim Exporter] Found {len(takes)} takes in scene: {takes}")
+            print(f"[AddAnimationDialog] Found {len(takes)} takes in scene: {takes}")
         except Exception as e:
-            print(f"[Anim Exporter] Error getting takes: {str(e)}")
+            print(f"[AddAnimationDialog] Error getting takes: {str(e)}")
             import traceback
             traceback.print_exc()
 
@@ -429,7 +438,7 @@ class AddAnimationDialog(QDialog):
 
     def get_scene_characters(self):
         """Get list of character names from the scene"""
-        from pyfbsdk import FBCharacter
+        from pyfbsdk import FBCharacter, FBSystem
         characters = []
 
         try:
@@ -437,8 +446,11 @@ class AddAnimationDialog(QDialog):
             for comp in scene.Components:
                 if isinstance(comp, FBCharacter):
                     characters.append(comp.Name)
+            print(f"[AddAnimationDialog] Found {len(characters)} characters: {characters}")
         except Exception as e:
-            print(f"[Anim Exporter] Error getting characters: {str(e)}")
+            print(f"[AddAnimationDialog] Error getting characters: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
         return sorted(characters)
 

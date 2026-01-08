@@ -994,7 +994,15 @@ class AnimExporterDialog(QDialog):
         # Line edit for path
         path_edit = QLineEdit()
         path_edit.setText(path)
-        path_edit.setPlaceholderText("Select export directory...")
+
+        # Set placeholder based on P4 config
+        from core.config import config
+        p4_anims_path = config.get('export.character_animations_path', '')
+        if p4_anims_path:
+            path_edit.setPlaceholderText(f"Click [...] to browse (Default: P4 animations path)")
+        else:
+            path_edit.setPlaceholderText("Click [...] to select export directory")
+
         path_edit.setReadOnly(True)  # Make non-editable - must use browse button
 
         # Browse button
@@ -1004,10 +1012,21 @@ class AnimExporterDialog(QDialog):
 
         # Connect browse button to open directory dialog
         def browse_directory():
+            # Use configured P4 animation path as starting directory if available
+            from core.config import config
+            default_path = path_edit.text()
+
+            if not default_path:
+                # Try to use configured character animations path
+                p4_anims_path = config.get('export.character_animations_path', '')
+                if p4_anims_path:
+                    default_path = p4_anims_path
+                    print(f"[Anim Exporter] Using P4 animations path: {p4_anims_path}")
+
             directory = QFileDialog.getExistingDirectory(
                 self,
                 "Select Export Directory",
-                path_edit.text() or "",
+                default_path or "",
                 QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
             )
             if directory:

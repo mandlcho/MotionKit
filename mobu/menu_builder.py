@@ -270,6 +270,7 @@ class MenuBuilder:
             import mobu.tools.animation.keyframe_tools
             import mobu.tools.animation.anim_exporter
             import mobu.tools.character.character_mapper_qt
+            import mobu.tools.character.auto_characterize
             import mobu.tools.pipeline.scene_manager
             import mobu.tools.pipeline._settings_qt
             import mobu.tools.character.constraint_manager_qt
@@ -279,6 +280,7 @@ class MenuBuilder:
             importlib.reload(mobu.tools.animation.keyframe_tools)
             importlib.reload(mobu.tools.animation.anim_exporter)
             importlib.reload(mobu.tools.character.character_mapper_qt)
+            importlib.reload(mobu.tools.character.auto_characterize)
             importlib.reload(mobu.tools.character.constraint_manager_qt)
             importlib.reload(mobu.tools.pipeline.scene_manager)
             importlib.reload(mobu.tools.pipeline._settings_qt)

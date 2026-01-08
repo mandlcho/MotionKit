@@ -210,6 +210,10 @@ class TakeDelegate(QStyledItemDelegate):
         """Get the value from combobox and set it in the model"""
         model.setData(index, editor.currentText(), Qt.EditRole)
 
+    def updateEditorGeometry(self, editor, option, index):
+        """Make the combobox fill the entire cell"""
+        editor.setGeometry(option.rect)
+
     def get_scene_takes(self):
         """Get list of take names from the scene"""
         from pyfbsdk import FBSystem
@@ -288,6 +292,10 @@ class NamespaceDelegate(QStyledItemDelegate):
         """Get the value from combobox and set it in the model"""
         model.setData(index, editor.currentText(), Qt.EditRole)
 
+    def updateEditorGeometry(self, editor, option, index):
+        """Make the combobox fill the entire cell"""
+        editor.setGeometry(option.rect)
+
     def get_scene_characters(self):
         """Get list of character names from the scene"""
         from pyfbsdk import FBCharacter
@@ -321,12 +329,16 @@ class AddAnimationDialog(QDialog):
         layout.setSpacing(0)
         layout.setContentsMargins(10, 10, 10, 10)
 
+        # Get current take name for default animation name
+        current_take_name = self.get_current_take_name()
+
         # Top row - Animation Name and Frame Range
         top_row = QHBoxLayout()
         top_row.setSpacing(5)
         top_row.addWidget(QLabel("Animation Name:"))
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g., Idle, Walk, Run")
+        self.name_input.setText(current_take_name)  # Set default to current take name
         top_row.addWidget(self.name_input, stretch=1)
         top_row.addWidget(QLabel("Start:"))
         self.start_frame_input = QLineEdit()
@@ -368,10 +380,8 @@ class AddAnimationDialog(QDialog):
             self.namespace_combo.addItem(char)
 
         middle_row.addWidget(self.namespace_combo)
-        middle_row.addStretch()
-        layout.addLayout(middle_row)
 
-        # Add buttons
+        # Add buttons to the same row
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.on_accept)
         button_box.rejected.connect(self.reject)
@@ -380,10 +390,24 @@ class AddAnimationDialog(QDialog):
         add_button = button_box.button(QDialogButtonBox.Ok)
         add_button.setText("Add")
 
-        layout.addWidget(button_box)
+        middle_row.addStretch()
+        middle_row.addWidget(button_box)
+        layout.addLayout(middle_row)
 
         # Set focus to name input
         self.name_input.setFocus()
+
+    def get_current_take_name(self):
+        """Get the name of the current take"""
+        from pyfbsdk import FBSystem
+        try:
+            scene = FBSystem().Scene
+            current_take = scene.CurrentTake
+            if current_take:
+                return current_take.Name
+        except Exception as e:
+            print(f"[Anim Exporter] Error getting current take: {str(e)}")
+        return ""
 
     def get_scene_takes(self):
         """Get list of take names from the scene"""
@@ -395,8 +419,11 @@ class AddAnimationDialog(QDialog):
             for i in range(scene.Takes.GetCount()):
                 take = scene.Takes[i]
                 takes.append(take.Name)
+            print(f"[Anim Exporter] Found {len(takes)} takes in scene: {takes}")
         except Exception as e:
             print(f"[Anim Exporter] Error getting takes: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
         return takes
 

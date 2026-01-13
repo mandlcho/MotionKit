@@ -277,6 +277,7 @@ class MenuBuilder:
             import mobu.tools.unreal.content_browser
             import mobu.tools.unreal.live_link
             import mobu.tools.unreal.live_link_ui
+            import mobu.tools.unreal.send_to_unreal
             import mobu.tools.debug.random_objects
 
             importlib.reload(mobu.tools.animation.keyframe_tools)
@@ -289,6 +290,7 @@ class MenuBuilder:
             importlib.reload(mobu.tools.unreal.content_browser)
             importlib.reload(mobu.tools.unreal.live_link)
             importlib.reload(mobu.tools.unreal.live_link_ui)
+            importlib.reload(mobu.tools.unreal.send_to_unreal)
             importlib.reload(mobu.tools.debug.random_objects)
             print("[xMobu] Tool modules reloaded")
 

@@ -209,14 +209,6 @@ class LiveLinkStatusWindow(QtWidgets.QDialog):
         self.disconnect_btn.setEnabled(False)
         layout.addWidget(self.disconnect_btn)
 
-        # Send Selected button
-        self.send_btn = QtWidgets.QPushButton("Send Selected Objects")
-        self.send_btn.setMinimumHeight(35)
-        self.send_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
-        self.send_btn.clicked.connect(self._on_send_selected)
-        self.send_btn.setEnabled(False)
-        layout.addWidget(self.send_btn)
-
         frame.setLayout(layout)
         return frame
 
@@ -304,7 +296,6 @@ class LiveLinkStatusWindow(QtWidgets.QDialog):
 
             self.connect_btn.setEnabled(False)
             self.disconnect_btn.setEnabled(True)
-            self.send_btn.setEnabled(True)
         else:
             # Disconnected state
             self.status_indicator.setStyleSheet("color: #f44336; font-size: 24px;")
@@ -313,7 +304,6 @@ class LiveLinkStatusWindow(QtWidgets.QDialog):
 
             self.connect_btn.setEnabled(True)
             self.disconnect_btn.setEnabled(False)
-            self.send_btn.setEnabled(False)
 
         # Update statistics
         self.objects_sent_label.setText(str(self.objects_sent))
@@ -362,37 +352,6 @@ class LiveLinkStatusWindow(QtWidgets.QDialog):
         self._add_log('INFO', 'Disconnecting from Unreal Engine...')
         self.live_link.disconnect()
         self._add_log('INFO', 'Disconnected')
-        self._update_status()
-
-    def _on_send_selected(self):
-        """Handle send selected objects button click"""
-        from pyfbsdk import FBModelList
-
-        selected = FBModelList()
-        from pyfbsdk import FBGetSelectedModels
-        FBGetSelectedModels(selected)
-
-        if len(selected) == 0:
-            self._add_log('WARNING', 'No objects selected')
-            FBMessageBox("No Selection", "Please select objects to send to Unreal Engine.", "OK")
-            return
-
-        self._add_log('INFO', f'Sending {len(selected)} object(s) to Unreal Engine...')
-
-        success_count = 0
-        for model in selected:
-            if self.live_link.send_object(model):
-                success_count += 1
-                self.objects_sent += 1
-                self._add_log('INFO', f'  → Sent: {model.Name}')
-            else:
-                self._add_log('ERROR', f'  ✗ Failed: {model.Name}')
-
-        if success_count > 0:
-            self._add_log('INFO', f'Successfully sent {success_count}/{len(selected)} object(s)')
-        else:
-            self._add_log('ERROR', 'Failed to send objects')
-
         self._update_status()
 
     def _on_filter_changed(self):

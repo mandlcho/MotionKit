@@ -8,9 +8,34 @@ from PySide2 import QtWidgets, QtCore, QtGui
 from core.logger import logger
 from mobu.tools.unreal.live_link import get_live_link
 import sys
+import threading
 from datetime import datetime
 
-TOOL_NAME = "UE5 Live Link Monitor"
+TOOL_NAME = "LiveLink Settings"
+
+
+class ConnectionThread(QtCore.QThread):
+    """Thread for non-blocking connection attempts"""
+
+    connection_result = QtCore.Signal(bool, str)  # success, message
+
+    def __init__(self, live_link, host=None, port=None):
+        super(ConnectionThread, self).__init__()
+        self.live_link = live_link
+        self.host = host
+        self.port = port
+
+    def run(self):
+        """Run connection attempt in thread"""
+        try:
+            success = self.live_link.connect(self.host, self.port)
+            if success:
+                message = f"Connected to {self.live_link.host}:{self.live_link.port}"
+            else:
+                message = "Failed to connect to Unreal Engine"
+            self.connection_result.emit(success, message)
+        except Exception as e:
+            self.connection_result.emit(False, str(e))
 
 
 class LogHandler:
@@ -72,6 +97,9 @@ class LiveLinkStatusWindow(QtWidgets.QDialog):
 
         # Log initial message
         self.log_handler.add_message('INFO', 'Live Link Monitor started')
+
+        # Connection thread
+        self.connection_thread = None
 
     def _setup_ui(self):
         """Setup the user interface"""
@@ -291,22 +319,41 @@ class LiveLinkStatusWindow(QtWidgets.QDialog):
         self.objects_sent_label.setText(str(self.objects_sent))
 
     def _on_connect(self):
-        """Handle connect button click"""
+        """Handle connect button click - non-blocking"""
         self._add_log('INFO', 'Connecting to Unreal Engine...')
 
-        if self.live_link.connect():
-            self._add_log('INFO', f'Connected to {self.live_link.host}:{self.live_link.port}')
+        # Disable connect button during connection attempt
+        self.connect_btn.setEnabled(False)
+        self.connect_btn.setText("Connecting...")
+
+        # Start connection in separate thread to avoid freezing
+        self.connection_thread = ConnectionThread(self.live_link)
+        self.connection_thread.connection_result.connect(self._on_connection_result)
+        self.connection_thread.start()
+
+    def _on_connection_result(self, success, message):
+        """Handle connection thread result"""
+        # Re-enable connect button
+        self.connect_btn.setEnabled(True)
+        self.connect_btn.setText("Connect")
+
+        if success:
+            self._add_log('INFO', message)
             self._update_status()
         else:
             self._add_log('ERROR', 'Failed to connect to Unreal Engine')
             self._add_log('WARNING', 'Make sure UE5 receiver is running')
+            self._update_status()
+
+            # Show error dialog
             FBMessageBox(
                 "Connection Failed",
                 "Failed to connect to Unreal Engine.\n\n"
                 "Make sure:\n"
                 "1. Unreal Engine 5 is running\n"
                 "2. The receiver widget is started\n"
-                f"3. Port {self.live_link.port} is not blocked",
+                f"3. Port {self.live_link.port} is not blocked\n\n"
+                f"Details: {message}",
                 "OK"
             )
 
@@ -434,6 +481,12 @@ mobu/tools/unreal/README_LIVE_LINK.md
     def closeEvent(self, event):
         """Handle window close"""
         self.update_timer.stop()
+
+        # Clean up connection thread if running
+        if self.connection_thread and self.connection_thread.isRunning():
+            self.connection_thread.quit()
+            self.connection_thread.wait()
+
         event.accept()
 
 

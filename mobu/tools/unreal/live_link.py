@@ -14,7 +14,7 @@ from pyfbsdk import (
 from core.logger import logger
 from core.config import config
 
-TOOL_NAME = "UE5 Live Link"
+TOOL_NAME = "LiveLink Settings"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9998
 
@@ -49,7 +49,7 @@ class UnrealLiveLink:
 
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.settimeout(5.0)
+            self.socket.settimeout(2.0)  # Reduced from 5.0 to 2.0 seconds
             self.socket.connect((host, port))
             self.connected = True
 

@@ -188,6 +188,7 @@ class MotionBuilderReceiver:
         """Spawn an object in the Unreal level"""
         try:
             object_name = data.get("object_name", "MobuObject")
+            object_type = data.get("object_type", "FBModel")
             transform = data.get("transform", {})
             geometry = data.get("geometry")
 
@@ -209,16 +210,17 @@ class MotionBuilderReceiver:
                 actor = self._create_empty_actor(object_name, ue_location, ue_rotation, ue_scale)
 
             if actor:
-                unreal.log(f"[MoBu Link] Spawned '{object_name}'")
+                unreal.log(f"[MoBu Link] Spawned '{object_name}' (type: {object_type})")
             else:
-                unreal.log_warning(f"[MoBu Link] Failed to spawn '{object_name}'")
+                unreal.log_warning(f"[MoBu Link] Failed to spawn '{object_name}' (type: {object_type})")
 
         except Exception as e:
-            unreal.log_error(f"[MoBu Link] Error spawning: {str(e)}")
+            unreal.log_error(f"[MoBu Link] Error spawning '{object_name}': {str(e)}")
 
     def _create_empty_actor(self, name, location, rotation, scale):
         """Create an empty actor"""
         try:
+            # Try to spawn an empty actor
             actor = self.editor_actor_subsystem.spawn_actor_from_class(
                 unreal.Actor,
                 location,
@@ -228,11 +230,17 @@ class MotionBuilderReceiver:
             if actor:
                 actor.set_actor_label(name)
                 actor.set_actor_scale3d(scale)
-
-            return actor
+                return actor
+            else:
+                # If spawn returns None, log details
+                unreal.log_warning(f"[MoBu Link] spawn_actor_from_class returned None for '{name}'")
+                unreal.log_warning(f"[MoBu Link]   Location: {location}, Rotation: {rotation}, Scale: {scale}")
+                return None
 
         except Exception as e:
-            unreal.log_error(f"[MoBu Link] Error creating actor: {str(e)}")
+            unreal.log_error(f"[MoBu Link] Exception creating actor '{name}': {str(e)}")
+            import traceback
+            unreal.log_error(traceback.format_exc())
             return None
 
     def _create_mesh_actor(self, name, geometry, location, rotation, scale):

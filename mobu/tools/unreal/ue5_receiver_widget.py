@@ -261,10 +261,9 @@ class MotionBuilderReceiver:
             return None
 
 
-# Public API for Editor Utility Widget
-@unreal.ufunction(static=True, ret=bool, params=[])
+# Public API - Simple functions (no decorators needed for Python console)
 def start_receiver():
-    """Start the MotionBuilder receiver - called from Blueprint"""
+    """Start the MotionBuilder receiver"""
     global _receiver_instance
 
     if _receiver_instance and _receiver_instance.running:
@@ -275,9 +274,8 @@ def start_receiver():
     return _receiver_instance.start()
 
 
-@unreal.ufunction(static=True, ret=bool, params=[])
 def stop_receiver():
-    """Stop the MotionBuilder receiver - called from Blueprint"""
+    """Stop the MotionBuilder receiver"""
     global _receiver_instance
 
     if _receiver_instance:
@@ -287,23 +285,20 @@ def stop_receiver():
         return False
 
 
-@unreal.ufunction(static=True, ret=bool, params=[])
 def is_receiver_running():
-    """Check if receiver is running - called from Blueprint"""
+    """Check if receiver is running"""
     global _receiver_instance
     return _receiver_instance is not None and _receiver_instance.running
 
 
-@unreal.ufunction(static=True, ret=bool, params=[])
 def is_receiver_connected():
-    """Check if MotionBuilder is connected - called from Blueprint"""
+    """Check if MotionBuilder is connected"""
     global _receiver_instance
     return _receiver_instance is not None and _receiver_instance.connected
 
 
-@unreal.ufunction(static=True, ret=str, params=[])
 def get_receiver_status():
-    """Get receiver status as string - called from Blueprint"""
+    """Get receiver status as string"""
     global _receiver_instance
 
     if _receiver_instance:
@@ -318,9 +313,8 @@ def get_receiver_status():
         return "Not initialized"
 
 
-@unreal.ufunction(static=True, ret=int, params=[])
 def get_objects_received():
-    """Get count of objects received - called from Blueprint"""
+    """Get count of objects received"""
     global _receiver_instance
     if _receiver_instance:
         return _receiver_instance.objects_received

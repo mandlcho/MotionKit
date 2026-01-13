@@ -58,7 +58,12 @@ def execute(control, event):
             return
 
         # Show confirmation with object count
-        object_names = [obj.Name for obj in selected[:5]]  # Show first 5
+        # FBModelList doesn't support slice notation, use manual loop
+        object_names = []
+        max_display = min(5, len(selected))
+        for i in range(max_display):
+            object_names.append(selected[i].Name)
+
         if len(selected) > 5:
             object_list = "\n".join(f"  • {name}" for name in object_names)
             object_list += f"\n  • ... and {len(selected) - 5} more"

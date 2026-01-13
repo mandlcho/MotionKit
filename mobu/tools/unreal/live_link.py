@@ -14,7 +14,8 @@ from pyfbsdk import (
 from core.logger import logger
 from core.config import config
 
-TOOL_NAME = "LiveLink Settings"
+# Note: This module provides the backend connection logic only.
+# The menu item is provided by live_link_ui.py
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9998
 
@@ -251,20 +252,6 @@ def get_live_link():
     if _live_link_instance is None:
         _live_link_instance = UnrealLiveLink()
     return _live_link_instance
-
-
-def execute(control, event):
-    """Execute Unreal Live Link tool - Opens the monitoring UI"""
-    logger.info("Opening Unreal Live Link Monitor...")
-
-    try:
-        # Import and launch the UI
-        from mobu.tools.unreal.live_link_ui import execute as launch_ui
-        launch_ui(control, event)
-
-    except Exception as e:
-        logger.error(f"Unreal Live Link error: {str(e)}")
-        FBMessageBox("Error", f"Failed to open Live Link Monitor:\n{str(e)}", "OK")
 
 
 def send_selected_to_ue5(control, event):

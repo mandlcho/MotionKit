@@ -29,6 +29,27 @@
             }
         ]
     },
+    "max": {
+        "menu_name": "MotionKit",
+        "tool_categories": [
+            {
+                "name": "Animation",
+                "enabled": true
+            },
+            {
+                "name": "Modeling",
+                "enabled": true
+            },
+            {
+                "name": "Rendering",
+                "enabled": true
+            },
+            {
+                "name": "Pipeline",
+                "enabled": true
+            }
+        ]
+    },
     "perforce": {
         "server": "",
         "user": "",

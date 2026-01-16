@@ -40,11 +40,15 @@ def initialize():
         # Load configuration
         print("[MotionKit] Loading configuration...")
         menu_name = config.get('max.menu_name', 'MotionKit')
+        categories = config.get('max.tool_categories', [])
         print(f"[MotionKit] Menu name: {menu_name}")
+        print(f"[MotionKit] Enabled categories: {len([c for c in categories if c.get('enabled', True)])}")
 
-        # TODO: Build the menu system for Max
+        # Build the menu system
         print("[MotionKit] Building menu system...")
-        print("[MotionKit] NOTE: Max menu integration is under development")
+        from max.menu_builder import MenuBuilder
+        menu_builder = MenuBuilder()
+        menu_builder.build()
 
         print("[MotionKit] ========================================")
         print("[MotionKit] Initialization completed successfully!")

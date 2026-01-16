@@ -1,3 +1,3 @@
 """
-Unreal Engine Integration Tools for xMobu
+Unreal Engine Integration Tools for MotionKit
 """

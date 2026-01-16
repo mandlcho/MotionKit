@@ -1,3 +1,3 @@
 """
-Rigging Tools for xMobu
+Rigging Tools for MotionKit
 """

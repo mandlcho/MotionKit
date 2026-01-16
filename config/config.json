@@ -8,6 +8,10 @@
                 "enabled": true
             },
             {
+                "name": "Character",
+                "enabled": true
+            },
+            {
                 "name": "Rigging",
                 "enabled": true
             },

@@ -1,3 +1,3 @@
 """
-Pipeline Tools for xMobu
+Pipeline Tools for MotionKit
 """

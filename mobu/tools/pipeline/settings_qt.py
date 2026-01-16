@@ -1,5 +1,5 @@
 """
-xMobu Settings Tool (Qt Designer version)
+MotionKit Settings Tool (Qt Designer version)
 Configure P4 connection and export paths using Qt Designer UI
 """
 
@@ -24,7 +24,7 @@ except ImportError:
 from core.config import config
 from core.logger import logger
 
-TOOL_NAME = "xMobu Settings"
+TOOL_NAME = "Settings"
 
 # Global reference to prevent garbage collection
 _settings_dialog = None

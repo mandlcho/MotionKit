@@ -205,13 +205,18 @@ class MenuBuilder:
 
     def _open_settings(self, control, event):
         """Open settings dialog"""
-        from pyfbsdk import FBMessageBox
-        FBMessageBox(
-            "MotionKit Settings",
-            "Settings dialog coming soon!\n\n"
-            "For now, edit config/config.json to customize MotionKit.",
-            "OK"
-        )
+        try:
+            from mobu.tools.pipeline.settings_qt import execute as settings_execute
+            settings_execute(control, event)
+        except Exception as e:
+            from pyfbsdk import FBMessageBox
+            logger.error(f"Failed to open settings: {str(e)}")
+            FBMessageBox(
+                "MotionKit Settings Error",
+                f"Failed to open settings:\n{str(e)}\n\n"
+                "For now, edit config/config.json to customize MotionKit.",
+                "OK"
+            )
 
     def _reload_xmobu(self, control, event):
         """Reload MotionKit system"""

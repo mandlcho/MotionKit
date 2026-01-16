@@ -239,7 +239,7 @@ class MenuBuilder:
             builder = MenuBuilder()
             builder.build()
 
-            rt.messageBox("MotionKit reloaded successfully!" title="MotionKit")
+            rt.messageBox("MotionKit reloaded successfully!", title="MotionKit")
             logger.info("✓ Reload complete!")
 
         except Exception as e:

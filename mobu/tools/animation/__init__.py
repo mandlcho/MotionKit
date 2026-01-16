@@ -1,3 +1,3 @@
 """
-Animation Tools for xMobu
+Animation Tools for MotionKit
 """

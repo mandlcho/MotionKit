@@ -1,6 +1,6 @@
 """
 Keyframe manipulation tools
-Example tool demonstrating xMobu tool structure
+Example tool demonstrating MotionKit tool structure
 """
 
 from pyfbsdk import (

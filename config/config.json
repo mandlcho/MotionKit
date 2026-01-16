@@ -8,7 +8,15 @@
                 "enabled": true
             },
             {
-                "name": "Character",
+                "name": "Rigging",
+                "enabled": true
+            },
+            {
+                "name": "Debug",
+                "enabled": true
+            },
+            {
+                "name": "Pipeline",
                 "enabled": true
             },
             {

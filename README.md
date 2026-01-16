@@ -1,4 +1,4 @@
-# MotionKit - MotionBuilder Pipeline Toolset
+# MotionKit - DCC Pipeline Toolset
 
 A comprehensive, easy-to-deploy pipeline toolset for Autodesk MotionBuilder with future integration support for Maya and 3ds Max.
 

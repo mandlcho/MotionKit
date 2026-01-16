@@ -1,6 +1,6 @@
 """
 Menu builder for 3ds Max integration
-Dynamically builds menus from tool files in the tools/ directory
+Dynamically builds menus from tool files in the tools/ directory using MaxScript
 """
 
 import os
@@ -22,15 +22,15 @@ from core.logger import logger
 
 
 class MenuBuilder:
-    """Builds MotionKit menu structure in 3ds Max"""
+    """Builds MotionKit menu structure in 3ds Max using MaxScript"""
 
     def __init__(self):
         self.menu_name = config.get('max.menu_name', 'MotionKit')
         self.tool_categories = config.get('max.tool_categories', [])
-        self.main_menu = None
+        self.tools_registry = {}  # Store Python callbacks
 
     def build(self):
-        """Build the complete MotionKit menu"""
+        """Build the complete MotionKit menu using MaxScript"""
         if not pymxs or not rt:
             logger.error("Cannot build menu - pymxs not available")
             return False
@@ -38,42 +38,11 @@ class MenuBuilder:
         try:
             logger.info("Building MotionKit menu system for 3ds Max...")
 
-            # Get the main menu bar
-            main_menu_bar = rt.menuMan.getMainMenuBar()
+            # Generate MaxScript code to build the menu
+            maxscript_code = self._generate_menu_maxscript()
 
-            # Check if MotionKit menu already exists
-            existing_menu = None
-            for i in range(main_menu_bar.numMenus()):
-                menu = main_menu_bar.getMenu(i + 1)  # MaxScript is 1-indexed
-                if menu.getTitle() == self.menu_name:
-                    existing_menu = menu
-                    logger.info(f"Menu '{self.menu_name}' already exists, rebuilding...")
-                    break
-
-            # Remove existing menu if found
-            if existing_menu:
-                main_menu_bar.removeMenu(existing_menu)
-
-            # Create new menu
-            self.main_menu = rt.menuMan.createMenu(self.menu_name)
-
-            # Build category submenus
-            for category in self.tool_categories:
-                if category.get('enabled', True):
-                    self._build_category(category['name'])
-
-            # Add separator and utilities
-            separator = rt.menuMan.createSeparatorItem()
-            self.main_menu.addItem(separator, -1)
-
-            self._add_utility_items()
-
-            # Add menu to menu bar
-            submenu_item = rt.menuMan.createSubMenuItem(self.menu_name, self.main_menu)
-            main_menu_bar.addItem(submenu_item, -1)
-
-            # Update the menu bar
-            rt.menuMan.updateMenuBar()
+            # Execute the MaxScript
+            rt.execute(maxscript_code)
 
             logger.info(f"✓ Menu '{self.menu_name}' built successfully!")
             return True
@@ -83,17 +52,83 @@ class MenuBuilder:
             traceback.print_exc()
             return False
 
-    def _build_category(self, category_name):
-        """Build a tool category submenu"""
-        logger.info(f"Building category: {category_name}")
+    def _generate_menu_maxscript(self):
+        """Generate MaxScript code to create the entire menu structure"""
 
-        # Create category folder path
+        # Start building the MaxScript
+        ms = f'''
+-- MotionKit Menu Builder
+-- Auto-generated menu structure
+
+(
+    -- Get the main menu bar
+    local mainMenuBar = menuMan.getMainMenuBar()
+
+    -- Remove existing MotionKit menu if it exists
+    local existingMenu = menuMan.findMenu "{self.menu_name}"
+    if existingMenu != undefined then
+    (
+        menuMan.unRegisterMenu existingMenu
+    )
+
+    -- Create main MotionKit menu
+    local motionKitMenu = menuMan.createMenu "{self.menu_name}"
+
+'''
+
+        # Discover and register tools for each category
+        for category in self.tool_categories:
+            if category.get('enabled', True):
+                category_name = category['name']
+                ms += self._generate_category_maxscript(category_name)
+
+        # Add utility items
+        ms += '''
+    -- Add separator
+    local sep1 = menuMan.createSeparatorItem()
+    motionKitMenu.addItem sep1 -1
+
+'''
+
+        # Add Reload action
+        ms += self._generate_reload_maxscript()
+
+        # Add separator and About
+        ms += '''
+    -- Add separator
+    local sep2 = menuMan.createSeparatorItem()
+    motionKitMenu.addItem sep2 -1
+
+'''
+        ms += self._generate_about_maxscript()
+
+        # Finish the menu
+        ms += f'''
+    -- Create submenu item and add to main menu bar
+    local motionKitSubMenu = menuMan.createSubMenuItem "{self.menu_name}" motionKitMenu
+
+    -- Find a good position (before Help menu if possible)
+    local insertPos = mainMenuBar.numItems()
+    mainMenuBar.addItem motionKitSubMenu insertPos
+
+    -- Update the menu bar
+    menuMan.updateMenuBar()
+
+    format "[MotionKit] Menu added to menu bar\\n"
+)
+'''
+
+        return ms
+
+    def _generate_category_maxscript(self, category_name):
+        """Generate MaxScript for a tool category submenu"""
+
         category_folder = category_name.lower().replace(' ', '_')
         tools_path = Path(__file__).parent / 'tools' / category_folder
 
         if not tools_path.exists():
             logger.warning(f"Category folder not found: {tools_path}")
-            return
+            return ""
 
         # Find all tool files
         tool_files = [f for f in tools_path.glob('*.py')
@@ -101,34 +136,45 @@ class MenuBuilder:
 
         if not tool_files:
             logger.info(f"  No tools found in {category_name}")
-            return
+            return ""
 
         logger.info(f"  Found {len(tool_files)} tool(s) in {category_name}")
 
-        # Create submenu for this category
-        category_menu = rt.menuMan.createMenu(category_name)
+        # Create submenu for category
+        ms = f'''
+    -- Create {category_name} submenu
+    local {category_folder}Menu = menuMan.createMenu "{category_name}"
 
-        # Load each tool
+'''
+
+        # Add each tool
         tools_loaded = 0
         for tool_file in tool_files:
-            if self._load_tool(category_menu, category_folder, tool_file):
+            tool_ms = self._generate_tool_maxscript(category_folder, tool_file)
+            if tool_ms:
+                ms += tool_ms
                 tools_loaded += 1
 
-        # Add category submenu to main menu
         if tools_loaded > 0:
-            submenu_item = rt.menuMan.createSubMenuItem(category_name, category_menu)
-            self.main_menu.addItem(submenu_item, -1)
-            logger.info(f"  ✓ Loaded {tools_loaded}/{len(tool_files)} tools")
-        else:
-            logger.info(f"  No tools loaded for {category_name}")
+            # Add category submenu to main menu
+            ms += f'''
+    -- Add {category_name} submenu to main menu
+    local {category_folder}SubMenu = menuMan.createSubMenuItem "{category_name}" {category_folder}Menu
+    motionKitMenu.addItem {category_folder}SubMenu -1
 
-    def _load_tool(self, category_menu, category_folder, tool_file):
-        """Load a single tool and add it to the menu"""
+'''
+            logger.info(f"  ✓ Loaded {tools_loaded}/{len(tool_files)} tools")
+
+        return ms
+
+    def _generate_tool_maxscript(self, category_folder, tool_file):
+        """Generate MaxScript macro for a single tool"""
+
         try:
-            # Import the tool module
+            # Import the tool module to validate it
             module_name = f"max.tools.{category_folder}.{tool_file.stem}"
 
-            # Remove from sys.modules if already loaded (for reload support)
+            # Remove from sys.modules if already loaded
             if module_name in sys.modules:
                 del sys.modules[module_name]
 
@@ -137,89 +183,91 @@ class MenuBuilder:
             # Check for required attributes
             if not hasattr(module, 'TOOL_NAME'):
                 logger.warning(f"  ⚠ {tool_file.name} missing TOOL_NAME constant")
-                return False
+                return ""
 
             if not hasattr(module, 'execute'):
                 logger.warning(f"  ⚠ {tool_file.name} missing execute() function")
-                return False
+                return ""
 
             tool_name = module.TOOL_NAME
 
-            # Create MaxScript callback that calls Python function
-            # We need to store the Python callback globally
-            callback_name = f"motionkit_{category_folder}_{tool_file.stem}"
+            # Register Python callback
+            callback_key = f"{category_folder}_{tool_file.stem}"
+            self.tools_registry[callback_key] = module.execute
 
-            # Store in globals so MaxScript can call it
-            globals()[callback_name] = lambda: module.execute()
+            # Store in global namespace so MaxScript can access it
+            globals()[f"motionkit_tool_{callback_key}"] = module.execute
 
-            # Create MaxScript action
-            action_id = f"MotionKit_{category_folder}_{tool_file.stem}"
+            # Create unique macro ID
+            macro_id = f"MotionKit_{category_folder}_{tool_file.stem}"
 
-            # Register MaxScript macro
-            macroscript_code = f'''
-            macroScript {action_id}
-            category:"MotionKit"
-            buttonText:"{tool_name}"
-            tooltip:"{tool_name}"
-            (
-                python.execute "import max.menu_builder; max.menu_builder.{callback_name}()"
-            )
-            '''
+            # Generate MaxScript macro and menu item
+            ms = f'''
+    -- Tool: {tool_name}
+    macroScript {macro_id}
+    category:"MotionKit"
+    buttonText:"{tool_name}"
+    tooltip:"{tool_name}"
+    (
+        python.execute "import max.menu_builder; max.menu_builder.motionkit_tool_{callback_key}()"
+    )
 
-            rt.execute(macroscript_code)
+    local {callback_key}_action = menuMan.createActionItem "{macro_id}" "MotionKit"
+    {category_folder}Menu.addItem {callback_key}_action -1
 
-            # Create menu item that runs the macro
-            action_item = rt.menuMan.createActionItem(action_id, "MotionKit")
-            category_menu.addItem(action_item, -1)
+'''
 
             logger.debug(f"    ✓ {tool_name}")
-            return True
+            return ms
 
         except Exception as e:
             logger.error(f"  ✗ Failed to load {tool_file.name}: {str(e)}")
             traceback.print_exc()
-            return False
+            return ""
 
-    def _add_utility_items(self):
-        """Add utility menu items (settings, reload, about)"""
+    def _generate_reload_maxscript(self):
+        """Generate MaxScript for Reload menu item"""
 
-        # Reload MotionKit
-        reload_callback = lambda: self._reload_motionkit()
-        globals()['motionkit_reload'] = reload_callback
+        # Store reload callback
+        globals()['motionkit_reload'] = self._reload_motionkit
 
-        reload_macro = '''
-        macroScript MotionKit_Reload
-        category:"MotionKit"
-        buttonText:"Reload MotionKit"
-        tooltip:"Reload MotionKit"
-        (
-            python.execute "import max.menu_builder; max.menu_builder.motionkit_reload()"
-        )
-        '''
-        rt.execute(reload_macro)
-        reload_item = rt.menuMan.createActionItem("MotionKit_Reload", "MotionKit")
-        self.main_menu.addItem(reload_item, -1)
+        ms = '''
+    -- Reload MotionKit
+    macroScript MotionKit_Reload
+    category:"MotionKit"
+    buttonText:"Reload MotionKit"
+    tooltip:"Reload MotionKit system"
+    (
+        python.execute "import max.menu_builder; max.menu_builder.motionkit_reload()"
+    )
 
-        # Separator
-        separator = rt.menuMan.createSeparatorItem()
-        self.main_menu.addItem(separator, -1)
+    local reload_action = menuMan.createActionItem "MotionKit_Reload" "MotionKit"
+    motionKitMenu.addItem reload_action -1
 
-        # About
-        about_callback = lambda: self._show_about()
-        globals()['motionkit_about'] = about_callback
+'''
+        return ms
 
-        about_macro = '''
-        macroScript MotionKit_About
-        category:"MotionKit"
-        buttonText:"About MotionKit"
-        tooltip:"About MotionKit"
-        (
-            python.execute "import max.menu_builder; max.menu_builder.motionkit_about()"
-        )
-        '''
-        rt.execute(about_macro)
-        about_item = rt.menuMan.createActionItem("MotionKit_About", "MotionKit")
-        self.main_menu.addItem(about_item, -1)
+    def _generate_about_maxscript(self):
+        """Generate MaxScript for About menu item"""
+
+        # Store about callback
+        globals()['motionkit_about'] = self._show_about
+
+        ms = '''
+    -- About MotionKit
+    macroScript MotionKit_About
+    category:"MotionKit"
+    buttonText:"About MotionKit"
+    tooltip:"About MotionKit"
+    (
+        python.execute "import max.menu_builder; max.menu_builder.motionkit_about()"
+    )
+
+    local about_action = menuMan.createActionItem "MotionKit_About" "MotionKit"
+    motionKitMenu.addItem about_action -1
+
+'''
+        return ms
 
     def _reload_motionkit(self):
         """Reload MotionKit system"""

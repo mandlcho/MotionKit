@@ -381,9 +381,9 @@ class SettingsDialog(QDialog):
                                 "Error",
                                 f"Failed to create directory:\n{str(e)}"
                             )
-                            return
+                            return False
                     else:
-                        return
+                        return False
 
             config.set('export.fbx_path', fbx_path)
 
@@ -396,6 +396,7 @@ class SettingsDialog(QDialog):
                 "Settings saved successfully!"
             )
             print("[Settings Qt] Settings saved to config file")
+            return True
 
         except Exception as e:
             QMessageBox.critical(
@@ -404,6 +405,7 @@ class SettingsDialog(QDialog):
                 f"Failed to save settings:\n{str(e)}"
             )
             logger.error(f"Failed to save settings: {str(e)}")
+            return False
 
     def on_reset_settings(self):
         """Reset settings to defaults"""
@@ -424,6 +426,8 @@ class SettingsDialog(QDialog):
 
     def on_apply_and_close(self):
         """Save settings and close"""
-        self.on_save_settings()
-        print("[Settings Qt] Settings applied, closing window")
-        self.close()
+        if self.on_save_settings():
+            print("[Settings Qt] Settings applied, closing window")
+            self.close()
+        else:
+            print("[Settings Qt] Settings not saved, dialog remains open")

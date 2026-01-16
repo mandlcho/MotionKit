@@ -90,6 +90,9 @@ class MenuBuilder:
 
 '''
 
+        # Add Settings action
+        ms += self._generate_settings_maxscript()
+
         # Add Reload action
         ms += self._generate_reload_maxscript()
 
@@ -224,6 +227,36 @@ class MenuBuilder:
             logger.error(f"  ✗ Failed to load {tool_file.name}: {str(e)}")
             traceback.print_exc()
             return ""
+
+    def _generate_settings_maxscript(self):
+        """Generate MaxScript for Settings menu item"""
+
+        # Store settings callback
+        def open_settings():
+            try:
+                from max.tools.pipeline.settings import execute
+                execute()
+            except Exception as e:
+                logger.error(f"Failed to open settings: {str(e)}")
+                rt.messageBox(f"Failed to open settings:\n{str(e)}", title="MotionKit Settings Error")
+
+        globals()['motionkit_settings'] = open_settings
+
+        ms = '''
+    -- Settings
+    macroScript MotionKit_Settings
+    category:"MotionKit"
+    buttonText:"Settings..."
+    tooltip:"Configure MotionKit settings"
+    (
+        python.execute "import max.menu_builder; max.menu_builder.motionkit_settings()"
+    )
+
+    local settings_action = menuMan.createActionItem "MotionKit_Settings" "MotionKit"
+    motionKitMenu.addItem settings_action -1
+
+'''
+        return ms
 
     def _generate_reload_maxscript(self):
         """Generate MaxScript for Reload menu item"""

@@ -1,34 +1,38 @@
-# MotionKit - DCC Pipeline Toolset
+# MotionKit - Multi-DCC Pipeline Toolset
 
-A comprehensive, easy-to-deploy pipeline toolset for Autodesk MotionBuilder with future integration support for Maya and 3ds Max.
+A comprehensive, easy-to-deploy pipeline toolset for Autodesk MotionBuilder and 3ds Max with future integration support for Maya.
 
 ## Features
 
-- **Easy Installation**: One-click batch installer automatically configures MotionBuilder
-- **Menu Integration**: Access all tools from the MotionKit menu in MotionBuilder
+- **Easy Installation**: One-click batch installer automatically configures MotionBuilder and 3ds Max
+- **Multi-DCC Support**: Currently supports MotionBuilder 2020+ and 3ds Max 2020+
+- **Menu Integration**: Access all tools from the MotionKit menu in each application
 - **Organized Tools**: Tools categorized into Animation, Rigging, Pipeline, and Unreal Engine integration
-- **Extensible Architecture**: DCC-agnostic core designed for future Maya and Max integration
-- **Python 3**: Compatible with MotionBuilder 2020+
+- **Extensible Architecture**: DCC-agnostic core designed for easy expansion to other applications
+- **Python 3**: Full Python 3 support
 
 ## Installation
 
 1. Clone or download this repository
 2. Run `install.bat`
-3. Follow the prompts to configure your MotionBuilder installation
-4. Restart MotionBuilder
+3. The installer will automatically detect and configure:
+   - MotionBuilder (2020-2025)
+   - 3ds Max (2020-2026)
+4. Restart your applications
 
 The installer will automatically:
-- Detect your MotionBuilder installation
-- Configure the Python startup path
+- Detect your MotionBuilder and 3ds Max installations
+- Configure the Python startup path for MotionBuilder
+- Create MAXScript startup file for 3ds Max
 - Set up the MotionKit menu system
 
 ## Uninstallation
 
-To remove MotionKit from MotionBuilder:
+To remove MotionKit:
 
 1. Run `uninstall.bat`
-2. Choose which MotionBuilder versions to uninstall from
-3. Restart MotionBuilder
+2. Select to uninstall from all versions or specific applications
+3. Restart your applications
 
 The uninstaller removes only the startup integration. The MotionKit files remain in your directory for easy reinstallation.
 
@@ -79,9 +83,12 @@ The core framework is designed to be DCC-agnostic. Maya and Max integrations fol
 
 ## Requirements
 
-- MotionBuilder 2020 or newer
+- **MotionBuilder** 2020 or newer (optional)
+- **3ds Max** 2020 or newer (optional)
 - Python 3.7+
 - Windows (installer currently Windows-only, manual setup possible on other platforms)
+
+Note: The installer will detect and configure any installed DCC applications. You don't need both MotionBuilder and 3ds Max installed.
 
 ## License
 

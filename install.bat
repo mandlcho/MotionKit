@@ -70,7 +70,7 @@ if "!STRUCTURE_OK!"=="0" (
 echo.
 
 REM Detect MotionBuilder installations
-echo [STEP 3/5] Detecting MotionBuilder installations...
+echo [STEP 3/6] Detecting MotionBuilder installations...
 set "MOBU_FOUND=0"
 set "MOBU_VERSIONS="
 
@@ -95,54 +95,109 @@ for %%v in (2025 2024 2023 2022 2021 2020) do (
 )
 
 echo.
+
+REM Detect 3ds Max installations
+echo [STEP 4/6] Detecting 3ds Max installations...
+set "MAX_FOUND=0"
+set "MAX_VERSIONS="
+
+REM Check common installation paths for 3ds Max 2020-2026
+for %%v in (2026 2025 2024 2023 2022 2021 2020) do (
+    echo [SCAN] Checking for 3ds Max %%v...
+    if exist "C:\Program Files\Autodesk\3ds Max %%v" (
+        echo [FOUND] 3ds Max %%v at: C:\Program Files\Autodesk\3ds Max %%v
+
+        REM Check if scripts\Startup directory exists
+        if exist "C:\Program Files\Autodesk\3ds Max %%v\scripts\Startup" (
+            echo [OK] scripts\Startup directory exists
+        ) else (
+            echo [WARN] scripts\Startup directory not found, will attempt to create
+        )
+
+        set "MAX_FOUND=1"
+        set "MAX_VERSIONS=!MAX_VERSIONS! %%v"
+    ) else (
+        echo [SKIP] 3ds Max %%v not found
+    )
+)
+
+echo.
 if "%MOBU_FOUND%"=="0" (
-    echo [ERROR] No MotionBuilder installation detected in default location
-    echo [INFO] Default search location: C:\Program Files\Autodesk\MotionBuilder [VERSION]
-    echo.
-    echo Manual Installation Required:
-    echo 1. Locate your MotionBuilder installation folder
-    echo 2. Navigate to: bin\config\PythonStartup
-    echo 3. Create a file called motionkit_init.py with the following content:
-    echo.
-    echo ---- BEGIN FILE CONTENT ----
-    echo import sys
-    echo sys.path.insert(0, r'%MOTIONKIT_ROOT%'^)
-    echo import mobu.startup
-    echo ---- END FILE CONTENT ----
-    echo.
-    echo Terminal will remain open for review...
-    pause
-    exit /b 1
+    if "%MAX_FOUND%"=="0" (
+        echo [ERROR] No MotionBuilder or 3ds Max installation detected
+        echo [INFO] Default search locations:
+        echo [INFO] - MotionBuilder: C:\Program Files\Autodesk\MotionBuilder [VERSION]
+        echo [INFO] - 3ds Max: C:\Program Files\Autodesk\3ds Max [VERSION]
+        echo.
+        echo Terminal will remain open for review...
+        pause
+        exit /b 1
+    ) else (
+        echo [INFO] No MotionBuilder installations found
+    )
+) else (
+    echo [INFO] Found %MOBU_FOUND% MotionBuilder installation(s)
 )
 
-echo [STEP 4/5] Selecting MotionBuilder version(s) to configure...
-echo.
-echo Found MotionBuilder installations:
+if "%MAX_FOUND%"=="0" (
+    if "%MOBU_FOUND%"=="1" (
+        echo [INFO] No 3ds Max installations found
+    )
+) else (
+    echo [INFO] Found %MAX_FOUND% 3ds Max installation(s)
+)
 echo.
 
-REM List available versions
-set /a count=0
-for %%v in (%MOBU_VERSIONS%) do (
-    set /a count+=1
-    echo [!count!] MotionBuilder %%v
-    set "VERSION_!count!=%%v"
+echo [STEP 5/6] Selecting applications to configure...
+echo.
+
+if "%MOBU_FOUND%"=="1" (
+    echo Found MotionBuilder installations:
+    for %%v in (%MOBU_VERSIONS%) do (
+        echo   - MotionBuilder %%v
+    )
+    echo.
 )
 
-echo.
+if "%MAX_FOUND%"=="1" (
+    echo Found 3ds Max installations:
+    for %%v in (%MAX_VERSIONS%) do (
+        echo   - 3ds Max %%v
+    )
+    echo.
+)
+
 echo [AUTO-INSTALL] Installing for ALL detected versions...
 echo [INFO] To manually select versions, edit install.bat
 echo.
 
-echo [STEP 5/5] Installing MotionKit...
+echo [STEP 6/6] Installing MotionKit...
 echo.
 
-REM Automatically install for all versions
-for %%v in (%MOBU_VERSIONS%) do (
-    call :InstallForVersion %%v
+REM Install for MotionBuilder
+if "%MOBU_FOUND%"=="1" (
+    echo ========================================
+    echo Installing for MotionBuilder...
+    echo ========================================
+    for %%v in (%MOBU_VERSIONS%) do (
+        call :InstallForMobu %%v
+    )
 )
+
+REM Install for 3ds Max
+if "%MAX_FOUND%"=="1" (
+    echo.
+    echo ========================================
+    echo Installing for 3ds Max...
+    echo ========================================
+    for %%v in (%MAX_VERSIONS%) do (
+        call :InstallForMax %%v
+    )
+)
+
 goto :Done
 
-:InstallForVersion
+:InstallForMobu
 set "VERSION=%~1"
 set "MOBU_PATH=C:\Program Files\Autodesk\MotionBuilder %VERSION%"
 set "STARTUP_PATH=%MOBU_PATH%\bin\config\PythonStartup"
@@ -253,6 +308,104 @@ if exist "%STARTUP_FILE%" (
     echo 1. Create file: %STARTUP_FILE%
     echo 2. Copy the content shown above into the file
     echo 3. Save and restart MotionBuilder
+)
+echo.
+
+goto :eof
+
+:InstallForMax
+set "VERSION=%~1"
+set "MAX_PATH=C:\Program Files\Autodesk\3ds Max %VERSION%"
+set "STARTUP_PATH=%MAX_PATH%\scripts\Startup"
+
+echo.
+echo ----------------------------------------
+echo [VERSION] 3ds Max %VERSION%
+echo ----------------------------------------
+echo [INFO] 3ds Max path: %MAX_PATH%
+echo [INFO] Startup path: %STARTUP_PATH%
+echo.
+
+REM Check if 3ds Max directory exists
+if not exist "%MAX_PATH%" (
+    echo [ERROR] 3ds Max directory does not exist!
+    echo [ERROR] Path: %MAX_PATH%
+    goto :eof
+)
+
+REM Create Startup directory if it doesn't exist
+if not exist "%STARTUP_PATH%" (
+    echo [WARN] Startup directory does not exist
+    echo [ACTION] Creating directory: %STARTUP_PATH%
+    mkdir "%STARTUP_PATH%" 2>nul
+
+    if exist "%STARTUP_PATH%" (
+        echo [OK] Directory created successfully
+    ) else (
+        echo [ERROR] Failed to create directory (permission denied?)
+        echo [ERROR] You may need to run this installer as Administrator
+        goto :eof
+    )
+) else (
+    echo [OK] Startup directory exists
+)
+
+REM Create the startup script (MAXScript file)
+set "STARTUP_FILE=%STARTUP_PATH%\motionkit_init.ms"
+echo.
+echo [ACTION] Creating startup script...
+echo [FILE] %STARTUP_FILE%
+echo.
+echo [CONTENT] Writing MAXScript startup script:
+echo ----------------------------------------
+
+echo -- MotionKit Startup Script for 3ds Max > "%STARTUP_FILE%"
+echo -- Auto-generated by MotionKit installer >> "%STARTUP_FILE%"
+echo -- This file is executed when 3ds Max starts >> "%STARTUP_FILE%"
+echo. >> "%STARTUP_FILE%"
+echo ^( >> "%STARTUP_FILE%"
+echo     -- Add MotionKit to Python path >> "%STARTUP_FILE%"
+echo     local motionkit_root = "%MOTIONKIT_ROOT:\=\\%" >> "%STARTUP_FILE%"
+echo. >> "%STARTUP_FILE%"
+echo     python.execute ^("import sys"^) >> "%STARTUP_FILE%"
+echo     python.execute ^("motionkit_root = r'" + motionkit_root + "'"^) >> "%STARTUP_FILE%"
+echo     python.execute ^("if motionkit_root not in sys.path: sys.path.insert^(0, motionkit_root^)"^) >> "%STARTUP_FILE%"
+echo     python.execute ^("print^('[MotionKit] Added ' + motionkit_root + ' to Python path'^)"^) >> "%STARTUP_FILE%"
+echo. >> "%STARTUP_FILE%"
+echo     -- Initialize MotionKit >> "%STARTUP_FILE%"
+echo     python.execute ^("print^('[MotionKit] Initializing MotionKit menu system...'^)"^) >> "%STARTUP_FILE%"
+echo     python.execute ^("try:\n    import max.startup\n    print^('[MotionKit] Initialization completed successfully!'^)\n    print^('[MotionKit] Menu should appear in: MotionKit ^> [categories]'^)\nexcept ImportError as e:\n    print^('[MotionKit ERROR] Import failed - ' + str^(e^)^)\n    print^('[MotionKit ERROR] Check that all MotionKit files are present'^)\n    import traceback\n    traceback.print_exc^(^)\nexcept Exception as e:\n    print^('[MotionKit ERROR] Initialization failed - ' + str^(e^)^)\n    import traceback\n    traceback.print_exc^(^)"^) >> "%STARTUP_FILE%"
+echo. >> "%STARTUP_FILE%"
+echo     format "[MotionKit] Startup script executed\n" >> "%STARTUP_FILE%"
+echo ^) >> "%STARTUP_FILE%"
+
+echo ----------------------------------------
+echo.
+
+REM Verify file was created
+if exist "%STARTUP_FILE%" (
+    echo [OK] Startup script created successfully!
+
+    REM Show file size
+    for %%A in ("%STARTUP_FILE%") do (
+        echo [INFO] File size: %%~zA bytes
+        echo [INFO] File location: %%~fA
+    )
+
+    echo.
+    echo [SUCCESS] 3ds Max %VERSION% configured successfully!
+) else (
+    echo [ERROR] Failed to create startup script!
+    echo [ERROR] Target path: %STARTUP_FILE%
+    echo [ERROR] Possible causes:
+    echo [ERROR] - Permission denied (try running as Administrator^)
+    echo [ERROR] - Disk full
+    echo [ERROR] - Antivirus blocking file creation
+    echo.
+    echo [WORKAROUND] Manual installation:
+    echo 1. Create file: %STARTUP_FILE%
+    echo 2. Copy the motionkit_init.ms from the MotionKit directory
+    echo 3. Save and restart 3ds Max
 )
 echo.
 

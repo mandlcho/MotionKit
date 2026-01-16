@@ -1,3 +1,0 @@
-"""
-Animation Tools for xMobu
-"""

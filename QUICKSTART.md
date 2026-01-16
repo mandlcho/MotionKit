@@ -1,11 +1,11 @@
-# xMobu Quick Start Guide
+# MotionKit Quick Start Guide
 
 ## Installation (5 minutes)
 
-### Step 1: Get xMobu
+### Step 1: Get MotionKit
 ```bash
-git clone <repository-url> C:\xMobu
-cd C:\xMobu
+git clone <repository-url> C:\MotionKit
+cd C:\MotionKit
 ```
 
 ### Step 2: Run Installer
@@ -15,26 +15,26 @@ Double-click `install.bat` and follow the prompts:
 - Press any key to complete
 
 ### Step 3: Launch MotionBuilder
-Start MotionBuilder and look for the **xMobu** menu in the menu bar!
+Start MotionBuilder and look for the **MotionKit** menu in the menu bar!
 
 ## Uninstallation
 
-To remove xMobu:
+To remove MotionKit:
 
 1. Double-click `uninstall.bat`
 2. Choose which MotionBuilder version(s) to remove from
 3. Restart MotionBuilder
 
-The xMobu files remain in the directory for easy reinstallation.
+The MotionKit files remain in the directory for easy reinstallation.
 
 ## First Steps
 
 ### Accessing Tools
 
-All tools are organized under the **xMobu** menu:
+All tools are organized under the **MotionKit** menu:
 
 ```
-xMobu
+MotionKit
 ├── Animation
 │   └── Keyframe Tools
 ├── Rigging
@@ -45,9 +45,9 @@ xMobu
 │   └── UE Content Browser
 ├── ───────────────
 ├── Settings...
-├── Reload xMobu
+├── Reload MotionKit
 ├── ───────────────
-└── About xMobu
+└── About MotionKit
 ```
 
 ### Configuration
@@ -62,7 +62,7 @@ Edit `config/config.json` to customize:
 }
 ```
 
-Then use **xMobu > Reload xMobu** to apply changes.
+Then use **MotionKit > Reload MotionKit** to apply changes.
 
 ## Creating Your First Tool
 
@@ -78,16 +78,16 @@ TOOL_NAME = "My First Tool"
 
 def execute(control, event):
     logger.info("Hello from my tool!")
-    FBMessageBox("Success", "My first xMobu tool!", "OK")
+    FBMessageBox("Success", "My first MotionKit tool!", "OK")
 ```
 
-### 2. Reload xMobu
+### 2. Reload MotionKit
 
-In MotionBuilder: **xMobu > Reload xMobu**
+In MotionBuilder: **MotionKit > Reload MotionKit**
 
 ### 3. Test it
 
-Click **xMobu > Animation > My First Tool**
+Click **MotionKit > Animation > My First Tool**
 
 That's it! Your tool now appears in the menu automatically.
 
@@ -96,13 +96,13 @@ That's it! Your tool now appears in the menu automatically.
 ### Export Animation to Unreal
 
 1. Select character/objects in MotionBuilder
-2. **xMobu > Unreal Engine > UE Content Browser**
+2. **MotionKit > Unreal Engine > UE Content Browser**
 3. Configure export settings
 4. Animation is automatically imported to Unreal
 
 ### Batch Processing
 
-1. **xMobu > Pipeline > Scene Manager**
+1. **MotionKit > Pipeline > Scene Manager**
 2. Select files to process
 3. Choose operation
 4. Run batch process
@@ -110,7 +110,7 @@ That's it! Your tool now appears in the menu automatically.
 ### Reload Tools During Development
 
 After making changes to tool code:
-- **xMobu > Reload xMobu** (or restart MotionBuilder)
+- **MotionKit > Reload MotionKit** (or restart MotionBuilder)
 - Changes take effect immediately
 
 ## Tips
@@ -124,13 +124,13 @@ After making changes to tool code:
 
 ### Menu doesn't appear
 - Check MotionBuilder console for errors
-- Verify installation: Look for `xmobu_init.py` in `MotionBuilder/bin/config/PythonStartup/`
+- Verify installation: Look for `motionkit_init.py` in `MotionBuilder/bin/config/PythonStartup/`
 - Try manual initialization in Python console: `import mobu.startup`
 
 ### Tool doesn't show up
 - Verify file is in correct category folder
 - Check that `TOOL_NAME` and `execute` are defined
-- Use **Reload xMobu** after adding new tools
+- Use **Reload MotionKit** after adding new tools
 - Check console for import errors
 
 ### Import errors

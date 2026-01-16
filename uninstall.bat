@@ -1,19 +1,19 @@
 @echo off
-REM xMobu Uninstallation Script
-REM Removes xMobu startup scripts from MotionBuilder installations
+REM MotionKit Uninstallation Script
+REM Removes MotionKit startup scripts from MotionBuilder installations
 
 echo.
 echo ========================================
-echo  xMobu Uninstallation
+echo  MotionKit Uninstallation
 echo ========================================
 echo.
 
 REM Get the directory where this script is located
-set "XMOBU_ROOT=%~dp0"
-set "XMOBU_ROOT=%XMOBU_ROOT:~0,-1%"
+set "MOTIONKIT_ROOT=%~dp0"
+set "MOTIONKIT_ROOT=%MOTIONKIT_ROOT:~0,-1%"
 
-echo This will remove xMobu integration from MotionBuilder.
-echo The xMobu files in %XMOBU_ROOT% will NOT be deleted.
+echo This will remove MotionKit integration from MotionBuilder.
+echo The MotionKit files in %MOTIONKIT_ROOT% will NOT be deleted.
 echo.
 echo Do you want to continue?
 set /p "confirm=Type YES to confirm: "
@@ -34,8 +34,8 @@ REM Check common installation paths for MotionBuilder 2020-2025
 for %%v in (2025 2024 2023 2022 2021 2020) do (
     if exist "C:\Program Files\Autodesk\MotionBuilder %%v" (
         set "STARTUP_PATH=C:\Program Files\Autodesk\MotionBuilder %%v\bin\config\PythonStartup"
-        if exist "!STARTUP_PATH!\xmobu_init.py" (
-            echo [*] Found xMobu installation in MotionBuilder %%v
+        if exist "!STARTUP_PATH!\motionkit_init.py" (
+            echo [*] Found MotionKit installation in MotionBuilder %%v
             set "MOBU_FOUND=1"
             set "MOBU_VERSIONS=!MOBU_VERSIONS! %%v"
         )
@@ -44,20 +44,20 @@ for %%v in (2025 2024 2023 2022 2021 2020) do (
 
 if "%MOBU_FOUND%"=="0" (
     echo.
-    echo [!] No xMobu installations found in MotionBuilder
-    echo     xMobu may not be installed, or was installed manually.
+    echo [!] No MotionKit installations found in MotionBuilder
+    echo     MotionKit may not be installed, or was installed manually.
     echo.
-    echo If you installed xMobu manually:
+    echo If you installed MotionKit manually:
     echo 1. Locate your MotionBuilder installation folder
     echo 2. Navigate to: bin\config\PythonStartup
-    echo 3. Delete the xmobu_init.py file
+    echo 3. Delete the motionkit_init.py file
     echo.
     pause
     exit /b 1
 )
 
 echo.
-echo Found xMobu in the following MotionBuilder versions:
+echo Found MotionKit in the following MotionBuilder versions:
 for %%v in (%MOBU_VERSIONS%) do (
     echo   - MotionBuilder %%v
 )
@@ -118,7 +118,7 @@ exit /b 1
 set "VERSION=%~1"
 set "MOBU_PATH=C:\Program Files\Autodesk\MotionBuilder %VERSION%"
 set "STARTUP_PATH=%MOBU_PATH%\bin\config\PythonStartup"
-set "STARTUP_FILE=%STARTUP_PATH%\xmobu_init.py"
+set "STARTUP_FILE=%STARTUP_PATH%\motionkit_init.py"
 
 echo.
 echo Processing MotionBuilder %VERSION%...
@@ -134,7 +134,7 @@ if exist "%STARTUP_FILE%" (
         echo        You may need to delete it manually with administrator privileges.
     )
 ) else (
-    echo [SKIP] No xMobu installation found in MotionBuilder %VERSION%
+    echo [SKIP] No MotionKit installation found in MotionBuilder %VERSION%
 )
 
 goto :eof
@@ -145,12 +145,12 @@ echo ========================================
 echo  Uninstallation Complete!
 echo ========================================
 echo.
-echo xMobu has been removed from MotionBuilder.
+echo MotionKit has been removed from MotionBuilder.
 echo.
-echo The xMobu files in this directory were NOT deleted.
-echo If you want to completely remove xMobu:
-echo 1. Delete this folder: %XMOBU_ROOT%
+echo The MotionKit files in this directory were NOT deleted.
+echo If you want to completely remove MotionKit:
+echo 1. Delete this folder: %MOTIONKIT_ROOT%
 echo.
-echo To reinstall xMobu later, simply run install.bat again.
+echo To reinstall MotionKit later, simply run install.bat again.
 echo.
 pause

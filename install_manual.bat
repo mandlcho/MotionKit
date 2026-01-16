@@ -1,14 +1,14 @@
 @echo off
 SETLOCAL ENABLEDELAYEDEXPANSION
-REM Manual installation helper for xMobu - VERBOSE MODE
+REM Manual installation helper for MotionKit - VERBOSE MODE
 REM Run this as Administrator
 
 echo.
 echo ========================================
-echo  xMobu Manual Installation [VERBOSE]
+echo  MotionKit Manual Installation [VERBOSE]
 echo ========================================
 echo.
-echo [INFO] This script copies xmobu_init.py to MotionBuilder's startup folder
+echo [INFO] This script copies motionkit_init.py to MotionBuilder's startup folder
 echo [INFO] Time: %TIME%
 echo [INFO] Date: %DATE%
 echo.
@@ -30,8 +30,8 @@ if %errorLevel% neq 0 (
     echo.
 )
 
-set "SOURCE=%~dp0xmobu_init.py"
-set "DEST=C:\Program Files\Autodesk\MotionBuilder 2024\bin\config\PythonStartup\xmobu_init.py"
+set "SOURCE=%~dp0motionkit_init.py"
+set "DEST=C:\Program Files\Autodesk\MotionBuilder 2024\bin\config\PythonStartup\motionkit_init.py"
 
 echo [INFO] Source file: %SOURCE%
 echo [INFO] Destination: %DEST%
@@ -43,7 +43,7 @@ if not exist "%SOURCE%" (
     echo [ERROR] Expected location: %SOURCE%
     echo [ERROR] Cannot proceed without source file
     echo.
-    echo [ACTION] Ensure xmobu_init.py exists in the xMobu directory
+    echo [ACTION] Ensure motionkit_init.py exists in the MotionKit directory
     echo.
     pause
     exit /b 1
@@ -122,24 +122,24 @@ if exist "%DEST%" (
     echo  Installation Successful!
     echo ========================================
     echo.
-    echo [STATUS] xMobu has been installed to MotionBuilder 2024
+    echo [STATUS] MotionKit has been installed to MotionBuilder 2024
     echo.
     echo [NEXT STEPS]
     echo 1. Start/Restart MotionBuilder 2024
     echo 2. Open Python Console: View ^> Python Console
-    echo 3. Look for messages starting with [xMobu]
-    echo 4. Check menu bar for "xMobu" menu
+    echo 3. Look for messages starting with [MotionKit]
+    echo 4. Check menu bar for "MotionKit" menu
     echo.
     echo [EXPECTED CONSOLE OUTPUT]
-    echo [xMobu] Added C:\Users\elementa\projects\xMobu to Python path
-    echo [xMobu] Initializing xMobu menu system...
-    echo [xMobu] Initialization completed successfully!
-    echo [xMobu] Menu should appear in: xMobu ^> [categories]
+    echo [MotionKit] Added C:\Users\elementa\projects\MotionKit to Python path
+    echo [MotionKit] Initializing MotionKit menu system...
+    echo [MotionKit] Initialization completed successfully!
+    echo [MotionKit] Menu should appear in: MotionKit ^> [categories]
     echo.
     echo [TROUBLESHOOTING]
     echo - If no console messages appear, check the file was installed correctly
     echo - If error messages appear, report them for debugging
-    echo - All xMobu messages are prefixed with [xMobu]
+    echo - All MotionKit messages are prefixed with [MotionKit]
     echo.
 ) else (
     echo [ERROR] File copy failed!
@@ -153,7 +153,7 @@ if exist "%DEST%" (
     echo [MANUAL WORKAROUND]
     echo 1. Open File Explorer as Administrator
     echo 2. Navigate to: %DEST_DIR%
-    echo 3. Copy xmobu_init.py from xMobu directory
+    echo 3. Copy motionkit_init.py from MotionKit directory
     echo 4. Paste it into the PythonStartup folder
     echo.
 )

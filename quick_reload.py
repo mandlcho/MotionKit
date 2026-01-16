@@ -1,22 +1,22 @@
 """
-Quick Reload Script for xMobu Development
+Quick Reload Script for MotionKit Development
 Run this in MotionBuilder's Python Console for fast iteration
 
 Usage in Python Console:
-    exec(open(r'C:\Users\elementa\projects\xMobu\quick_reload.py').read())
+    exec(open(r'C:\Users\elementa\projects\MotionKit\quick_reload.py').read())
 
 Or shorter alias:
-    reload_xmobu()  (after first run)
+    reload_motionkit()  (after first run)
 """
 
 import importlib
 import sys
 
 
-def reload_xmobu():
-    """Reload all xMobu modules without restarting MotionBuilder"""
+def reload_motionkit():
+    """Reload all MotionKit modules without restarting MotionBuilder"""
     print("\n" + "="*50)
-    print("QUICK RELOAD - xMobu Development")
+    print("QUICK RELOAD - MotionKit Development")
     print("="*50)
 
     try:
@@ -99,9 +99,9 @@ def reload_xmobu():
 
 # Run immediately if executed
 if __name__ == "__main__":
-    reload_xmobu()
+    reload_motionkit()
 else:
     # Make function available globally
-    print("\n[xMobu Quick Reload] Function registered!")
-    print("Usage: reload_xmobu()")
-    reload_xmobu()
+    print("\n[MotionKit Quick Reload] Function registered!")
+    print("Usage: reload_motionkit()")
+    reload_motionkit()

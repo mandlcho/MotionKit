@@ -1,11 +1,11 @@
-# xMobu - MotionBuilder Pipeline Toolset
+# MotionKit - MotionBuilder Pipeline Toolset
 
 A comprehensive, easy-to-deploy pipeline toolset for Autodesk MotionBuilder with future integration support for Maya and 3ds Max.
 
 ## Features
 
 - **Easy Installation**: One-click batch installer automatically configures MotionBuilder
-- **Menu Integration**: Access all tools from the xMobu menu in MotionBuilder
+- **Menu Integration**: Access all tools from the MotionKit menu in MotionBuilder
 - **Organized Tools**: Tools categorized into Animation, Rigging, Pipeline, and Unreal Engine integration
 - **Extensible Architecture**: DCC-agnostic core designed for future Maya and Max integration
 - **Python 3**: Compatible with MotionBuilder 2020+
@@ -20,21 +20,21 @@ A comprehensive, easy-to-deploy pipeline toolset for Autodesk MotionBuilder with
 The installer will automatically:
 - Detect your MotionBuilder installation
 - Configure the Python startup path
-- Set up the xMobu menu system
+- Set up the MotionKit menu system
 
 ## Uninstallation
 
-To remove xMobu from MotionBuilder:
+To remove MotionKit from MotionBuilder:
 
 1. Run `uninstall.bat`
 2. Choose which MotionBuilder versions to uninstall from
 3. Restart MotionBuilder
 
-The uninstaller removes only the startup integration. The xMobu files remain in your directory for easy reinstallation.
+The uninstaller removes only the startup integration. The MotionKit files remain in your directory for easy reinstallation.
 
 ## Usage
 
-After installation, launch MotionBuilder and you'll find the **xMobu** menu in the menu bar with the following categories:
+After installation, launch MotionBuilder and you'll find the **MotionKit** menu in the menu bar with the following categories:
 
 - **Animation**: Tools for keyframe manipulation, retargeting, and mocap cleanup
 - **Rigging**: Character setup and rig utilities
@@ -44,7 +44,7 @@ After installation, launch MotionBuilder and you'll find the **xMobu** menu in t
 ## Project Structure
 
 ```
-xMobu/
+MotionKit/
 ├── install.bat              # Automatic installer
 ├── uninstall.bat            # Automatic uninstaller
 ├── core/                    # DCC-agnostic core framework

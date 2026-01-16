@@ -1,13 +1,13 @@
-# xMobu Development Guide
+# MotionKit Development Guide
 
 ## Architecture Overview
 
-xMobu is designed with a modular, DCC-agnostic architecture that allows easy extension to multiple applications.
+MotionKit is designed with a modular, DCC-agnostic architecture that allows easy extension to multiple applications.
 
 ### Directory Structure
 
 ```
-xMobu/
+MotionKit/
 ├── core/                   # DCC-agnostic core functionality
 │   ├── logger.py          # Centralized logging
 │   ├── config.py          # Configuration management
@@ -26,7 +26,7 @@ xMobu/
 ### Method 1: Use the Menu (Easiest)
 
 1. Make changes to your Python files
-2. In MotionBuilder: **xMobu > Reload xMobu**
+2. In MotionBuilder: **MotionKit > Reload MotionKit**
 3. Test your changes immediately
 
 This reloads all modules and rebuilds the menu without restarting MotionBuilder.
@@ -37,21 +37,21 @@ For rapid iteration, use the Python Console (View > Python Console):
 
 **First time setup:**
 ```python
-exec(open(r'C:\Users\elementa\projects\xMobu\quick_reload.py').read())
+exec(open(r'C:\Users\elementa\projects\MotionKit\quick_reload.py').read())
 ```
 
 **Subsequent reloads (after first run):**
 ```python
-reload_xmobu()
+reload_motionkit()
 ```
 
-This reloads all xMobu modules in seconds!
+This reloads all MotionKit modules in seconds!
 
 ### Method 3: Keyboard Shortcut (Advanced)
 
 1. Open MotionBuilder's Keyboard Editor
 2. Create a shortcut (e.g., Ctrl+Shift+R)
-3. Assign it to run: `exec(open(r'C:\Users\elementa\projects\xMobu\quick_reload.py').read())`
+3. Assign it to run: `exec(open(r'C:\Users\elementa\projects\MotionKit\quick_reload.py').read())`
 
 Now press your shortcut to reload instantly!
 
@@ -95,7 +95,7 @@ def execute(control, event):
 
 **No installation needed!** Just:
 1. Save your new tool file
-2. Run `reload_xmobu()` in Python Console (or use xMobu > Reload xMobu)
+2. Run `reload_motionkit()` in Python Console (or use MotionKit > Reload MotionKit)
 3. Your tool appears in the menu automatically
 
 ## Creating Custom UIs
@@ -147,7 +147,7 @@ Edit `config/config.json` to customize:
 ```json
 {
     "mobu": {
-        "menu_name": "xMobu",
+        "menu_name": "MotionKit",
         "tool_categories": [
             {"name": "Animation", "enabled": true},
             {"name": "Custom Category", "enabled": true}
@@ -183,7 +183,7 @@ logger.error("Error occurred")
 logger.critical("Critical error")
 ```
 
-Console output is prefixed with `[xMobu]` for easy filtering.
+Console output is prefixed with `[MotionKit]` for easy filtering.
 
 ## Best Practices
 
@@ -193,17 +193,17 @@ Console output is prefixed with `[xMobu]` for easy filtering.
 4. **Undo Support**: Use MotionBuilder's undo system when modifying scene
 5. **Performance**: Log performance-critical operations
 6. **Documentation**: Add docstrings to functions and classes
-7. **Iterative Testing**: Use `reload_xmobu()` frequently during development
+7. **Iterative Testing**: Use `reload_motionkit()` frequently during development
 
 ## Debugging Tips
 
 ### Check Console Output
 
-All xMobu messages start with `[xMobu]`:
+All MotionKit messages start with `[MotionKit]`:
 ```
-[xMobu] Initialization completed successfully!
-[xMobu] Building category: Animation
-[xMobu]   Found 1 tool(s) in Animation
+[MotionKit] Initialization completed successfully!
+[MotionKit] Building category: Animation
+[MotionKit]   Found 1 tool(s) in Animation
 ```
 
 ### Test Tool Directly
@@ -240,7 +240,7 @@ import maya.cmds as cmds
 from core.config import config
 
 def build_menu():
-    menu_name = config.get('maya.menu_name', 'xMobu')
+    menu_name = config.get('maya.menu_name', 'MotionKit')
     if cmds.menu(menu_name, exists=True):
         cmds.deleteUI(menu_name)
 
@@ -267,7 +267,7 @@ def build_menu():
 
 ### Import Errors
 
-1. Ensure xMobu root is in Python path (check console on startup)
+1. Ensure MotionKit root is in Python path (check console on startup)
 2. Check for syntax errors in tool files
 3. Verify all required imports are available in MotionBuilder
 4. Check MotionBuilder Python version compatibility (3.7+)
@@ -279,7 +279,7 @@ When contributing tools:
 1. Follow the tool structure template
 2. Add appropriate error handling
 3. Include docstrings
-4. Test with `reload_xmobu()` during development
+4. Test with `reload_motionkit()` during development
 5. Test with fresh MotionBuilder startup
 6. Update this documentation if needed
 
@@ -338,4 +338,4 @@ app.FileOpen("path/to/file.fbx")
 
 ---
 
-**Happy Development!** Remember: Use `reload_xmobu()` for instant testing - no MotionBuilder restart needed!
+**Happy Development!** Remember: Use `reload_motionkit()` for instant testing - no MotionBuilder restart needed!

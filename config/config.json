@@ -1,7 +1,7 @@
 {
     "version": "1.0.0",
     "mobu": {
-        "menu_name": "xMobu",
+        "menu_name": "MotionKit",
         "tool_categories": [
             {
                 "name": "Animation",

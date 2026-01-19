@@ -62,6 +62,27 @@
     "save_failed": "保存设置失败：\n{0}"
   },
   "tools": {
+    "fbx_exporter": {
+      "name": "FBX导出工具",
+      "title": "FBX动画导出工具 - MotionKit",
+      "animations_group": "动画列表",
+      "add_animation": "添加动画",
+      "edit_selected": "编辑选中",
+      "delete_selected": "删除选中",
+      "delete_all": "删除全部",
+      "export_group": "导出",
+      "export_selected": "导出选中",
+      "export_all": "导出全部",
+      "add_animation_title": "添加动画",
+      "edit_animation_title": "编辑动画",
+      "animation_name": "动画名称",
+      "start_frame": "起始帧",
+      "end_frame": "结束帧",
+      "objects": "对象",
+      "export_path": "导出路径",
+      "use_selection": "使用选择",
+      "use_timeline": "使用时间线"
+    },
     "root_anim_copy": {
       "name": "根节点动画拷贝",
       "title": "根节点动画拷贝 - MotionKit",

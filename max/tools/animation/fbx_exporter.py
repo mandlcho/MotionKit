@@ -102,8 +102,14 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
         -- Store reference globally
         MotionKitFBXExporter_DataGrid = animationsGrid
 
-        -- Basic appearance
-        animationsGrid.BackgroundColor = animationsGrid.DefaultCellStyle.BackColor
+        -- Basic appearance - Dark theme
+        local darkBg = (dotNetClass "System.Drawing.Color").FromArgb 45 45 45
+        local lightBg = (dotNetClass "System.Drawing.Color").FromArgb 55 55 55
+        local textColor = (dotNetClass "System.Drawing.Color").FromArgb 220 220 220
+
+        animationsGrid.BackgroundColor = darkBg
+        animationsGrid.DefaultCellStyle.BackColor = darkBg
+        animationsGrid.DefaultCellStyle.ForeColor = textColor
         animationsGrid.BorderStyle = (dotNetClass "System.Windows.Forms.BorderStyle").FixedSingle
         animationsGrid.AllowUserToAddRows = false
         animationsGrid.AllowUserToDeleteRows = false
@@ -115,8 +121,21 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
         animationsGrid.ReadOnly = true
         animationsGrid.AutoSizeColumnsMode = (dotNetClass "System.Windows.Forms.DataGridViewAutoSizeColumnsMode").Fill
 
-        -- Alternating row colors
-        animationsGrid.AlternatingRowsDefaultCellStyle.BackColor = (dotNetClass "System.Drawing.Color").FromArgb 240 240 240
+        -- Alternating row colors - lighter dark
+        animationsGrid.AlternatingRowsDefaultCellStyle.BackColor = lightBg
+        animationsGrid.AlternatingRowsDefaultCellStyle.ForeColor = textColor
+
+        -- Column header style - dark
+        animationsGrid.ColumnHeadersDefaultCellStyle.BackColor = (dotNetClass "System.Drawing.Color").FromArgb 35 35 35
+        animationsGrid.ColumnHeadersDefaultCellStyle.ForeColor = textColor
+        animationsGrid.EnableHeadersVisualStyles = false
+
+        -- Row header style - dark
+        animationsGrid.RowHeadersDefaultCellStyle.BackColor = (dotNetClass "System.Drawing.Color").FromArgb 35 35 35
+        animationsGrid.RowHeadersDefaultCellStyle.ForeColor = textColor
+
+        -- Grid line color
+        animationsGrid.GridColor = (dotNetClass "System.Drawing.Color").FromArgb 60 60 60
 
         -- Add columns
         local nameCol = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
@@ -308,8 +327,15 @@ def _add_animation_dialog():
         if rt.selection.count > 0:
             selection_str = ", ".join([obj.name for obj in rt.selection])
 
+        # Get selection sets
+        selection_sets = []
+        for i in range(rt.selectionSets.count):
+            selection_sets.append(rt.selectionSets[i].name)
+
+        selection_sets_str = "#(" + ", ".join([f'"{s}"' for s in selection_sets]) + ")"
+
         maxscript = f'''
-rollout AddAnimationDialog "{title}" width:550 height:220
+rollout AddAnimationDialog "{title}" width:550 height:250
 (
     label nameLbl "{name_label}:" pos:[10,10] width:80 align:#left
     edittext nameEdit "" pos:[100,8] width:440 height:18 labelOnTop:false
@@ -326,12 +352,16 @@ rollout AddAnimationDialog "{title}" width:550 height:220
     edittext objEdit "" pos:[100,60] width:340 height:18 labelOnTop:false text:"{selection_str}"
     button btnPickObjs "{use_selection}" pos:[450,60] width:90 height:18
 
-    label pathLbl "{path_label}:" pos:[10,88] width:80 align:#left
-    edittext pathEdit "" pos:[100,86] width:340 height:18 labelOnTop:false
-    button btnBrowse "{browse}" pos:[450,86] width:90 height:18
+    label selSetLbl "Selection Set:" pos:[10,88] width:80 align:#left
+    dropdownList selSetDDL "" pos:[100,86] width:340 height:18 items:{selection_sets_str}
+    button btnUseSelSet "Use Set" pos:[450,86] width:90 height:18
 
-    button btnAdd "{add}" pos:[340,190] width:90 height:24
-    button btnCancel "{cancel}" pos:[440,190] width:90 height:24
+    label pathLbl "{path_label}:" pos:[10,114] width:80 align:#left
+    edittext pathEdit "" pos:[100,112] width:340 height:18 labelOnTop:false
+    button btnBrowse "{browse}" pos:[450,112] width:90 height:18
+
+    button btnAdd "{add}" pos:[340,220] width:90 height:24
+    button btnCancel "{cancel}" pos:[440,220] width:90 height:24
 
     -- Use Timeline checkbox handler
     on useTimelineCB changed state do
@@ -355,6 +385,26 @@ rollout AddAnimationDialog "{title}" width:550 height:220
         else
         (
             messageBox "No objects selected!" title:"{title}"
+        )
+    )
+
+    -- Use Selection Set button
+    on btnUseSelSet pressed do
+    (
+        local setName = selSetDDL.selected
+        if setName != undefined and setName != "" then
+        (
+            local selSet = selectionSets[setName]
+            if selSet != undefined then
+            (
+                local objNames = #()
+                for obj in selSet do append objNames obj.name
+                objEdit.text = objNames as string
+            )
+        )
+        else
+        (
+            messageBox "Please select a selection set!" title:"{title}"
         )
     )
 

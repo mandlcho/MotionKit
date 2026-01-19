@@ -1,0 +1,75 @@
+{
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "apply": "Apply",
+    "browse": "Browse...",
+    "pick": "Pick",
+    "calculate": "Calculate",
+    "error": "Error",
+    "warning": "Warning",
+    "success": "Success",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "menu": {
+    "settings": "Settings...",
+    "reload": "Reload MotionKit",
+    "about": "About MotionKit"
+  },
+  "settings": {
+    "title": "MotionKit Settings",
+    "language": "Language",
+    "language_label": "Interface Language:",
+    "perforce_group": "Perforce Settings",
+    "perforce_info": "Configure your Perforce connection:",
+    "server": "Server:",
+    "user": "User:",
+    "workspace": "Workspace:",
+    "load_workspaces": "Load Workspaces",
+    "test_connection": "Test Connection",
+    "status": "Status:",
+    "status_not_connected": "Not connected",
+    "status_connected": "Connected",
+    "export_group": "Export Settings",
+    "fbx_path": "FBX Export Path:",
+    "save_close": "Save and Close",
+    "saved": "Settings saved successfully!"
+  },
+  "tools": {
+    "root_anim_copy": {
+      "title": "Root Animation Copy - MotionKit",
+      "description": "Copy animation from Biped Root (CS Pelvis) to custom Root bone",
+      "position_group": "Position Copy Options",
+      "rotation_group": "Rotation Copy Options",
+      "x_axis": "X Axis",
+      "y_axis": "Y Axis",
+      "z_axis": "Z Axis",
+      "z_rotation": "Z Rotation",
+      "frame_range_group": "Frame Range",
+      "use_timeline": "Use Current Timeline",
+      "start": "Start:",
+      "end": "End:",
+      "height_offset_group": "Height Offset (Z-axis)",
+      "apply_offset": "Apply Height Offset",
+      "offset": "Offset:",
+      "calc_from_selection": "Calculate from Selection",
+      "copy_button": "Copy Biped Root Animation to Root",
+      "error_root_not_found": "Root bone not found! Please ensure there is a node named 'root' in the scene.",
+      "error_cs_not_found": "CS Pelvis (Biped root) not found! Please ensure there is a Biped in the scene.",
+      "error_invalid_frames": "Invalid frame range! Please enter valid frame numbers.",
+      "error_frame_range": "End frame must be greater than or equal to start frame!",
+      "error_select_2_objects": "Please select exactly 2 objects: CS Pelvis and Root bone",
+      "error_need_biped_and_root": "Selection must contain one Biped node (CS Pelvis) and one regular node (Root)",
+      "success_copied": "Successfully copied {0} frames from CS Pelvis to Root bone!",
+      "cancelled": "Animation copy cancelled at frame {0}",
+      "height_calculated": "Height offset calculated: {0} units\n\nCS Pelvis Z: {1}\nRoot Z: {2}"
+    }
+  },
+  "about": {
+    "title": "About MotionKit",
+    "description": "MotionKit Pipeline Toolset\nVersion: {0}\n\nA comprehensive pipeline toolset for 3ds Max\nwith support for Animation, Modeling, Rendering,\nand Pipeline integration.\n\nVisit github.com/mandlcho/MotionKit for more information."
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "common": {
+    "ok": "확인",
+    "cancel": "취소",
+    "save": "저장",
+    "close": "닫기",
+    "apply": "적용",
+    "browse": "찾아보기...",
+    "pick": "선택",
+    "calculate": "계산",
+    "error": "오류",
+    "warning": "경고",
+    "success": "성공",
+    "yes": "예",
+    "no": "아니오"
+  },
+  "menu": {
+    "settings": "설정...",
+    "reload": "MotionKit 다시 로드",
+    "about": "MotionKit 정보"
+  },
+  "settings": {
+    "title": "MotionKit 설정",
+    "language": "언어",
+    "language_label": "인터페이스 언어:",
+    "perforce_group": "Perforce 설정",
+    "perforce_info": "Perforce 연결을 구성하세요:",
+    "server": "서버:",
+    "user": "사용자:",
+    "workspace": "작업 공간:",
+    "load_workspaces": "작업 공간 로드",
+    "test_connection": "연결 테스트",
+    "status": "상태:",
+    "status_not_connected": "연결되지 않음",
+    "status_connected": "연결됨",
+    "export_group": "내보내기 설정",
+    "fbx_path": "FBX 내보내기 경로:",
+    "save_close": "저장 후 닫기",
+    "saved": "설정이 성공적으로 저장되었습니다!"
+  },
+  "tools": {
+    "root_anim_copy": {
+      "title": "루트 애니메이션 복사 - MotionKit",
+      "description": "Biped 루트(CS 중심)에서 커스텀 루트 본으로 애니메이션 복사",
+      "position_group": "위치 복사 옵션",
+      "rotation_group": "회전 복사 옵션",
+      "x_axis": "X 축",
+      "y_axis": "Y 축",
+      "z_axis": "Z 축",
+      "z_rotation": "Z 회전",
+      "frame_range_group": "프레임 범위",
+      "use_timeline": "현재 타임라인 사용",
+      "start": "시작:",
+      "end": "끝:",
+      "height_offset_group": "높이 오프셋 (Z축)",
+      "apply_offset": "높이 오프셋 적용",
+      "offset": "오프셋:",
+      "calc_from_selection": "선택에서 계산",
+      "copy_button": "Biped 루트 애니메이션을 루트로 복사",
+      "error_root_not_found": "루트 본을 찾을 수 없습니다! 씬에 'root'라는 이름의 노드가 있는지 확인하세요.",
+      "error_cs_not_found": "CS 중심(Biped 루트)을 찾을 수 없습니다! 씬에 Biped가 있는지 확인하세요.",
+      "error_invalid_frames": "유효하지 않은 프레임 범위입니다! 유효한 프레임 번호를 입력하세요.",
+      "error_frame_range": "끝 프레임은 시작 프레임보다 크거나 같아야 합니다!",
+      "error_select_2_objects": "정확히 2개의 객체를 선택하세요: CS 중심과 루트 본",
+      "error_need_biped_and_root": "선택 항목에는 하나의 Biped 노드(CS 중심)와 하나의 일반 노드(루트)가 포함되어야 합니다",
+      "success_copied": "CS 중심에서 루트 본으로 {0}개의 프레임을 성공적으로 복사했습니다!",
+      "cancelled": "프레임 {0}에서 애니메이션 복사가 취소되었습니다",
+      "height_calculated": "높이 오프셋 계산됨: {0} 단위\n\nCS 중심 Z: {1}\n루트 Z: {2}"
+    }
+  },
+  "about": {
+    "title": "MotionKit 정보",
+    "description": "MotionKit 파이프라인 툴셋\n버전: {0}\n\n애니메이션, 모델링, 렌더링 및 파이프라인 통합을\n지원하는 3ds Max용 종합 파이프라인 툴셋입니다.\n\n자세한 정보는 github.com/mandlcho/MotionKit을 방문하세요."
+  }
+}

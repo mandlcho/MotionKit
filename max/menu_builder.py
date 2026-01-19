@@ -90,6 +90,9 @@ class MenuBuilder:
 
 '''
 
+        # Add Language submenu
+        ms += self._generate_language_maxscript()
+
         # Add Settings action
         ms += self._generate_settings_maxscript()
 
@@ -227,6 +230,101 @@ class MenuBuilder:
             logger.error(f"  ✗ Failed to load {tool_file.name}: {str(e)}")
             traceback.print_exc()
             return ""
+
+    def _generate_language_maxscript(self):
+        """Generate MaxScript for Language submenu"""
+
+        # Get current language
+        from core.config import config
+        current_lang = config.get('ui.language', 'en')
+
+        # Store language change callbacks
+        def change_language(lang_code):
+            """Change language and reload MotionKit"""
+            try:
+                from core.localization import set_language
+                from core.config import config
+
+                # Confirm with user
+                lang_names = {'en': 'English', 'zh': '中文 (Chinese)', 'ko': '한국어 (Korean)'}
+                lang_name = lang_names.get(lang_code, lang_code)
+
+                result = rt.queryBox(
+                    f"Change language to {lang_name}?\n\nThis will reload MotionKit.",
+                    title="Change Language"
+                )
+
+                if result:
+                    # Set language
+                    set_language(lang_code)
+                    logger.info(f"Language changed to: {lang_code}")
+
+                    # Auto-reload MotionKit
+                    self._reload_motionkit()
+
+                    rt.messageBox(
+                        f"Language changed to {lang_name}!",
+                        title="MotionKit"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to change language: {str(e)}")
+                rt.messageBox(
+                    f"Failed to change language:\n{str(e)}",
+                    title="MotionKit Error"
+                )
+
+        globals()['motionkit_change_language_en'] = lambda: change_language('en')
+        globals()['motionkit_change_language_zh'] = lambda: change_language('zh')
+        globals()['motionkit_change_language_ko'] = lambda: change_language('ko')
+
+        # Determine which language has radio button (●)
+        en_check = '●' if current_lang == 'en' else '○'
+        zh_check = '●' if current_lang == 'zh' else '○'
+        ko_check = '●' if current_lang == 'ko' else '○'
+
+        ms = f'''
+    -- Language submenu
+    local languageMenu = menuMan.createMenu "Language"
+
+    -- English
+    macroScript MotionKit_Language_EN
+    category:"MotionKit"
+    buttonText:"{en_check} English"
+    tooltip:"Switch to English"
+    (
+        python.execute "import max.menu_builder; max.menu_builder.motionkit_change_language_en()"
+    )
+    local lang_en_action = menuMan.createActionItem "MotionKit_Language_EN" "MotionKit"
+    languageMenu.addItem lang_en_action -1
+
+    -- Chinese
+    macroScript MotionKit_Language_ZH
+    category:"MotionKit"
+    buttonText:"{zh_check} 中文 (Chinese)"
+    tooltip:"Switch to Chinese"
+    (
+        python.execute "import max.menu_builder; max.menu_builder.motionkit_change_language_zh()"
+    )
+    local lang_zh_action = menuMan.createActionItem "MotionKit_Language_ZH" "MotionKit"
+    languageMenu.addItem lang_zh_action -1
+
+    -- Korean
+    macroScript MotionKit_Language_KO
+    category:"MotionKit"
+    buttonText:"{ko_check} 한국어 (Korean)"
+    tooltip:"Switch to Korean"
+    (
+        python.execute "import max.menu_builder; max.menu_builder.motionkit_change_language_ko()"
+    )
+    local lang_ko_action = menuMan.createActionItem "MotionKit_Language_KO" "MotionKit"
+    languageMenu.addItem lang_ko_action -1
+
+    -- Add Language submenu to main menu
+    local languageSubMenu = menuMan.createSubMenuItem "Language" languageMenu
+    motionKitMenu.addItem languageSubMenu -1
+
+'''
+        return ms
 
     def _generate_settings_maxscript(self):
         """Generate MaxScript for Settings menu item"""

@@ -64,7 +64,7 @@
   "tools": {
     "fbx_exporter": {
       "name": "FBX 내보내기",
-      "title": "FBX 애니메이션 내보내기 - MotionKit",
+      "title": "MotionKit 애니메이션 내보내기",
       "animations_group": "애니메이션 목록",
       "add_animation": "애니메이션 추가",
       "edit_selected": "선택 편집",

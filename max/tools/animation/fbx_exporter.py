@@ -63,7 +63,7 @@ class FBXExporterDialog:
 
         maxscript = f'''
 -- ============================================
--- MotionKit FBX Animation Exporter Tool
+-- MotionKit Animation Exporter Tool
 -- ============================================
 
 global MotionKitFBXExporter_AnimationList = #()
@@ -77,20 +77,20 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
     -- Animations List Group
     groupBox animationsGroup "{animations_group}" pos:[10,26] width:740 height:540
 
-    -- Listbox for animations (custom formatted)
+    -- Listbox for animations (custom formatted) - fill the entire group
     listBox animationsListBox "" pos:[20,44] width:720 height:30 items:#()
 
     -- Animation controls group
-    groupBox animControlGroup "Animation" pos:[760,26] width:130 height:140
+    groupBox animControlGroup "Animation" pos:[760,26] width:130 height:160
     button btnAddAnim "{add_animation}" pos:[770,46] width:110 height:28
-    button btnEditAnim "{edit_selected}" pos:[770,80] width:110 height:28
-    button btnDeleteSelected "{delete_selected}" pos:[770,114] width:110 height:28
-    button btnDeleteAll "{delete_all}" pos:[770,148] width:110 height:28
+    button btnEditAnim "{edit_selected}" pos:[770,78] width:110 height:28
+    button btnDeleteSelected "{delete_selected}" pos:[770,110] width:110 height:28
+    button btnDeleteAll "{delete_all}" pos:[770,142] width:110 height:28
 
     -- Export group
-    groupBox exportControlGroup "{export_group}" pos:[760,420] width:130 height:100
-    button btnExportSelected "{export_selected}" pos:[770,440] width:110 height:28
-    button btnExportAll "{export_all}" pos:[770,474] width:110 height:28
+    groupBox exportControlGroup "{export_group}" pos:[760,380] width:130 height:92
+    button btnExportSelected "{export_selected}" pos:[770,400] width:110 height:28
+    button btnExportAll "{export_all}" pos:[770,432] width:110 height:28
 
     -- Close button at bottom
     button btnClose "{close}" pos:[770,530] width:110 height:28

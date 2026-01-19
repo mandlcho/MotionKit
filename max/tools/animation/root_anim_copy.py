@@ -77,11 +77,11 @@ rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" 
     checkbox useTimelineRange "Use Current Timeline" pos:[20,98] checked:true
 
     label startLabel "Start:" pos:[20,120] width:40
-    edittext frameStartEdit "" pos:[65,118] width:90 height:18 enabled:false
+    edittext frameStartEdit "" pos:[65,118] width:90 height:18 enabled:false labelOnTop:false
     button pickStartFrame "Pick" pos:[160,118] width:50 height:18 enabled:false
 
     label endLabel "End:" pos:[270,120] width:40
-    edittext frameEndEdit "" pos:[310,118] width:90 height:18 enabled:false
+    edittext frameEndEdit "" pos:[310,118] width:90 height:18 enabled:false labelOnTop:false
     button pickEndFrame "Pick" pos:[405,118] width:50 height:18 enabled:false
 
     -- Height Offset Group

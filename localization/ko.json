@@ -15,6 +15,16 @@
     "no": "아니오"
   },
   "menu": {
+    "main": "MotionKit",
+    "animation": "애니메이션",
+    "modeling": "모델링",
+    "rendering": "렌더링",
+    "character": "캐릭터",
+    "rigging": "리깅",
+    "debug": "디버그",
+    "pipeline": "파이프라인",
+    "unreal_engine": "언리얼 엔진",
+    "language": "언어",
     "settings": "설정...",
     "reload": "MotionKit 다시 로드",
     "about": "MotionKit 정보"
@@ -40,6 +50,7 @@
   },
   "tools": {
     "root_anim_copy": {
+      "name": "루트 애니메이션 복사",
       "title": "루트 애니메이션 복사 - MotionKit",
       "description": "Biped 루트(CS 중심)에서 커스텀 루트 본으로 애니메이션 복사",
       "position_group": "위치 복사 옵션",

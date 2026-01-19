@@ -15,6 +15,16 @@
     "no": "否"
   },
   "menu": {
+    "main": "MotionKit",
+    "animation": "动画",
+    "modeling": "建模",
+    "rendering": "渲染",
+    "character": "角色",
+    "rigging": "绑定",
+    "debug": "调试",
+    "pipeline": "流程",
+    "unreal_engine": "虚幻引擎",
+    "language": "语言",
     "settings": "设置...",
     "reload": "重新加载 MotionKit",
     "about": "关于 MotionKit"
@@ -40,6 +50,7 @@
   },
   "tools": {
     "root_anim_copy": {
+      "name": "根节点动画拷贝",
       "title": "根节点动画拷贝 - MotionKit",
       "description": "从 Biped 根节点（CS 质心）复制动画到自定义根骨骼",
       "position_group": "位移复制选项",

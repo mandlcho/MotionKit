@@ -29,6 +29,10 @@ class MenuBuilder:
         self.tool_categories = config.get('max.tool_categories', [])
         self.tools_registry = {}  # Store Python callbacks
 
+        # Initialize localization
+        from core.localization import get_localization
+        self.loc = get_localization()
+
     def build(self):
         """Build the complete MotionKit menu using MaxScript"""
         if not pymxs or not rt:
@@ -146,10 +150,13 @@ class MenuBuilder:
 
         logger.info(f"  Found {len(tool_files)} tool(s) in {category_name}")
 
+        # Get localized category name
+        localized_category = self.loc.get(f'menu.{category_folder}', category_name)
+
         # Create submenu for category
         ms = f'''
     -- Create {category_name} submenu
-    local {category_folder}Menu = menuMan.createMenu "{category_name}"
+    local {category_folder}Menu = menuMan.createMenu "{localized_category}"
 
 '''
 
@@ -165,7 +172,7 @@ class MenuBuilder:
             # Add category submenu to main menu
             ms += f'''
     -- Add {category_name} submenu to main menu
-    local {category_folder}SubMenu = menuMan.createSubMenuItem "{category_name}" {category_folder}Menu
+    local {category_folder}SubMenu = menuMan.createSubMenuItem "{localized_category}" {category_folder}Menu
     motionKitMenu.addItem {category_folder}SubMenu -1
 
 '''
@@ -195,7 +202,9 @@ class MenuBuilder:
                 logger.warning(f"  ⚠ {tool_file.name} missing execute() function")
                 return ""
 
-            tool_name = module.TOOL_NAME
+            # Get localized tool name
+            tool_key = f"tools.{tool_file.stem}.name"
+            tool_name = self.loc.get(tool_key, module.TOOL_NAME)
 
             # Register Python callback
             callback_key = f"{category_folder}_{tool_file.stem}"
@@ -282,9 +291,12 @@ class MenuBuilder:
         zh_check = '●' if current_lang == 'zh' else '○'
         ko_check = '●' if current_lang == 'ko' else '○'
 
+        # Get localized "Language" text
+        lang_text = self.loc.get('menu.language', 'Language')
+
         ms = f'''
     -- Language submenu
-    local languageMenu = menuMan.createMenu "Language"
+    local languageMenu = menuMan.createMenu "{lang_text}"
 
     -- English
     macroScript MotionKit_Language_EN
@@ -320,7 +332,7 @@ class MenuBuilder:
     languageMenu.addItem lang_ko_action -1
 
     -- Add Language submenu to main menu
-    local languageSubMenu = menuMan.createSubMenuItem "Language" languageMenu
+    local languageSubMenu = menuMan.createSubMenuItem "{lang_text}" languageMenu
     motionKitMenu.addItem languageSubMenu -1
 
 '''
@@ -340,11 +352,14 @@ class MenuBuilder:
 
         globals()['motionkit_settings'] = open_settings
 
-        ms = '''
+        # Get localized text
+        settings_text = self.loc.get('menu.settings', 'Settings...')
+
+        ms = f'''
     -- Settings
     macroScript MotionKit_Settings
     category:"MotionKit"
-    buttonText:"Settings..."
+    buttonText:"{settings_text}"
     tooltip:"Configure MotionKit settings"
     (
         python.execute "import max.menu_builder; max.menu_builder.motionkit_settings()"
@@ -362,12 +377,15 @@ class MenuBuilder:
         # Store reload callback
         globals()['motionkit_reload'] = self._reload_motionkit
 
-        ms = '''
+        # Get localized text
+        reload_text = self.loc.get('menu.reload', 'Reload MotionKit')
+
+        ms = f'''
     -- Reload MotionKit
     macroScript MotionKit_Reload
     category:"MotionKit"
-    buttonText:"Reload MotionKit"
-    tooltip:"Reload MotionKit system"
+    buttonText:"{reload_text}"
+    tooltip:"{reload_text}"
     (
         python.execute "import max.menu_builder; max.menu_builder.motionkit_reload()"
     )
@@ -384,12 +402,15 @@ class MenuBuilder:
         # Store about callback
         globals()['motionkit_about'] = self._show_about
 
-        ms = '''
+        # Get localized text
+        about_text = self.loc.get('menu.about', 'About MotionKit')
+
+        ms = f'''
     -- About MotionKit
     macroScript MotionKit_About
     category:"MotionKit"
-    buttonText:"About MotionKit"
-    tooltip:"About MotionKit"
+    buttonText:"{about_text}"
+    tooltip:"{about_text}"
     (
         python.execute "import max.menu_builder; max.menu_builder.motionkit_about()"
     )

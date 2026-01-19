@@ -67,6 +67,7 @@ class SettingsDialog:
         test_connection = t('settings.test_connection')
         status = t('settings.status')
         status_not_connected = t('settings.status_not_connected')
+        status_connected = t('settings.status_connected')
         export_group = t('settings.export_group')
         fbx_path_label = t('settings.fbx_path')
         browse = t('common.browse')
@@ -88,10 +89,10 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:390
     -- Language Settings Group
     group "{language}"
     (
-        label lblLanguageInfo "{language_label}" align:#left
+        label lblLanguageInfo "{language_label}" align:#left across:2
         dropdownList ddlLanguage items:#("English", "中文 (Chinese)", "한국어 (Korean)") \\
             selection:{1 if current_language == 'en' else (2 if current_language == 'zh' else 3)} \\
-            width:400 align:#left
+            width:250 align:#right
     )
 
     -- Perforce Settings Group
@@ -117,9 +118,9 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:390
     -- Export Settings Group
     group "{export_group}"
     (
-        label lblExport "{fbx_path_label}" align:#left across:2
-        editText edtFbxPath "" text:"{self._escape_maxscript(fbx_path)}" fieldWidth:300 align:#right labelOnTop:false
-        button btnBrowse "{browse}" width:70 height:20 align:#right offset:[0, -22]
+        label lblExport "{fbx_path_label}" align:#left across:3
+        editText edtFbxPath "" text:"{self._escape_maxscript(fbx_path)}" fieldWidth:320 align:#left labelOnTop:false
+        button btnBrowse "..." width:30 height:20 align:#right
     )
 
     -- Buttons

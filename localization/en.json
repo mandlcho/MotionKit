@@ -43,10 +43,23 @@
     "status": "Status:",
     "status_not_connected": "Not connected",
     "status_connected": "Connected",
+    "status_found_workspaces": "Found {0} workspace(s)",
+    "status_no_workspaces": "No workspaces found",
+    "status_error_loading": "Error loading workspaces",
+    "status_p4_not_found": "P4 CLI not found",
+    "status_timeout": "Connection timeout",
     "export_group": "Export Settings",
     "fbx_path": "FBX Export Path:",
     "save_close": "Save and Close",
-    "saved": "Settings saved successfully!"
+    "saved": "Settings saved successfully!",
+    "saved_reload": "Settings saved successfully! Please reload MotionKit to apply language changes.",
+    "error_server_user": "Please enter Server and User first",
+    "error_fill_all": "Please fill in Server, User, and load Workspaces first",
+    "p4_configured": "Perforce settings configured:\n\nServer: {0}\nUser: {1}\nWorkspace: {2}\n\nEnvironment variables have been set.",
+    "p4_not_found_msg": "Perforce command-line tool (p4) not found.\n\nPlease install P4 CLI and ensure it's in your PATH.",
+    "create_path_prompt": "The path does not exist:\n{0}\n\nCreate it?",
+    "create_path_failed": "Failed to create directory:\n{0}",
+    "save_failed": "Failed to save settings:\n{0}"
   },
   "tools": {
     "root_anim_copy": {

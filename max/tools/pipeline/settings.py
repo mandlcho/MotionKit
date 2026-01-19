@@ -17,6 +17,7 @@ except ImportError:
 
 from core.config import config
 from core.logger import logger
+from core.localization import t
 
 TOOL_NAME = "Settings"
 
@@ -53,51 +54,78 @@ class SettingsDialog:
         fbx_path = config.get('export.fbx_path', '')
         current_language = config.get('ui.language', 'en')
 
+        # Get all translations
+        title = t('settings.title')
+        language = t('settings.language')
+        language_label = t('settings.language_label')
+        perforce_group = t('settings.perforce_group')
+        perforce_info = t('settings.perforce_info')
+        server = t('settings.server')
+        user = t('settings.user')
+        workspace = t('settings.workspace')
+        load_workspaces = t('settings.load_workspaces')
+        test_connection = t('settings.test_connection')
+        status = t('settings.status')
+        status_not_connected = t('settings.status_not_connected')
+        export_group = t('settings.export_group')
+        fbx_path_label = t('settings.fbx_path')
+        browse = t('common.browse')
+        save = t('common.save')
+        save_close = t('settings.save_close')
+        cancel = t('common.cancel')
+
+        # Error messages
+        error_server_user = t('settings.error_server_user')
+        error_fill_all = t('settings.error_fill_all')
+        p4_configured = t('settings.p4_configured')
+        saved_msg = t('settings.saved')
+        saved_reload_msg = t('settings.saved_reload')
+
         # Generate MaxScript for the dialog
         maxscript = f'''
-rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:390
+rollout MotionKitSettingsRollout "{title}" width:480 height:390
 (
     -- Language Settings Group
-    group "Language / 语言 / 언어"
+    group "{language}"
     (
-        label lblLanguageInfo "Interface Language:" align:#left
+        label lblLanguageInfo "{language_label}" align:#left
         dropdownList ddlLanguage items:#("English", "中文 (Chinese)", "한국어 (Korean)") \\
             selection:{1 if current_language == 'en' else (2 if current_language == 'zh' else 3)} \\
             width:400 align:#left
     )
 
     -- Perforce Settings Group
-    group "Perforce Settings"
+    group "{perforce_group}"
     (
-        label lblP4Info "Configure your Perforce connection:" align:#left
+        label lblP4Info "{perforce_info}" align:#left
 
-        label lblServer "Server:" align:#left across:2
+        label lblServer "{server}" align:#left across:2
         editText edtServer "" text:"{self._escape_maxscript(p4_server)}" fieldWidth:350 align:#right labelOnTop:false
 
-        label lblUser "User:" align:#left across:2
+        label lblUser "{user}" align:#left across:2
         editText edtUser "" text:"{self._escape_maxscript(p4_user)}" fieldWidth:350 align:#right labelOnTop:false
 
-        label lblWorkspace "Workspace:" align:#left across:2
+        label lblWorkspace "{workspace}" align:#left across:2
         dropdownList ddlWorkspace items:#("(Not loaded)") selection:1 width:350 align:#right
 
-        button btnLoadWorkspaces "Load Workspaces" width:150 height:24 align:#left
-        button btnTestConnection "Test Connection" width:150 height:24 align:#left offset:[160, -28]
+        button btnLoadWorkspaces "{load_workspaces}" width:150 height:24 align:#left
+        button btnTestConnection "{test_connection}" width:150 height:24 align:#left offset:[160, -28]
 
-        label lblStatus "Status: Not connected" align:#left
+        label lblStatus "{status} {status_not_connected}" align:#left
     )
 
     -- Export Settings Group
-    group "Export Settings"
+    group "{export_group}"
     (
-        label lblExport "FBX Export Path:" align:#left across:2
+        label lblExport "{fbx_path_label}" align:#left across:2
         editText edtFbxPath "" text:"{self._escape_maxscript(fbx_path)}" fieldWidth:300 align:#right labelOnTop:false
-        button btnBrowse "Browse..." width:70 height:20 align:#right offset:[0, -22]
+        button btnBrowse "{browse}" width:70 height:20 align:#right offset:[0, -22]
     )
 
     -- Buttons
-    button btnSave "Save" width:80 height:28 pos:[180, 300]
-    button btnApplyClose "Save and Close" width:110 height:28 pos:[270, 300]
-    button btnCancel "Cancel" width:80 height:28 pos:[390, 300]
+    button btnSave "{save}" width:80 height:28 pos:[180, 300]
+    button btnApplyClose "{save_close}" width:110 height:28 pos:[270, 300]
+    button btnCancel "{cancel}" width:80 height:28 pos:[390, 300]
 
     -- Event handlers
     on btnLoadWorkspaces pressed do
@@ -107,7 +135,7 @@ rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:390
 
         if server == "" or user == "" then
         (
-            messageBox "Please enter Server and User first" title:"MotionKit Settings"
+            messageBox "{error_server_user}" title:"{title}"
         )
         else
         (
@@ -123,7 +151,7 @@ rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:390
 
         if server == "" or user == "" or workspace == "(Not loaded)" then
         (
-            messageBox "Please fill in Server, User, and load Workspaces first" title:"MotionKit Settings"
+            messageBox "{error_fill_all}" title:"{title}"
         )
         else
         (
@@ -132,8 +160,11 @@ rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:390
             python.execute ("import os; os.environ['P4USER'] = '" + user + "'")
             python.execute ("import os; os.environ['P4CLIENT'] = '" + workspace + "'")
 
-            lblStatus.text = "Status: Connection configured"
-            messageBox ("Perforce settings configured:\\n\\nServer: " + server + "\\nUser: " + user + "\\nWorkspace: " + workspace + "\\n\\nEnvironment variables have been set.") title:"MotionKit Settings"
+            lblStatus.text = "{status} {status_connected}"
+            local msg = substituteString "{p4_configured}" "{{0}}" server
+            msg = substituteString msg "{{1}}" user
+            msg = substituteString msg "{{2}}" workspace
+            messageBox msg title:"{title}"
         )
     )
 
@@ -150,14 +181,14 @@ rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:390
     (
         local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
         python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + edtFbxPath.text + "', '" + langCode + "')")
-        messageBox "Settings saved successfully!" title:"MotionKit Settings"
+        messageBox "{saved_msg}" title:"{title}"
     )
 
     on btnApplyClose pressed do
     (
         local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
         python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + edtFbxPath.text + "', '" + langCode + "')")
-        messageBox "Settings saved successfully! Please reload MotionKit to apply language changes." title:"MotionKit Settings"
+        messageBox "{saved_reload_msg}" title:"{title}"
         destroyDialog MotionKitSettingsRollout
     )
 
@@ -221,32 +252,38 @@ def _load_workspaces(server, user):
                 workspace_array = "#(" + ", ".join([f'"{w}"' for w in workspaces]) + ")"
                 rt.execute(f"MotionKitSettingsRollout.ddlWorkspace.items = {workspace_array}")
                 rt.execute("MotionKitSettingsRollout.ddlWorkspace.selection = 1")
-                rt.execute(f'MotionKitSettingsRollout.lblStatus.text = "Status: Found {len(workspaces)} workspace(s)"')
+                status_msg = t('settings.status') + " " + t('settings.status_found_workspaces').format(len(workspaces))
+                rt.execute(f'MotionKitSettingsRollout.lblStatus.text = "{status_msg}"')
 
                 logger.info(f"Loaded {len(workspaces)} Perforce workspaces")
             else:
-                rt.execute('MotionKitSettingsRollout.lblStatus.text = "Status: No workspaces found"')
+                status_msg = t('settings.status') + " " + t('settings.status_no_workspaces')
+                rt.execute(f'MotionKitSettingsRollout.lblStatus.text = "{status_msg}"')
                 logger.warning("No Perforce workspaces found")
 
         else:
             error_msg = result.stderr if result.stderr else "Unknown error"
-            rt.execute(f'MotionKitSettingsRollout.lblStatus.text = "Status: Error loading workspaces"')
+            status_msg = t('settings.status') + " " + t('settings.status_error_loading')
+            rt.execute(f'MotionKitSettingsRollout.lblStatus.text = "{status_msg}"')
             logger.error(f"Failed to load workspaces: {error_msg}")
 
     except FileNotFoundError:
-        rt.execute('MotionKitSettingsRollout.lblStatus.text = "Status: P4 CLI not found"')
+        status_msg = t('settings.status') + " " + t('settings.status_p4_not_found')
+        rt.execute(f'MotionKitSettingsRollout.lblStatus.text = "{status_msg}"')
         rt.messageBox(
-            "Perforce command-line tool (p4) not found.\\n\\nPlease install P4 CLI and ensure it's in your PATH.",
-            title="MotionKit Settings"
+            t('settings.p4_not_found_msg'),
+            title=t('settings.title')
         )
         logger.error("P4 command-line tool not found")
 
     except subprocess.TimeoutExpired:
-        rt.execute('MotionKitSettingsRollout.lblStatus.text = "Status: Connection timeout"')
+        status_msg = t('settings.status') + " " + t('settings.status_timeout')
+        rt.execute(f'MotionKitSettingsRollout.lblStatus.text = "{status_msg}"')
         logger.error("Perforce connection timeout")
 
     except Exception as e:
-        rt.execute(f'MotionKitSettingsRollout.lblStatus.text = "Status: Error - {str(e)[:30]}..."')
+        status_msg = t('settings.status') + f" Error - {str(e)[:30]}..."
+        rt.execute(f'MotionKitSettingsRollout.lblStatus.text = "{status_msg}"')
         logger.error(f"Failed to load workspaces: {str(e)}")
 
 
@@ -271,16 +308,16 @@ def _save_settings(server, user, workspace, fbx_path, language='en'):
             if not path_obj.exists():
                 # Ask if user wants to create it
                 result = rt.queryBox(
-                    f"The path does not exist:\n{fbx_path}\n\nCreate it?",
-                    title="MotionKit Settings"
+                    t('settings.create_path_prompt').format(fbx_path),
+                    title=t('settings.title')
                 )
                 if result:
                     try:
                         path_obj.mkdir(parents=True, exist_ok=True)
                     except Exception as e:
                         rt.messageBox(
-                            f"Failed to create directory:\n{str(e)}",
-                            title="MotionKit Settings Error"
+                            t('settings.create_path_failed').format(str(e)),
+                            title=t('settings.title')
                         )
                         return False
 
@@ -294,8 +331,8 @@ def _save_settings(server, user, workspace, fbx_path, language='en'):
 
     except Exception as e:
         rt.messageBox(
-            f"Failed to save settings:\n{str(e)}",
-            title="MotionKit Settings Error"
+            t('settings.save_failed').format(str(e)),
+            title=t('settings.title')
         )
         logger.error(f"Failed to save settings: {str(e)}")
         return False

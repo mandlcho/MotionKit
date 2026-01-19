@@ -67,6 +67,7 @@ class FBXExporterDialog:
 -- ============================================
 
 global MotionKitFBXExporter_AnimationList = #()
+global MotionKitFBXExporter_DataGrid = undefined
 
 rollout MotionKitFBXExporter "{title}" width:900 height:600
 (
@@ -77,8 +78,8 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
     -- Animations List Group
     groupBox animationsGroup "{animations_group}" pos:[10,26] width:740 height:540
 
-    -- Listbox for animations (custom formatted) - fill the entire group
-    listBox animationsListBox "" pos:[20,44] width:720 height:32 items:#()
+    -- DataGridView for Excel-like table
+    dotNetControl animationsGrid "System.Windows.Forms.DataGridView" pos:[20,44] width:710 height:512
 
     -- Animation controls group
     groupBox animControlGroup "Animation" pos:[760,26] width:130 height:160
@@ -95,31 +96,98 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
     -- Close button at bottom
     button btnClose "{close}" pos:[770,530] width:110 height:28
 
-    -- Format animation list for display
-    function formatAnimationList =
+    -- Setup DataGridView
+    function setupDataGrid =
     (
-        local displayItems = #()
+        -- Store reference globally
+        MotionKitFBXExporter_DataGrid = animationsGrid
+
+        -- Basic appearance
+        animationsGrid.BackgroundColor = animationsGrid.DefaultCellStyle.BackColor
+        animationsGrid.BorderStyle = (dotNetClass "System.Windows.Forms.BorderStyle").FixedSingle
+        animationsGrid.AllowUserToAddRows = false
+        animationsGrid.AllowUserToDeleteRows = false
+        animationsGrid.AllowUserToResizeRows = false
+        animationsGrid.RowHeadersVisible = true
+        animationsGrid.RowHeadersWidth = 40
+        animationsGrid.SelectionMode = (dotNetClass "System.Windows.Forms.DataGridViewSelectionMode").FullRowSelect
+        animationsGrid.MultiSelect = false
+        animationsGrid.ReadOnly = true
+        animationsGrid.AutoSizeColumnsMode = (dotNetClass "System.Windows.Forms.DataGridViewAutoSizeColumnsMode").Fill
+
+        -- Alternating row colors
+        animationsGrid.AlternatingRowsDefaultCellStyle.BackColor = (dotNetClass "System.Drawing.Color").FromArgb 240 240 240
+
+        -- Add columns
+        local nameCol = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
+        nameCol.HeaderText = "Animation Name"
+        nameCol.Name = "Name"
+        nameCol.FillWeight = 25
+        animationsGrid.Columns.Add nameCol
+
+        local startCol = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
+        startCol.HeaderText = "Start"
+        startCol.Name = "Start"
+        startCol.FillWeight = 12
+        animationsGrid.Columns.Add startCol
+
+        local endCol = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
+        endCol.HeaderText = "End"
+        endCol.Name = "End"
+        endCol.FillWeight = 12
+        animationsGrid.Columns.Add endCol
+
+        local objCol = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
+        objCol.HeaderText = "Objects"
+        objCol.Name = "Objects"
+        objCol.FillWeight = 20
+        animationsGrid.Columns.Add objCol
+
+        local pathCol = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
+        pathCol.HeaderText = "Path"
+        pathCol.Name = "Path"
+        pathCol.FillWeight = 31
+        animationsGrid.Columns.Add pathCol
+    )
+
+    -- Update DataGridView with animation list
+    function updateDataGrid =
+    (
+        animationsGrid.Rows.Clear()
+
         for anim in MotionKitFBXExporter_AnimationList do
         (
             local name = anim[1]
             local startFrame = anim[2] as string
             local endFrame = anim[3] as string
             local path = anim[4]
+            local objects = anim[5]
 
-            -- Format: "AnimName  [Start-End]  Path"
-            local frameRange = "[" + startFrame + "-" + endFrame + "]"
-            local pathShort = if path != "" then (filenameFromPath path) else "(no path)"
-            local displayStr = name + "  " + frameRange + "  " + pathShort
-
-            append displayItems displayStr
+            local rowIndex = animationsGrid.Rows.Add()
+            local row = animationsGrid.Rows.item[rowIndex]
+            row.Cells.item[0].Value = name
+            row.Cells.item[1].Value = startFrame
+            row.Cells.item[2].Value = endFrame
+            row.Cells.item[3].Value = objects
+            row.Cells.item[4].Value = path
         )
-        animationsListBox.items = displayItems
+    )
+
+    -- Get selected row index
+    function getSelectedRowIndex =
+    (
+        if animationsGrid.SelectedRows.Count > 0 then
+        (
+            return (animationsGrid.SelectedRows.item[0].Index + 1)  -- Convert to 1-based
+        )
+        return 0
     )
 
     -- Initialize
     on MotionKitFBXExporter open do
     (
-        formatAnimationList()
+        setupDataGrid()
+        updateDataGrid()
     )
 
     -- Add Animation
@@ -131,7 +199,7 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
     -- Edit Selected
     on btnEditAnim pressed do
     (
-        local sel = animationsListBox.selection
+        local sel = getSelectedRowIndex()
         if sel > 0 then
         (
             python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._edit_animation_dialog(" + (sel as string) + ")")
@@ -145,11 +213,11 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
     -- Delete Selected
     on btnDeleteSelected pressed do
     (
-        local sel = animationsListBox.selection
+        local sel = getSelectedRowIndex()
         if sel > 0 then
         (
             deleteItem MotionKitFBXExporter_AnimationList sel
-            formatAnimationList()
+            updateDataGrid()
         )
         else
         (
@@ -165,7 +233,7 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
             if queryBox "Delete all animations from the list?" title:"{title}" then
             (
                 MotionKitFBXExporter_AnimationList = #()
-                formatAnimationList()
+                updateDataGrid()
             )
         )
     )
@@ -173,7 +241,7 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
     -- Export Selected
     on btnExportSelected pressed do
     (
-        local sel = animationsListBox.selection
+        local sel = getSelectedRowIndex()
         if sel > 0 then
         (
             python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_animation(" + (sel as string) + ")")
@@ -320,7 +388,7 @@ rollout AddAnimationDialog "{title}" width:550 height:220
         append MotionKitFBXExporter_AnimationList animEntry
 
         -- Update main dialog
-        MotionKitFBXExporter.formatAnimationList()
+        MotionKitFBXExporter.updateDataGrid()
 
         destroyDialog AddAnimationDialog
     )
@@ -436,7 +504,7 @@ rollout EditAnimationDialog "{title}" width:550 height:200
         MotionKitFBXExporter_AnimationList[{index}] = #(nameEdit.text, startSpn.value, endSpn.value, pathEdit.text, objEdit.text)
 
         -- Update main dialog
-        MotionKitFBXExporter.formatAnimationList()
+        MotionKitFBXExporter.updateDataGrid()
 
         destroyDialog EditAnimationDialog
     )

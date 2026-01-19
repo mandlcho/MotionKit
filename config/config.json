@@ -51,9 +51,9 @@
         ]
     },
     "perforce": {
-        "server": "",
-        "user": "",
-        "workspace": ""
+        "server": "p4-cg.happyelements.com:1666",
+        "user": "mandl.cho",
+        "workspace": "mandl.cho_rawdata_74"
     },
     "export": {
         "fbx_path": "",

@@ -3,6 +3,9 @@ FBX Animation Exporter Tool for MotionKit
 Export animation with custom frame range and object selection to FBX
 """
 
+import os
+from pathlib import Path
+
 try:
     import pymxs
     rt = pymxs.runtime
@@ -13,8 +16,60 @@ except ImportError:
 
 from core.logger import logger
 from core.localization import t
+from core.config import config
 
 TOOL_NAME = "Animation Exporter"
+
+
+def _detect_export_path():
+    """
+    Auto-detect FBX export path based on current Max file location.
+
+    Priority:
+    1. If in .../Max/ folder, use sibling ../FBX/ folder
+    2. Otherwise, use fallback path from Settings
+    3. If no fallback, return None (user will be prompted)
+
+    Returns:
+        str: Export directory path, or None if not detected
+    """
+    try:
+        # Get current Max file path
+        max_file_path = rt.maxFilePath
+        max_file_name = rt.maxFileName
+
+        if not max_file_path or not max_file_name:
+            # File not saved yet, use fallback
+            logger.info("Max file not saved, using fallback export path")
+            return config.get('export.fbx_path', None)
+
+        # Convert to Path object
+        current_dir = Path(max_file_path)
+
+        # Check if current directory is named "Max"
+        if current_dir.name.lower() == "max":
+            # Look for sibling FBX folder
+            parent = current_dir.parent
+            fbx_dir = parent / "FBX"
+
+            if fbx_dir.exists() and fbx_dir.is_dir():
+                logger.info(f"Auto-detected FBX export path: {fbx_dir}")
+                return str(fbx_dir)
+            else:
+                logger.warning(f"Sibling FBX folder not found at: {fbx_dir}")
+
+        # Fallback to configured path
+        fallback = config.get('export.fbx_path', None)
+        if fallback:
+            logger.info(f"Using fallback export path: {fallback}")
+            return fallback
+
+        logger.warning("No export path detected or configured")
+        return None
+
+    except Exception as e:
+        logger.error(f"Failed to detect export path: {str(e)}")
+        return config.get('export.fbx_path', None)
 
 
 def execute(control=None, event=None):
@@ -41,6 +96,15 @@ class AnimationExporterDialog:
 
     def __init__(self):
         self.version = "1.0.0"
+
+    def _escape_maxscript(self, text):
+        """Escape special characters for MaxScript strings"""
+        if not text:
+            return ""
+        # Escape backslashes and quotes
+        text = text.replace('\\', '\\\\')
+        text = text.replace('"', '\\"')
+        return text
 
     def show(self):
         """Show the Animation Exporter dialog using MaxScript"""
@@ -79,12 +143,17 @@ class AnimationExporterDialog:
             # Remove file extension
             default_anim_name = rt.getFilenameFile(rt.maxFileName)
 
+        # Detect export path
+        export_path = _detect_export_path()
+        export_path_display = export_path if export_path else "(Not configured - set in Settings)"
+        export_path_escaped = self._escape_maxscript(export_path_display)
+
         maxscript = f'''
 -- ============================================
 -- MotionKit Animation Exporter Tool
 -- ============================================
 
-rollout MotionKitAnimExporter "{title}" width:480 height:280
+rollout MotionKitAnimExporter "{title}" width:480 height:330
 (
     -- Animation Name
     group "Animation"
@@ -117,9 +186,17 @@ rollout MotionKitAnimExporter "{title}" width:480 height:280
         button btnUseSelSet "Use Set" pos:[380,146] width:70 height:20
     )
 
+    -- Export Path Preview
+    group "Export Path"
+    (
+        label pathPreviewLbl "Export to:" pos:[20,200] width:60 align:#left
+        edittext pathValueEdit "" pos:[90,198] width:360 height:20 labelOnTop:false text:"{export_path_escaped}" readOnly:true
+        button btnChangePath "Change..." pos:[380,222] width:70 height:20
+    )
+
     -- Bottom buttons
-    button btnExport "{export_btn}" pos:[250,240] width:100 height:30
-    button btnClose "{close}" pos:[360,240] width:100 height:30
+    button btnExport "{export_btn}" pos:[250,290] width:100 height:30
+    button btnClose "{close}" pos:[360,290] width:100 height:30
 
     -- Use Timeline checkbox handler
     on useTimelineCB changed state do
@@ -163,6 +240,18 @@ rollout MotionKitAnimExporter "{title}" width:480 height:280
         else
         (
             messageBox "Please select a selection set!" title:"{title}"
+        )
+    )
+
+    -- Change Path button
+    on btnChangePath pressed do
+    (
+        local newPath = getSavePath caption:"Select FBX Export Directory"
+        if newPath != undefined then
+        (
+            pathValueEdit.text = newPath
+            -- Save to config
+            python.execute ("import max.tools.animation.fbx_exporter; from core.config import config; config.set('export.fbx_path', '" + newPath + "'); config.save()")
         )
     )
 
@@ -212,12 +301,26 @@ createDialog MotionKitAnimExporter
 def _export_animation(name, start_frame, end_frame, objects_str):
     """Export animation to FBX (placeholder for now)"""
     try:
+        # Detect export path
+        export_path = _detect_export_path()
+
+        if not export_path:
+            rt.messageBox(
+                "Export path not configured!\n\nPlease set the default FBX export path in MotionKit Settings,\nor save your Max file in a folder structure with a sibling FBX folder.",
+                title="Animation Exporter"
+            )
+            return
+
+        # Build full export file path
+        export_file = os.path.join(export_path, f"{name}.fbx")
+
         logger.info(f"Exporting animation '{name}' from frame {start_frame} to {end_frame}")
         logger.info(f"Objects: {objects_str}")
+        logger.info(f"Export path: {export_file}")
 
         # TODO: Implement actual FBX export
         rt.messageBox(
-            f"Export functionality will be implemented next!\n\nAnimation: {name}\nFrames: {start_frame}-{end_frame}\nObjects: {objects_str}",
+            f"Export functionality will be implemented next!\n\nAnimation: {name}\nFrames: {start_frame}-{end_frame}\nObjects: {objects_str}\n\nExport to: {export_file}",
             title="Animation Exporter"
         )
 

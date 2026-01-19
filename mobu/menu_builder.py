@@ -245,10 +245,10 @@ class MenuBuilder:
         about_text = f"""MotionKit Pipeline Toolset
 Version: {__version__}
 
-A comprehensive pipeline toolset for MotionBuilder
-with support for Animation, Rigging, Pipeline, and
-Unreal Engine integration.
+A comprehensive pipeline toolset for 3ds Max
+with support for Animation, Modeling, Rendering,
+and Pipeline integration.
 
-Visit github.com/yourorg/MotionKit for more information.
+Visit github.com/mandlcho/MotionKit for more information.
 """
         FBMessageBox("About MotionKit", about_text, "OK")

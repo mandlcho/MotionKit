@@ -46,7 +46,7 @@
             },
             {
                 "name": "Pipeline",
-                "enabled": true
+                "enabled": false
             }
         ]
     },

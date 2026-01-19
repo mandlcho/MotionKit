@@ -14,3 +14,6 @@ config/local_config.json
 
 # Backup files
 *.bak
+
+# Reverse engineered/proprietary code (DO NOT COMMIT)
+ANIMAX_EXTRACTED_FUNCTIONS.txt

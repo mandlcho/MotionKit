@@ -43,10 +43,23 @@
     "status": "상태:",
     "status_not_connected": "연결되지 않음",
     "status_connected": "연결됨",
+    "status_found_workspaces": "{0}개의 작업 공간 찾음",
+    "status_no_workspaces": "작업 공간을 찾지 못함",
+    "status_error_loading": "작업 공간 로드 중 오류",
+    "status_p4_not_found": "P4 CLI를 찾지 못함",
+    "status_timeout": "연결 시간 초과",
     "export_group": "내보내기 설정",
     "fbx_path": "FBX 내보내기 경로:",
     "save_close": "저장 후 닫기",
-    "saved": "설정이 성공적으로 저장되었습니다!"
+    "saved": "설정이 성공적으로 저장되었습니다!",
+    "saved_reload": "설정이 성공적으로 저장되었습니다! 언어 변경을 적용하려면 MotionKit을 다시 로드하세요.",
+    "error_server_user": "먼저 서버와 사용자를 입력하세요",
+    "error_fill_all": "먼저 서버, 사용자를 입력하고 작업 공간을 로드하세요",
+    "p4_configured": "Perforce 설정이 구성되었습니다：\n\n서버：{0}\n사용자：{1}\n작업 공간：{2}\n\n환경 변수가 설정되었습니다.",
+    "p4_not_found_msg": "Perforce 명령줄 도구(p4)를 찾을 수 없습니다。\n\nP4 CLI를 설치하고 PATH에 있는지 확인하세요.",
+    "create_path_prompt": "경로가 존재하지 않습니다：\n{0}\n\n생성하시겠습니까?",
+    "create_path_failed": "디렉토리 생성 실패：\n{0}",
+    "save_failed": "설정 저장 실패：\n{0}"
   },
   "tools": {
     "root_anim_copy": {

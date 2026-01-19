@@ -43,10 +43,23 @@
     "status": "状态:",
     "status_not_connected": "未连接",
     "status_connected": "已连接",
+    "status_found_workspaces": "找到 {0} 个工作区",
+    "status_no_workspaces": "未找到工作区",
+    "status_error_loading": "加载工作区时出错",
+    "status_p4_not_found": "未找到 P4 CLI",
+    "status_timeout": "连接超时",
     "export_group": "导出设置",
     "fbx_path": "FBX 导出路径:",
     "save_close": "保存并关闭",
-    "saved": "设置保存成功！"
+    "saved": "设置保存成功！",
+    "saved_reload": "设置保存成功！请重新加载 MotionKit 以应用语言更改。",
+    "error_server_user": "请先输入服务器和用户",
+    "error_fill_all": "请先填写服务器、用户并加载工作区",
+    "p4_configured": "Perforce 设置已配置：\n\n服务器：{0}\n用户：{1}\n工作区：{2}\n\n环境变量已设置。",
+    "p4_not_found_msg": "未找到 Perforce 命令行工具 (p4)。\n\n请安装 P4 CLI 并确保它在您的 PATH 中。",
+    "create_path_prompt": "路径不存在：\n{0}\n\n是否创建？",
+    "create_path_failed": "创建目录失败：\n{0}",
+    "save_failed": "保存设置失败：\n{0}"
   },
   "tools": {
     "root_anim_copy": {

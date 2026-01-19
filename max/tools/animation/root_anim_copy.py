@@ -19,6 +19,7 @@ except ImportError:
     rt = None
 
 from core.logger import logger
+from core.localization import t
 
 TOOL_NAME = "Root Animation Copy"
 
@@ -51,50 +52,81 @@ class RootAnimCopyDialog:
     def show(self):
         """Show the Root Animation Copy dialog using MaxScript"""
 
+        # Get all translations
+        title = t('tools.root_anim_copy.title')
+        description = t('tools.root_anim_copy.description')
+        position_group = t('tools.root_anim_copy.position_group')
+        rotation_group = t('tools.root_anim_copy.rotation_group')
+        x_axis = t('tools.root_anim_copy.x_axis')
+        y_axis = t('tools.root_anim_copy.y_axis')
+        z_axis = t('tools.root_anim_copy.z_axis')
+        z_rotation = t('tools.root_anim_copy.z_rotation')
+        frame_range_group = t('tools.root_anim_copy.frame_range_group')
+        use_timeline = t('tools.root_anim_copy.use_timeline')
+        start = t('tools.root_anim_copy.start')
+        end = t('tools.root_anim_copy.end')
+        height_offset_group = t('tools.root_anim_copy.height_offset_group')
+        apply_offset = t('tools.root_anim_copy.apply_offset')
+        offset = t('tools.root_anim_copy.offset')
+        calc_from_selection = t('tools.root_anim_copy.calc_from_selection')
+        copy_button = t('tools.root_anim_copy.copy_button')
+        pick = t('common.pick')
+
+        # Error messages
+        error_root_not_found = t('tools.root_anim_copy.error_root_not_found')
+        error_cs_not_found = t('tools.root_anim_copy.error_cs_not_found')
+        error_invalid_frames = t('tools.root_anim_copy.error_invalid_frames')
+        error_frame_range = t('tools.root_anim_copy.error_frame_range')
+        error_select_2_objects = t('tools.root_anim_copy.error_select_2_objects')
+        error_need_biped_and_root = t('tools.root_anim_copy.error_need_biped_and_root')
+        success_copied = t('tools.root_anim_copy.success_copied')
+        cancelled = t('tools.root_anim_copy.cancelled')
+        height_calculated = t('tools.root_anim_copy.height_calculated')
+
         maxscript = f'''
 -- ============================================
 -- MotionKit Root Animation Copy Tool
 -- ============================================
 
-rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" width:520 height:285
+rollout MotionKitRootAnimCopy "{title}" width:520 height:285
 (
     -- Title with margins
-    label titleLabel "Copy animation from Biped Root (CS Pelvis) to custom Root bone" \\
+    label titleLabel "{description}" \\
         pos:[10,6] width:500 align:#center
 
     -- Position Group
-    groupBox positionGroup "Position Copy Options" pos:[10,26] width:245 height:48
-    checkbox xAxisPos "X Axis" pos:[20,44] checked:true across:3
-    checkbox yAxisPos "Y Axis" pos:[95,44] checked:true
-    checkbox zAxisPos "Z Axis" pos:[170,44] checked:true
+    groupBox positionGroup "{position_group}" pos:[10,26] width:245 height:48
+    checkbox xAxisPos "{x_axis}" pos:[20,44] checked:true across:3
+    checkbox yAxisPos "{y_axis}" pos:[95,44] checked:true
+    checkbox zAxisPos "{z_axis}" pos:[170,44] checked:true
 
     -- Rotation Group
-    groupBox rotationGroup "Rotation Copy Options" pos:[265,26] width:245 height:48
-    checkbox zAxisRot "Z Rotation" pos:[275,44] checked:false
+    groupBox rotationGroup "{rotation_group}" pos:[265,26] width:245 height:48
+    checkbox zAxisRot "{z_rotation}" pos:[275,44] checked:false
 
     -- Frame Range Group
-    groupBox frameRangeGroup "Frame Range" pos:[10,82] width:500 height:73
-    checkbox useTimelineRange "Use Current Timeline" pos:[20,98] checked:true
+    groupBox frameRangeGroup "{frame_range_group}" pos:[10,82] width:500 height:73
+    checkbox useTimelineRange "{use_timeline}" pos:[20,98] checked:true
 
-    label startLabel "Start:" pos:[20,120] width:40
+    label startLabel "{start}" pos:[20,120] width:40
     edittext frameStartEdit "" pos:[65,118] width:90 height:18 enabled:false labelOnTop:false
-    button pickStartFrame "Pick" pos:[160,118] width:50 height:18 enabled:false
+    button pickStartFrame "{pick}" pos:[160,118] width:50 height:18 enabled:false
 
-    label endLabel "End:" pos:[270,120] width:40
+    label endLabel "{end}" pos:[270,120] width:40
     edittext frameEndEdit "" pos:[310,118] width:90 height:18 enabled:false labelOnTop:false
-    button pickEndFrame "Pick" pos:[405,118] width:50 height:18 enabled:false
+    button pickEndFrame "{pick}" pos:[405,118] width:50 height:18 enabled:false
 
     -- Height Offset Group
-    groupBox heightOffsetGroup "Height Offset (Z-axis)" pos:[10,163] width:500 height:73
-    checkbox useHeightOffset "Apply Height Offset" pos:[20,179] checked:false
+    groupBox heightOffsetGroup "{height_offset_group}" pos:[10,163] width:500 height:73
+    checkbox useHeightOffset "{apply_offset}" pos:[20,179] checked:false
 
-    label offsetLabel "Offset:" pos:[20,201] width:45
+    label offsetLabel "{offset}" pos:[20,201] width:45
     spinner heightOffsetSpn "" pos:[70,199] width:120 height:18 \\
         range:[-1000,1000,0] type:#float scale:0.1 enabled:false
-    button calcHeightOffset "Calculate from Selection" pos:[200,199] width:300 height:18 enabled:false
+    button calcHeightOffset "{calc_from_selection}" pos:[200,199] width:300 height:18 enabled:false
 
     -- Main copy button
-    button copyRootAnim "Copy Biped Root Animation to Root" pos:[10,245] width:500 height:35
+    button copyRootAnim "{copy_button}" pos:[10,245] width:500 height:35
 
     -- Initialize with current timeline
     on MotionKitRootAnimCopy open do
@@ -151,7 +183,7 @@ rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" 
     (
         if selection.count != 2 then
         (
-            messageBox "Please select exactly 2 objects: CS Pelvis and Root bone" \\
+            messageBox "{error_select_2_objects}" \\
                 title:"Height Offset"
             return undefined
         )
@@ -170,7 +202,7 @@ rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" 
 
         if csNode == undefined or rootNode == undefined then
         (
-            messageBox "Selection must contain one Biped node (CS Pelvis) and one regular node (Root)" \\
+            messageBox "{error_need_biped_and_root}" \\
                 title:"Height Offset"
             return undefined
         )
@@ -179,10 +211,10 @@ rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" 
         local heightDiff = csNode.pos.z - rootNode.pos.z
         heightOffsetSpn.value = heightDiff
 
-        messageBox ("Height offset calculated: " + (heightDiff as string) + " units\\n\\n" + \\
-                   "CS Pelvis Z: " + (csNode.pos.z as string) + "\\n" + \\
-                   "Root Z: " + (rootNode.pos.z as string)) \\
-            title:"Height Offset"
+        local msg = substituteString "{height_calculated}" "{{0}}" (heightDiff as string)
+        msg = substituteString msg "{{1}}" (csNode.pos.z as string)
+        msg = substituteString msg "{{2}}" (rootNode.pos.z as string)
+        messageBox msg title:"Height Offset"
     )
 
     -- Main copy function
@@ -213,14 +245,14 @@ rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" 
         )
         catch
         (
-            messageBox "Root bone not found! Please ensure there is a node named 'root' in the scene." \\
+            messageBox "{error_root_not_found}" \\
                 title:"Root Anim Copy"
             return undefined
         )
 
         if csRoot == undefined then
         (
-            messageBox "CS Pelvis (Biped root) not found! Please ensure there is a Biped in the scene." \\
+            messageBox "{error_cs_not_found}" \\
                 title:"Root Anim Copy"
             return undefined
         )
@@ -231,7 +263,7 @@ rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" 
 
         if startFrameValue == undefined or endFrameValue == undefined then
         (
-            messageBox "Invalid frame range! Please enter valid frame numbers." title:"Root Anim Copy"
+            messageBox "{error_invalid_frames}" title:"Root Anim Copy"
             return undefined
         )
 
@@ -241,7 +273,7 @@ rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" 
         -- Validate frame range
         if endFrame < startFrame then
         (
-            messageBox "End frame must be greater than or equal to start frame!" title:"Root Anim Copy"
+            messageBox "{error_frame_range}" title:"Root Anim Copy"
             return undefined
         )
 
@@ -316,7 +348,8 @@ rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" 
             -- Allow ESC to cancel
             if keyboard.escPressed do
             (
-                messageBox ("Animation copy cancelled at frame " + t as string) title:"Root Anim Copy"
+                local cancelMsg = substituteString "{cancelled}" "{{0}}" (t as string)
+                messageBox cancelMsg title:"Root Anim Copy"
                 return undefined
             )
         )
@@ -347,8 +380,8 @@ rollout MotionKitRootAnimCopy "Root Animation Copy - MotionKit v{self.version}" 
         )
 
         slidertime = startFrame
-        messageBox ("Successfully copied " + frameCount as string + " frames from CS Pelvis to Root bone!") \\
-            title:"Root Anim Copy"
+        local successMsg = substituteString "{success_copied}" "{{0}}" (frameCount as string)
+        messageBox successMsg title:"Root Anim Copy"
     )
 )
 

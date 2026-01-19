@@ -62,10 +62,10 @@ rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:340
         label lblP4Info "Configure your Perforce connection:" align:#left
 
         label lblServer "Server:" align:#left across:2
-        editText edtServer "" text:"{self._escape_maxscript(p4_server)}" fieldWidth:350 align:#right
+        editText edtServer "" text:"{self._escape_maxscript(p4_server)}" fieldWidth:350 align:#right labelOnTop:false
 
         label lblUser "User:" align:#left across:2
-        editText edtUser "" text:"{self._escape_maxscript(p4_user)}" fieldWidth:350 align:#right
+        editText edtUser "" text:"{self._escape_maxscript(p4_user)}" fieldWidth:350 align:#right labelOnTop:false
 
         label lblWorkspace "Workspace:" align:#left across:2
         dropdownList ddlWorkspace items:#("(Not loaded)") selection:1 width:350 align:#right
@@ -80,7 +80,7 @@ rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:340
     group "Export Settings"
     (
         label lblExport "FBX Export Path:" align:#left across:2
-        editText edtFbxPath "" text:"{self._escape_maxscript(fbx_path)}" fieldWidth:300 align:#right
+        editText edtFbxPath "" text:"{self._escape_maxscript(fbx_path)}" fieldWidth:300 align:#right labelOnTop:false
         button btnBrowse "Browse..." width:70 height:20 align:#right offset:[0, -22]
     )
 

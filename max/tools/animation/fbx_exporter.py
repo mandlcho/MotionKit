@@ -78,7 +78,7 @@ rollout MotionKitFBXExporter "{title}" width:900 height:600
     groupBox animationsGroup "{animations_group}" pos:[10,26] width:740 height:540
 
     -- Listbox for animations (custom formatted) - fill the entire group
-    listBox animationsListBox "" pos:[20,44] width:720 height:30 items:#()
+    listBox animationsListBox "" pos:[20,44] width:720 height:32 items:#()
 
     -- Animation controls group
     groupBox animControlGroup "Animation" pos:[760,26] width:130 height:160

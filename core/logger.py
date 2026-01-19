@@ -27,6 +27,10 @@ class Logger:
         self._logger = logging.getLogger('MotionKit')
         self._logger.setLevel(logging.DEBUG)
 
+        # Remove any existing handlers to prevent duplicates on reload
+        if self._logger.handlers:
+            self._logger.handlers.clear()
+
         # Console handler
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)

@@ -44,7 +44,7 @@ def _p4_checkout(file_path):
         p4_workspace = config.get('perforce.workspace', '')
 
         if not p4_server or not p4_user:
-            logger.warning("Perforce not configured, skipping checkout")
+            logger.info("Perforce not configured, skipping checkout")
             return True
 
         # Set P4 environment variables
@@ -55,6 +55,21 @@ def _p4_checkout(file_path):
             env['P4USER'] = p4_user
         if p4_workspace:
             env['P4CLIENT'] = p4_workspace
+
+        # Check if file is in P4 workspace first
+        check_result = subprocess.run(
+            ['p4', 'fstat', file_path],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=env
+        )
+
+        # If file is not in depot, skip P4 operations
+        if check_result.returncode != 0:
+            if "not under client's root" in check_result.stderr or "not in client view" in check_result.stderr or "no such file" in check_result.stderr:
+                logger.info(f"File not in P4 workspace, skipping P4 operations: {file_path}")
+                return True
 
         # Try to check out the file
         result = subprocess.run(
@@ -74,14 +89,14 @@ def _p4_checkout(file_path):
                 logger.info(f"File already checked out: {file_path}")
                 return True
             elif "not under client's root" in result.stdout or "not under client's root" in result.stderr:
-                logger.warning(f"File not in P4 workspace, proceeding anyway: {file_path}")
+                logger.info(f"File not in P4 workspace, proceeding anyway: {file_path}")
                 return True
             else:
                 logger.error(f"P4 checkout failed: {result.stderr}")
                 return False
 
     except FileNotFoundError:
-        logger.warning("P4 command not found, skipping checkout")
+        logger.info("P4 command not found, skipping checkout")
         return True
     except subprocess.TimeoutExpired:
         logger.error("P4 checkout timeout")
@@ -410,10 +425,29 @@ def _save_export_path(path):
 
 def _export_animation(name, start_frame, end_frame, objects_str):
     """Export animation to FBX with Perforce checkout"""
+
+    def _set_fbx_param(param_name, value):
+        """Helper to set FBX parameter with detailed logging and error handling."""
+        try:
+            logger.debug(f"Setting FBX Param: {param_name} = {value}")
+            rt.FBXExporterSetParam(rt.Name(param_name), value)
+            return True
+        except Exception as e:
+            error_msg = f"Failed to set FBX Exporter parameter '{param_name}' to '{value}'."
+            logger.error(error_msg)
+            
+            if "Error getting MAXScript value" in str(e):
+                full_error = (f"{error_msg}\n\nThis often means the 3ds Max FBX Exporter plugin is not loaded, "
+                              "is in a bad state, or does not support this parameter.\n\n"
+                              "Please try restarting 3ds Max or reinstalling the FBX plugin.")
+                logger.error(full_error.replace('\n\n', ' '))
+                rt.messageBox(full_error, title="FBX Configuration Error")
+            else:
+                rt.messageBox(f"{error_msg}\n\nError: {str(e)}", title="FBX Configuration Error")
+            raise e
+
     try:
         _update_progress(5, "Detecting export path...")
-
-        # Detect export path
         export_path = _detect_export_path()
 
         if not export_path:
@@ -424,39 +458,22 @@ def _export_animation(name, start_frame, end_frame, objects_str):
             )
             return
 
-        # Build full export file path
         export_file = os.path.join(export_path, f"{name}.fbx")
-
         logger.info(f"Exporting animation '{name}' from frame {start_frame} to {end_frame}")
         logger.info(f"Objects: {objects_str}")
         logger.info(f"Export path: {export_file}")
 
         _update_progress(10, "Parsing object names...")
-
-        # Parse object names from string
-        # MaxScript array format: #("Object1", "Object2", ...) or comma-separated: Object1, Object2
         objects_str_clean = objects_str.strip()
-
-        # Remove MaxScript array syntax if present
         if objects_str_clean.startswith('#(') and objects_str_clean.endswith(')'):
             objects_str_clean = objects_str_clean[2:-1]
-
-        # Split by comma and clean up
-        object_names = []
-        for obj in objects_str_clean.split(','):
-            obj = obj.strip()
-            # Remove quotes if present
-            if obj.startswith('"') and obj.endswith('"'):
-                obj = obj[1:-1]
-            # Skip empty strings and ellipsis
-            if obj and obj != '...':
-                object_names.append(obj)
+        object_names = [obj[1:-1] for obj in objects_str_clean.split(',') if obj.strip().startswith('"') and obj.strip().endswith('"')]
+        if not object_names:
+            object_names = [obj.strip() for obj in objects_str_clean.split(',') if obj.strip() and obj.strip() != '...']
 
         logger.info(f"Parsed object names: {object_names}")
 
         _update_progress(20, f"Finding {len(object_names)} objects in scene...")
-
-        # Get objects from scene
         objects_to_export = []
         for obj_name in object_names:
             obj = rt.getNodeByName(obj_name)
@@ -468,112 +485,57 @@ def _export_animation(name, start_frame, end_frame, objects_str):
 
         if not objects_to_export:
             _update_progress(0, "")
-            rt.messageBox(
-                f"No valid objects found to export!\n\nParsed names: {object_names}\n\nOriginal string: {objects_str}",
-                title="Animation Exporter"
-            )
+            rt.messageBox(f"No valid objects found to export for names: {object_names}", title="Animation Exporter")
             return
 
         _update_progress(30, f"Checking Perforce...")
-
-        # P4 checkout if file exists
         if not _p4_checkout(export_file):
-            result = rt.queryBox(
-                f"Perforce checkout failed for:\n{export_file}\n\nContinue with export anyway?",
-                title="Animation Exporter"
-            )
-            if not result:
+            if not rt.queryBox(f"P4 checkout failed for:\n{export_file}\n\nContinue anyway?", title="Animation Exporter"):
                 logger.info("Export cancelled by user due to P4 checkout failure")
                 return
 
         _update_progress(40, "Preparing file...")
-
-        # Remove read-only attribute if file exists
         if os.path.exists(export_file):
             try:
                 import stat
-                # Remove read-only flag
                 os.chmod(export_file, stat.S_IWRITE | stat.S_IREAD)
                 logger.info(f"Removed read-only attribute from: {export_file}")
             except Exception as e:
                 logger.warning(f"Failed to remove read-only attribute: {str(e)}")
 
-        # Store current selection
-        original_selection = rt.selection[:]
-
-        # Store current animation range
+        original_selection = rt.selection if rt.selection else []
         original_start = rt.animationRange.start
         original_end = rt.animationRange.end
 
         try:
-            _update_progress(50, f"Selecting {len(objects_to_export)} objects...")
-            logger.info("Selecting objects for export...")
-
-            # Select objects to export
+            logger.info("Setting export properties...")
+            _update_progress(50, "Selecting objects...")
             rt.select(objects_to_export)
 
             _update_progress(60, "Setting animation range...")
-            logger.info(f"Setting animation range: {start_frame} to {end_frame}")
             rt.animationRange = rt.interval(start_frame, end_frame)
 
             _update_progress(70, "Configuring FBX settings...")
-            logger.info("Configuring FBX export settings...")
-            rt.FBXExporterSetParam(rt.Name("Animation"), True)
-            rt.FBXExporterSetParam(rt.Name("BakeAnimation"), True)
-            rt.FBXExporterSetParam(rt.Name("BakeFrameStart"), start_frame)
-            rt.FBXExporterSetParam(rt.Name("BakeFrameEnd"), end_frame)
-            rt.FBXExporterSetParam(rt.Name("BakeFrameStep"), 1)
-            rt.FBXExporterSetParam(rt.Name("Shape"), True)
-            rt.FBXExporterSetParam(rt.Name("Skin"), True)
-            rt.FBXExporterSetParam(rt.Name("UpAxis"), rt.Name("Z"))
+            _set_fbx_param("Animation", True)
+            _set_fbx_param("BakeAnimation", True)
+            _set_fbx_param("BakeFrameStart", start_frame)
+            _set_fbx_param("BakeFrameEnd", end_frame)
+            _set_fbx_param("BakeFrameStep", 1)
+            _set_fbx_param("Shape", True)
+            _set_fbx_param("Skin", True)
+            _set_fbx_param("UpAxis", rt.Name("Z"))
 
-            _update_progress(80, f"Exporting animation...")
-            logger.info(f"Exporting to: {export_file}")
-
-            # Escape backslashes for MaxScript
-            export_file_escaped = export_file.replace('\\', '\\\\')
-
-            # Create progress bar
-            rt.progressStart(f"Exporting {name}...")
-
-            try:
-                # Use MaxScript execution for proper parameter handling
-                export_cmd = f'exportFile "{export_file_escaped}" #noPrompt selectedOnly:true using:FBXEXP'
-                logger.info(f"Executing MaxScript command: {export_cmd}")
-
-                try:
-                    result = rt.execute(export_cmd)
-                    logger.info(f"Export command result: {result}")
-
-                    if result == False:
-                        raise Exception("Export returned false - export may have failed")
-                except Exception as e:
-                    logger.error(f"MaxScript execute error: {str(e)}")
-                    # Try alternative approach using direct pymxs call
-                    logger.info("Attempting alternative export method...")
-                    result = rt.exportFile(
-                        export_file,
-                        rt.Name("noPrompt"),
-                        selectedOnly=True,
-                        using=rt.FBXEXP
-                    )
-                    logger.info(f"Alternative export result: {result}")
-
-            finally:
-                rt.progressEnd()
+            _update_progress(80, f"Exporting to {os.path.basename(export_file)}...")
+            logger.info(f"Performing silent FBX export to: {export_file}")
+            rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
+            logger.info("Silent export command executed without errors.")
 
             _update_progress(100, "Export complete!")
-            logger.info(f"Successfully exported to: {export_file}")
-            rt.messageBox(
-                f"Animation exported successfully!\n\nFile: {export_file}\nFrames: {start_frame}-{end_frame}\nObjects: {len(objects_to_export)}",
-                title="Export Success"
-            )
+            logger.info(f"Export completed for: {export_file}")
 
         finally:
-            # Restore original animation range
+            logger.debug("Restoring original scene state.")
             rt.animationRange = rt.interval(original_start, original_end)
-
-            # Restore original selection
             if len(original_selection) > 0:
                 rt.select(original_selection)
             else:
@@ -582,4 +544,7 @@ def _export_animation(name, start_frame, end_frame, objects_str):
     except Exception as e:
         _update_progress(0, "Export failed!")
         logger.error(f"Failed to export animation: {str(e)}")
-        rt.messageBox(f"Failed to export animation:\n{str(e)}", title="Export Error")
+        # Avoid showing a duplicate message box if one was already shown by a helper.
+        if "FBX Configuration Error" not in str(e):
+             rt.messageBox(f"Failed to export animation:\n{str(e)}", title="Export Error")
+

@@ -63,8 +63,8 @@
   },
   "tools": {
     "fbx_exporter": {
-      "name": "FBX Exporter",
-      "title": "MotionKit Animation Exporter",
+      "name": "Animation Exporter",
+      "title": "Animation Exporter",
       "animations_group": "Animations",
       "add_animation": "Add Animation",
       "edit_selected": "Edit Selected",

@@ -63,8 +63,8 @@
   },
   "tools": {
     "fbx_exporter": {
-      "name": "FBX导出工具",
-      "title": "MotionKit 动画导出工具",
+      "name": "动画导出工具",
+      "title": "动画导出工具",
       "animations_group": "动画列表",
       "add_animation": "添加动画",
       "edit_selected": "编辑选中",

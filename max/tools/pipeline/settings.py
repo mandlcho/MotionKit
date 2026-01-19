@@ -164,8 +164,9 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:280
     on btnSave pressed do
     (
         local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
-        local langChanged = python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + langCode + "')")
-        if langChanged then
+        python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + langCode + "')")
+        local langChanged = python.evaluate ("max.tools.pipeline.settings._lang_changed")
+        if langChanged == true then
         (
             messageBox "{saved_reload_msg}" title:"{title}"
         )
@@ -178,8 +179,9 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:280
     on btnApplyClose pressed do
     (
         local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
-        local langChanged = python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + langCode + "')")
-        if langChanged then
+        python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + langCode + "')")
+        local langChanged = python.evaluate ("max.tools.pipeline.settings._lang_changed")
+        if langChanged == true then
         (
             messageBox "{saved_reload_msg}" title:"{title}"
         )
@@ -214,6 +216,7 @@ createDialog MotionKitSettingsRollout
 
 # Global functions called from MaxScript
 _current_workspaces = []
+_lang_changed = False
 
 
 def _load_workspaces(server, user):
@@ -287,10 +290,11 @@ def _load_workspaces(server, user):
 
 def _save_settings(server, user, workspace, language='en'):
     """Save settings to config (called from MaxScript)"""
+    global _lang_changed
     try:
         # Check if language changed
         current_language = config.get('ui.language', 'en')
-        language_changed = (current_language != language)
+        _lang_changed = (current_language != language)
 
         # Save language setting
         config.set('ui.language', language)
@@ -308,7 +312,7 @@ def _save_settings(server, user, workspace, language='en'):
         config.save()
 
         logger.info("Settings saved to config file")
-        return language_changed
+        return True
 
     except Exception as e:
         rt.messageBox(
@@ -316,4 +320,5 @@ def _save_settings(server, user, workspace, language='en'):
             title=t('settings.title')
         )
         logger.error(f"Failed to save settings: {str(e)}")
+        _lang_changed = False
         return False

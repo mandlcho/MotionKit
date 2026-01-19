@@ -51,11 +51,21 @@ class SettingsDialog:
         p4_user = config.get('perforce.user', '')
         p4_workspace = config.get('perforce.workspace', '')
         fbx_path = config.get('export.fbx_path', '')
+        current_language = config.get('ui.language', 'en')
 
         # Generate MaxScript for the dialog
         maxscript = f'''
-rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:340
+rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:390
 (
+    -- Language Settings Group
+    group "Language / 语言 / 언어"
+    (
+        label lblLanguageInfo "Interface Language:" align:#left
+        dropdownList ddlLanguage items:#("English", "中文 (Chinese)", "한국어 (Korean)") \\
+            selection:{1 if current_language == 'en' else (2 if current_language == 'zh' else 3)} \\
+            width:400 align:#left
+    )
+
     -- Perforce Settings Group
     group "Perforce Settings"
     (
@@ -138,14 +148,16 @@ rollout MotionKitSettingsRollout "MotionKit Settings" width:480 height:340
 
     on btnSave pressed do
     (
-        python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + edtFbxPath.text + "')")
+        local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
+        python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + edtFbxPath.text + "', '" + langCode + "')")
         messageBox "Settings saved successfully!" title:"MotionKit Settings"
     )
 
     on btnApplyClose pressed do
     (
-        python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + edtFbxPath.text + "')")
-        messageBox "Settings saved successfully!" title:"MotionKit Settings"
+        local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
+        python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + edtFbxPath.text + "', '" + langCode + "')")
+        messageBox "Settings saved successfully! Please reload MotionKit to apply language changes." title:"MotionKit Settings"
         destroyDialog MotionKitSettingsRollout
     )
 
@@ -238,9 +250,12 @@ def _load_workspaces(server, user):
         logger.error(f"Failed to load workspaces: {str(e)}")
 
 
-def _save_settings(server, user, workspace, fbx_path):
+def _save_settings(server, user, workspace, fbx_path, language='en'):
     """Save settings to config (called from MaxScript)"""
     try:
+        # Save language setting
+        config.set('ui.language', language)
+
         # Save P4 settings
         config.set('perforce.server', server)
         config.set('perforce.user', user)

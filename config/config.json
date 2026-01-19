@@ -69,5 +69,8 @@
     "logging": {
         "level": "INFO",
         "log_to_file": false
+    },
+    "ui": {
+        "language": "en"
     }
 }

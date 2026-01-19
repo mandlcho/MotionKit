@@ -1,0 +1,75 @@
+{
+  "common": {
+    "ok": "确定",
+    "cancel": "取消",
+    "save": "保存",
+    "close": "关闭",
+    "apply": "应用",
+    "browse": "浏览...",
+    "pick": "拾取",
+    "calculate": "计算",
+    "error": "错误",
+    "warning": "警告",
+    "success": "成功",
+    "yes": "是",
+    "no": "否"
+  },
+  "menu": {
+    "settings": "设置...",
+    "reload": "重新加载 MotionKit",
+    "about": "关于 MotionKit"
+  },
+  "settings": {
+    "title": "MotionKit 设置",
+    "language": "语言",
+    "language_label": "界面语言:",
+    "perforce_group": "Perforce 设置",
+    "perforce_info": "配置您的 Perforce 连接:",
+    "server": "服务器:",
+    "user": "用户:",
+    "workspace": "工作区:",
+    "load_workspaces": "加载工作区",
+    "test_connection": "测试连接",
+    "status": "状态:",
+    "status_not_connected": "未连接",
+    "status_connected": "已连接",
+    "export_group": "导出设置",
+    "fbx_path": "FBX 导出路径:",
+    "save_close": "保存并关闭",
+    "saved": "设置保存成功！"
+  },
+  "tools": {
+    "root_anim_copy": {
+      "title": "根节点动画拷贝 - MotionKit",
+      "description": "从 Biped 根节点（CS 质心）复制动画到自定义根骨骼",
+      "position_group": "位移复制选项",
+      "rotation_group": "旋转复制选项",
+      "x_axis": "X 轴",
+      "y_axis": "Y 轴",
+      "z_axis": "Z 轴",
+      "z_rotation": "Z 旋转",
+      "frame_range_group": "帧范围",
+      "use_timeline": "使用当前时间线",
+      "start": "开始:",
+      "end": "结束:",
+      "height_offset_group": "高度偏移（Z轴）",
+      "apply_offset": "应用高度偏移",
+      "offset": "偏移:",
+      "calc_from_selection": "从选择计算",
+      "copy_button": "复制 Biped 根节点动画到根骨骼",
+      "error_root_not_found": "未找到根骨骼！请确保场景中存在名为 'root' 的节点。",
+      "error_cs_not_found": "未找到 CS 质心（Biped 根节点）！请确保场景中存在 Biped。",
+      "error_invalid_frames": "无效的帧范围！请输入有效的帧数。",
+      "error_frame_range": "结束帧必须大于或等于开始帧！",
+      "error_select_2_objects": "请选择恰好 2 个对象：CS 质心和根骨骼",
+      "error_need_biped_and_root": "选择必须包含一个 Biped 节点（CS 质心）和一个普通节点（根骨骼）",
+      "success_copied": "成功从 CS 质心复制了 {0} 帧到根骨骼！",
+      "cancelled": "动画复制在第 {0} 帧被取消",
+      "height_calculated": "高度偏移已计算: {0} 单位\n\nCS 质心 Z: {1}\n根骨骼 Z: {2}"
+    }
+  },
+  "about": {
+    "title": "关于 MotionKit",
+    "description": "MotionKit 流程工具集\n版本: {0}\n\n一套全面的 3ds Max 流程工具集\n支持动画、建模、渲染和流程集成。\n\n访问 github.com/mandlcho/MotionKit 获取更多信息。"
+  }
+}

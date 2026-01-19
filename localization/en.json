@@ -62,6 +62,27 @@
     "save_failed": "Failed to save settings:\n{0}"
   },
   "tools": {
+    "fbx_exporter": {
+      "name": "FBX Exporter",
+      "title": "FBX Animation Exporter - MotionKit",
+      "animations_group": "Animations",
+      "add_animation": "Add Animation",
+      "edit_selected": "Edit Selected",
+      "delete_selected": "Delete Selected",
+      "delete_all": "Delete All",
+      "export_group": "Export",
+      "export_selected": "Export Selected",
+      "export_all": "Export All",
+      "add_animation_title": "Add Animation",
+      "edit_animation_title": "Edit Animation",
+      "animation_name": "Animation Name",
+      "start_frame": "Start Frame",
+      "end_frame": "End Frame",
+      "objects": "Objects",
+      "export_path": "Export Path",
+      "use_selection": "Use Selection",
+      "use_timeline": "Use Timeline"
+    },
     "root_anim_copy": {
       "name": "Root Animation Copy",
       "title": "Root Animation Copy - MotionKit",

@@ -84,7 +84,7 @@ class SettingsDialog:
 
         # Generate MaxScript for the dialog
         maxscript = f'''
-rollout MotionKitSettingsRollout "{title}" width:480 height:390
+rollout MotionKitSettingsRollout "{title}" width:480 height:280
 (
     -- Language Settings Group
     group "{language}"
@@ -107,7 +107,7 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:390
         editText edtUser "" text:"{self._escape_maxscript(p4_user)}" fieldWidth:350 align:#right labelOnTop:false
 
         label lblWorkspace "{workspace}" align:#left across:2
-        dropdownList ddlWorkspace items:#("(Not loaded)") selection:1 width:350 align:#right
+        dropdownList ddlWorkspace items:#("{p4_workspace if p4_workspace else '(Not loaded)'}") selection:1 width:350 align:#right
 
         button btnLoadWorkspaces "{load_workspaces}" width:150 height:24 align:#left
         button btnTestConnection "{test_connection}" width:150 height:24 align:#left offset:[160, -28]
@@ -115,18 +115,10 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:390
         label lblStatus "{status} {status_not_connected}" align:#left
     )
 
-    -- Export Settings Group
-    group "{export_group}"
-    (
-        label lblExport "{fbx_path_label}" align:#left across:3
-        editText edtFbxPath "" text:"{self._escape_maxscript(fbx_path)}" fieldWidth:320 align:#left labelOnTop:false
-        button btnBrowse "..." width:30 height:20 align:#right
-    )
-
     -- Buttons
-    button btnSave "{save}" width:80 height:28 pos:[180, 300]
-    button btnApplyClose "{save_close}" width:110 height:28 pos:[270, 300]
-    button btnCancel "{cancel}" width:80 height:28 pos:[390, 300]
+    button btnSave "{save}" width:80 height:28 pos:[180, 240]
+    button btnApplyClose "{save_close}" width:110 height:28 pos:[270, 240]
+    button btnCancel "{cancel}" width:80 height:28 pos:[390, 240]
 
     -- Event handlers
     on btnLoadWorkspaces pressed do
@@ -169,27 +161,32 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:390
         )
     )
 
-    on btnBrowse pressed do
-    (
-        local newPath = getSavePath caption:"Select FBX Export Directory"
-        if newPath != undefined then
-        (
-            edtFbxPath.text = newPath
-        )
-    )
-
     on btnSave pressed do
     (
         local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
-        python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + edtFbxPath.text + "', '" + langCode + "')")
-        messageBox "{saved_msg}" title:"{title}"
+        local langChanged = python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + langCode + "')")
+        if langChanged then
+        (
+            messageBox "{saved_reload_msg}" title:"{title}"
+        )
+        else
+        (
+            messageBox "{saved_msg}" title:"{title}"
+        )
     )
 
     on btnApplyClose pressed do
     (
         local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
-        python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + edtFbxPath.text + "', '" + langCode + "')")
-        messageBox "{saved_reload_msg}" title:"{title}"
+        local langChanged = python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + langCode + "')")
+        if langChanged then
+        (
+            messageBox "{saved_reload_msg}" title:"{title}"
+        )
+        else
+        (
+            messageBox "{saved_msg}" title:"{title}"
+        )
         destroyDialog MotionKitSettingsRollout
     )
 
@@ -288,9 +285,13 @@ def _load_workspaces(server, user):
         logger.error(f"Failed to load workspaces: {str(e)}")
 
 
-def _save_settings(server, user, workspace, fbx_path, language='en'):
+def _save_settings(server, user, workspace, language='en'):
     """Save settings to config (called from MaxScript)"""
     try:
+        # Check if language changed
+        current_language = config.get('ui.language', 'en')
+        language_changed = (current_language != language)
+
         # Save language setting
         config.set('ui.language', language)
 
@@ -303,32 +304,11 @@ def _save_settings(server, user, workspace, fbx_path, language='en'):
         else:
             config.set('perforce.workspace', '')
 
-        # Save export settings
-        if fbx_path:
-            path_obj = Path(fbx_path)
-            if not path_obj.exists():
-                # Ask if user wants to create it
-                result = rt.queryBox(
-                    t('settings.create_path_prompt').format(fbx_path),
-                    title=t('settings.title')
-                )
-                if result:
-                    try:
-                        path_obj.mkdir(parents=True, exist_ok=True)
-                    except Exception as e:
-                        rt.messageBox(
-                            t('settings.create_path_failed').format(str(e)),
-                            title=t('settings.title')
-                        )
-                        return False
-
-        config.set('export.fbx_path', fbx_path)
-
         # Save to file
         config.save()
 
         logger.info("Settings saved to config file")
-        return True
+        return language_changed
 
     except Exception as e:
         rt.messageBox(

@@ -15,6 +15,16 @@
     "no": "No"
   },
   "menu": {
+    "main": "MotionKit",
+    "animation": "Animation",
+    "modeling": "Modeling",
+    "rendering": "Rendering",
+    "character": "Character",
+    "rigging": "Rigging",
+    "debug": "Debug",
+    "pipeline": "Pipeline",
+    "unreal_engine": "Unreal Engine",
+    "language": "Language",
     "settings": "Settings...",
     "reload": "Reload MotionKit",
     "about": "About MotionKit"
@@ -40,6 +50,7 @@
   },
   "tools": {
     "root_anim_copy": {
+      "name": "Root Animation Copy",
       "title": "Root Animation Copy - MotionKit",
       "description": "Copy animation from Biped Root (CS Pelvis) to custom Root bone",
       "position_group": "Position Copy Options",

@@ -302,6 +302,10 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
             local selSet = selectionSets[setName]
             if selSet != undefined then
             (
+                -- Select the objects in the viewport
+                select selSet
+
+                -- Update the text field with the object names
                 local objNames = #()
                 for obj in selSet do append objNames obj.name
                 objEdit.text = objNames as string
@@ -402,7 +406,7 @@ def _export_animation(name, start_frame, end_frame, objects_str):
         logger.info(f"Export path: {export_file}")
 
         # Parse object names from string
-        # MaxScript array format: #(Object1, Object2) or comma-separated: Object1, Object2
+        # MaxScript array format: #("Object1", "Object2", ...) or comma-separated: Object1, Object2
         objects_str_clean = objects_str.strip()
 
         # Remove MaxScript array syntax if present
@@ -410,7 +414,15 @@ def _export_animation(name, start_frame, end_frame, objects_str):
             objects_str_clean = objects_str_clean[2:-1]
 
         # Split by comma and clean up
-        object_names = [obj.strip() for obj in objects_str_clean.split(',') if obj.strip()]
+        object_names = []
+        for obj in objects_str_clean.split(','):
+            obj = obj.strip()
+            # Remove quotes if present
+            if obj.startswith('"') and obj.endswith('"'):
+                obj = obj[1:-1]
+            # Skip empty strings and ellipsis
+            if obj and obj != '...':
+                object_names.append(obj)
 
         logger.info(f"Parsed object names: {object_names}")
 
@@ -441,6 +453,16 @@ def _export_animation(name, start_frame, end_frame, objects_str):
                 logger.info("Export cancelled by user due to P4 checkout failure")
                 return
 
+        # Remove read-only attribute if file exists
+        if os.path.exists(export_file):
+            try:
+                import stat
+                # Remove read-only flag
+                os.chmod(export_file, stat.S_IWRITE | stat.S_IREAD)
+                logger.info(f"Removed read-only attribute from: {export_file}")
+            except Exception as e:
+                logger.warning(f"Failed to remove read-only attribute: {str(e)}")
+
         # Store current selection
         original_selection = rt.selection[:]
 
@@ -449,13 +471,18 @@ def _export_animation(name, start_frame, end_frame, objects_str):
         original_end = rt.animationRange.end
 
         try:
+            # Update status
+            logger.info("Selecting objects for export...")
+
             # Select objects to export
             rt.select(objects_to_export)
 
             # Set animation range for export
+            logger.info(f"Setting animation range: {start_frame} to {end_frame}")
             rt.animationRange = rt.interval(start_frame, end_frame)
 
             # Configure FBX export settings
+            logger.info("Configuring FBX export settings...")
             rt.FBXExporterSetParam(rt.Name("Animation"), True)
             rt.FBXExporterSetParam(rt.Name("BakeAnimation"), True)
             rt.FBXExporterSetParam(rt.Name("BakeFrameStart"), start_frame)
@@ -466,11 +493,24 @@ def _export_animation(name, start_frame, end_frame, objects_str):
             rt.FBXExporterSetParam(rt.Name("UpAxis"), rt.Name("Z"))
 
             # Export selected objects
-            # Use MaxScript execution for proper parameter handling
-            export_cmd = f'''
-            exportFile @"{export_file}" #noPrompt selectedOnly:true using:FBXEXP
-            '''
-            rt.execute(export_cmd)
+            logger.info(f"Exporting to: {export_file}")
+
+            # Escape backslashes for MaxScript
+            export_file_escaped = export_file.replace('\\', '\\\\')
+
+            # Create progress bar
+            rt.progressStart(f"Exporting {name}...")
+
+            try:
+                # Use MaxScript execution for proper parameter handling
+                export_cmd = f'exportFile "{export_file_escaped}" #noPrompt selectedOnly:true using:FBXEXP'
+                result = rt.execute(export_cmd)
+
+                if result == False:
+                    raise Exception("Export returned false - export may have failed")
+
+            finally:
+                rt.progressEnd()
 
             logger.info(f"Successfully exported to: {export_file}")
             rt.messageBox(

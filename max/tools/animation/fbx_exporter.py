@@ -716,18 +716,61 @@ def _show_file_selection_dialog(start_frame, end_frame, export_path):
 
         # Show file selection dialog via MaxScript
         maxscript = f'''
-rollout FileSelectionDialog "Select Files to Export" width:400 height:500
+rollout FileSelectionDialog "Select Files to Export" width:420 height:540
 (
     multiListBox fileList "" items:#({",".join([f'"{f}"' for f in max_files])}) selection:#{{}} height:22
-    label selectionLabel "0 files selected" pos:[20,420] width:360 align:#left
 
-    button btnExport "Export Selection" pos:[20,445] width:150 height:30
-    button btnCancel "Cancel" pos:[230,445] width:150 height:30
+    -- Selection helper buttons
+    button btnSelectAll "Select All" pos:[20,420] width:90 height:25
+    button btnDeselectAll "Deselect All" pos:[120,420] width:90 height:25
+    button btnInvertSel "Invert Selection" pos:[220,420] width:110 height:25
 
-    on fileList selectionEnd do
+    label selectionLabel "0 file(s) selected" pos:[20,455] width:380 align:#left
+
+    button btnExport "Export Selection" pos:[20,480] width:150 height:30
+    button btnCancel "Cancel" pos:[250,480] width:150 height:30
+
+    -- Update selection count
+    fn updateSelectionCount =
     (
         local count = (fileList.selection as bitArray).numberSet
         selectionLabel.text = (count as string) + " file(s) selected"
+    )
+
+    on fileList selectionEnd do
+    (
+        updateSelectionCount()
+    )
+
+    -- Select All button
+    on btnSelectAll pressed do
+    (
+        local allBits = #{{}}
+        for i = 1 to fileList.items.count do
+            append allBits i
+        fileList.selection = allBits as bitArray
+        updateSelectionCount()
+    )
+
+    -- Deselect All button
+    on btnDeselectAll pressed do
+    (
+        fileList.selection = #{{}}
+        updateSelectionCount()
+    )
+
+    -- Invert Selection button
+    on btnInvertSel pressed do
+    (
+        local currentSel = fileList.selection as bitArray
+        local invertedSel = #{{}}
+        for i = 1 to fileList.items.count do
+        (
+            if not (currentSel[i]) then
+                append invertedSel i
+        )
+        fileList.selection = invertedSel as bitArray
+        updateSelectionCount()
     )
 
     on btnExport pressed do

@@ -31,7 +31,8 @@ except ImportError:
         QtWidgets = None
 
 from pyfbsdk import (
-    FBMessageBox, FBSystem, FBNote, FBPlayerControl, FBPropertyString, FBPropertyType
+    FBMessageBox, FBSystem, FBNote, FBPlayerControl, FBPropertyString, FBPropertyType,
+    FBApplication, FBFbxOptions, FBModelList, FBCharacter, FBTime
 )
 from core.logger import logger
 
@@ -1221,31 +1222,189 @@ class AnimExporterDialog(QDialog):
             row: Row index in the table
         """
         try:
-            # Get animation data from table
+            # Get animation data from table (handle widgets properly)
             anim_name = self.animation_table.item(row, 0).text()
-            take_name = self.animation_table.item(row, 1).text()
+
+            # Column 1 (Take) is a QComboBox widget
+            take_combo = self.animation_table.cellWidget(row, 1)
+            take_name = take_combo.currentText() if take_combo else ''
+
             start_frame = int(self.animation_table.item(row, 2).text())
             end_frame = int(self.animation_table.item(row, 3).text())
-            namespace = self.animation_table.item(row, 4).text()
-            export_path = self.animation_table.item(row, 5).text()
+
+            # Column 4 (Namespace) is a QComboBox widget
+            namespace_combo = self.animation_table.cellWidget(row, 4)
+            namespace = namespace_combo.currentText() if namespace_combo else ''
+
+            # Column 5 (Path) is a widget with QLineEdit
+            path_widget = self.animation_table.cellWidget(row, 5)
+            export_path = ''
+            if path_widget:
+                path_edit = path_widget.findChild(QLineEdit)
+                if path_edit:
+                    export_path = path_edit.text()
 
             print(f"[Anim Exporter] Exporting '{anim_name}': take '{take_name}', frames {start_frame}-{end_frame}, namespace: '{namespace}', path: '{export_path}'")
 
-            # TODO: Implement actual FBX export logic here
-            # For now, just log the export
-            # You would use FBFbxOptions and FBApplication().FileSave() here
-
+            # Validate export path
             if not export_path:
                 print(f"[Anim Exporter] WARNING: No export path specified for '{anim_name}'")
-                return
+                QMessageBox.warning(
+                    self,
+                    "Missing Export Path",
+                    f"No export path specified for animation '{anim_name}'.\nPlease set an export path in the Path column."
+                )
+                return False
 
-            # Placeholder for actual export implementation
-            print(f"[Anim Exporter] Would export '{anim_name}' to '{export_path}'")
+            # Get application and system
+            app = FBApplication()
+            system = FBSystem()
+
+            # Save current state
+            original_take = system.CurrentTake
+            player = FBPlayerControl()
+            original_start = player.LoopStart
+            original_end = player.LoopStop
+
+            try:
+                # 1. Switch to the specified take if provided
+                if take_name:
+                    found_take = None
+                    for take in system.Scene.Takes:
+                        if take.Name == take_name:
+                            found_take = take
+                            break
+
+                    if found_take:
+                        system.CurrentTake = found_take
+                        print(f"[Anim Exporter] Switched to take: {take_name}")
+                    else:
+                        print(f"[Anim Exporter] WARNING: Take '{take_name}' not found, using current take")
+
+                # 2. Set the frame range
+                player.LoopStart = FBTime(0, 0, 0, start_frame)
+                player.LoopStop = FBTime(0, 0, 0, end_frame)
+                print(f"[Anim Exporter] Set frame range: {start_frame} - {end_frame}")
+
+                # 3. Select objects to export
+                # Clear current selection
+                for model in system.Scene.Components:
+                    if hasattr(model, 'Selected'):
+                        model.Selected = False
+
+                # Find and select character hierarchy
+                if namespace:
+                    # Find character by namespace
+                    character = None
+                    for comp in system.Scene.Components:
+                        if isinstance(comp, FBCharacter) and comp.Name == namespace:
+                            character = comp
+                            break
+
+                    if character:
+                        # Select all bones in the character
+                        self._select_character_hierarchy(character)
+                        print(f"[Anim Exporter] Selected character hierarchy: {namespace}")
+                    else:
+                        print(f"[Anim Exporter] WARNING: Character '{namespace}' not found")
+                        # Fall back to selecting all models
+                        self._select_all_models()
+                else:
+                    # No namespace specified - select all models
+                    self._select_all_models()
+                    print(f"[Anim Exporter] Selected all models (no namespace specified)")
+
+                # 4. Build export file path
+                export_dir = Path(export_path)
+                export_file = export_dir / f"{anim_name}.fbx"
+                export_file_str = str(export_file)
+
+                # Ensure directory exists
+                export_dir.mkdir(parents=True, exist_ok=True)
+                print(f"[Anim Exporter] Export file: {export_file_str}")
+
+                # 5. Configure FBX export options
+                fbx_options = FBFbxOptions(True)  # True = export mode
+                fbx_options.SaveSelectedModelsOnly = True
+                fbx_options.ShowFileDialog = False
+                fbx_options.ShowOptionsDialog = False
+
+                # Set export options for animation
+                # fbx_options.EmbedMedia = False
+                # fbx_options.TransportMode = True  # Animation only
+
+                # 6. Perform the export
+                result = app.FileSave(export_file_str, fbx_options)
+
+                if result:
+                    print(f"[Anim Exporter] Successfully exported '{anim_name}' to: {export_file_str}")
+                    return True
+                else:
+                    print(f"[Anim Exporter] Export failed for '{anim_name}'")
+                    QMessageBox.warning(
+                        self,
+                        "Export Failed",
+                        f"Failed to export animation '{anim_name}' to:\n{export_file_str}"
+                    )
+                    return False
+
+            finally:
+                # Restore original state
+                system.CurrentTake = original_take
+                player.LoopStart = original_start
+                player.LoopStop = original_end
+                print(f"[Anim Exporter] Restored original timeline state")
 
         except Exception as e:
             print(f"[Anim Exporter] Error exporting row {row}: {str(e)}")
             import traceback
             traceback.print_exc()
+            QMessageBox.critical(
+                self,
+                "Export Error",
+                f"Error exporting animation:\n{str(e)}"
+            )
+            return False
+
+    def _select_character_hierarchy(self, character):
+        """
+        Select all bones in a character hierarchy
+
+        Args:
+            character: FBCharacter object
+        """
+        try:
+            # Select the character reference model (usually the root)
+            if hasattr(character, 'GetCharacterizeRootModel'):
+                root = character.GetCharacterizeRootModel()
+                if root:
+                    root.Selected = True
+
+            # Select all character bones
+            for i in range(character.GetCharacterBoneCount()):
+                bone = character.GetCharacterBone(i)
+                if bone:
+                    bone.Selected = True
+
+            print(f"[Anim Exporter] Selected {character.GetCharacterBoneCount()} bones from character")
+
+        except Exception as e:
+            print(f"[Anim Exporter] Error selecting character hierarchy: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    def _select_all_models(self):
+        """Select all models in the scene"""
+        try:
+            system = FBSystem()
+            count = 0
+            for model in system.Scene.Components:
+                if hasattr(model, 'Selected'):
+                    model.Selected = True
+                    count += 1
+            print(f"[Anim Exporter] Selected {count} models")
+        except Exception as e:
+            print(f"[Anim Exporter] Error selecting all models: {str(e)}")
 
     def closeEvent(self, event):
         """Handle dialog close event"""

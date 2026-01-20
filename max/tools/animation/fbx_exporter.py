@@ -302,9 +302,14 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
     (
         if selection.count > 0 then
         (
-            local objNames = #()
-            for obj in selection do append objNames obj.name
-            objEdit.text = objNames as string
+            -- Use only selected objects, no hierarchy expansion
+            local objNamesStr = ""
+            for i = 1 to selection.count do
+            (
+                objNamesStr += selection[i].name
+                if i < selection.count then objNamesStr += "|"
+            )
+            objEdit.text = objNamesStr
         )
         else
         (
@@ -321,13 +326,20 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
             local selSet = selectionSets[setName]
             if selSet != undefined then
             (
-                -- Select the objects in the viewport
-                select selSet
+                -- Use only the objects in the selection set, no hierarchy expansion
+                local allObjects = for obj in selSet collect obj
 
-                -- Update the text field with the object names
-                local objNames = #()
-                for obj in selSet do append objNames obj.name
-                objEdit.text = objNames as string
+                -- Select all objects in the viewport
+                select allObjects
+
+                -- Create pipe-delimited string of object names
+                local objNamesStr = ""
+                for i = 1 to allObjects.count do
+                (
+                    objNamesStr += allObjects[i].name
+                    if i < allObjects.count then objNamesStr += "|"
+                )
+                objEdit.text = objNamesStr
             )
         )
         else
@@ -464,29 +476,32 @@ def _export_animation(name, start_frame, end_frame, objects_str):
         logger.info(f"Export path: {export_file}")
 
         _update_progress(10, "Parsing object names...")
-        objects_str_clean = objects_str.strip()
-        if objects_str_clean.startswith('#(') and objects_str_clean.endswith(')'):
-            objects_str_clean = objects_str_clean[2:-1]
-        object_names = [obj[1:-1] for obj in objects_str_clean.split(',') if obj.strip().startswith('"') and obj.strip().endswith('"')]
-        if not object_names:
-            object_names = [obj.strip() for obj in objects_str_clean.split(',') if obj.strip() and obj.strip() != '...']
+        # Parse pipe-delimited object names
+        object_names = [name.strip() for name in objects_str.split('|') if name.strip()]
 
-        logger.info(f"Parsed object names: {object_names}")
+        logger.info(f"Parsed {len(object_names)} object names: {object_names}")
 
         _update_progress(20, f"Finding {len(object_names)} objects in scene...")
         objects_to_export = []
+        missing_objects = []
         for obj_name in object_names:
             obj = rt.getNodeByName(obj_name)
             if obj:
                 objects_to_export.append(obj)
                 logger.info(f"Found object: {obj_name}")
             else:
+                missing_objects.append(obj_name)
                 logger.warning(f"Object not found: {obj_name}")
 
         if not objects_to_export:
             _update_progress(0, "")
-            rt.messageBox(f"No valid objects found to export for names: {object_names}", title="Animation Exporter")
+            rt.messageBox(f"No valid objects found to export!\n\nLooking for: {', '.join(object_names)}", title="Animation Exporter")
             return
+
+        if missing_objects:
+            logger.warning(f"Some objects not found: {missing_objects}")
+
+        logger.info(f"Found {len(objects_to_export)} objects to export: {[obj.name for obj in objects_to_export]}")
 
         _update_progress(30, f"Checking Perforce...")
         if not _p4_checkout(export_file):
@@ -511,6 +526,12 @@ def _export_animation(name, start_frame, end_frame, objects_str):
             logger.info("Setting export properties...")
             _update_progress(50, "Selecting objects...")
             rt.select(objects_to_export)
+
+            # Verify selection
+            selected_count = rt.selection.count
+            logger.info(f"Selected {selected_count} objects in viewport")
+            if selected_count != len(objects_to_export):
+                logger.warning(f"Selection count mismatch! Expected {len(objects_to_export)}, got {selected_count}")
 
             _update_progress(60, "Setting animation range...")
             rt.animationRange = rt.interval(start_frame, end_frame)

@@ -285,18 +285,28 @@ rollout MotionKitRootAnimCopy "{title}" width:520 height:285
         local applyHeightOffset = useHeightOffset.checked
         local heightOffsetValue = heightOffsetSpn.value
 
-        -- Reset root bone controllers
+        -- Setup root bone controllers if needed
         with animate off
         (
-            rootBone.controller = prs()
-            rootBone.controller[1].controller = Position_XYZ()
-            rootBone.controller[2].controller = Euler_XYZ()
-            rootBone.controller[3].controller = ScaleXYZ()
+            -- Only reset controllers if they're not already the right type
+            if classof rootBone.controller != PRS then
+                rootBone.controller = prs()
+            if classof rootBone.controller[1].controller != Position_XYZ then
+                rootBone.controller[1].controller = Position_XYZ()
+            if classof rootBone.controller[2].controller != Euler_XYZ then
+                rootBone.controller[2].controller = Euler_XYZ()
+            if classof rootBone.controller[3].controller != ScaleXYZ then
+                rootBone.controller[3].controller = ScaleXYZ()
 
-            -- Clear existing keys
-            deleteKeys rootBone.controller[1][1].controller #allKeys  -- X pos
-            deleteKeys rootBone.controller[1][2].controller #allKeys  -- Y pos
-            deleteKeys rootBone.controller[2].controller #allKeys      -- Rotation
+            -- Only clear keys for axes we're going to copy
+            if copyX then
+                deleteKeys rootBone.controller[1][1].controller #allKeys  -- X pos
+            if copyY then
+                deleteKeys rootBone.controller[1][2].controller #allKeys  -- Y pos
+            if copyZ then
+                deleteKeys rootBone.controller[1][3].controller #allKeys  -- Z pos
+            if copyRotZ then
+                deleteKeys rootBone.controller[2].controller #allKeys      -- Rotation
         )
 
         -- Copy animation frame by frame
@@ -311,23 +321,21 @@ rollout MotionKitRootAnimCopy "{title}" width:520 height:285
                 local csPos = csRoot.transform.pos
                 local csRot = csRoot.transform.rotation
 
-                -- Calculate new position
-                local newPos = rootBone.pos
-
-                if copyX then newPos.x = csPos.x
-                if copyY then newPos.y = csPos.y
-                if copyZ then
-                (
-                    if applyHeightOffset then
-                        newPos.z = csPos.z - heightOffsetValue
-                    else
-                        newPos.z = csPos.z
-                )
-
-                -- Apply position
+                -- Apply animation (only for checked axes)
                 with animate on
                 (
-                    rootBone.pos = newPos
+                    -- Copy position axes individually to preserve existing animation on unchecked axes
+                    if copyX then
+                        rootBone.controller[1][1].value = csPos.x  -- X pos
+                    if copyY then
+                        rootBone.controller[1][2].value = csPos.y  -- Y pos
+                    if copyZ then
+                    (
+                        if applyHeightOffset then
+                            rootBone.controller[1][3].value = csPos.z - heightOffsetValue  -- Z pos
+                        else
+                            rootBone.controller[1][3].value = csPos.z  -- Z pos
+                    )
 
                     -- Apply rotation if enabled
                     if copyRotZ then
@@ -335,11 +343,7 @@ rollout MotionKitRootAnimCopy "{title}" width:520 height:285
                         local eulerRot = csRot as eulerAngles
                         rootBone.rotation = eulerAngles 0 0 eulerRot.z
                     )
-                    else
-                    (
-                        -- Clear rotation
-                        rootBone.controller[2].controller.value = matrix3 1
-                    )
+                    -- Note: Don't touch rotation when not copying - preserve existing animation
                 )
 
                 frameCount += 1
@@ -354,30 +358,7 @@ rollout MotionKitRootAnimCopy "{title}" width:520 height:285
             )
         )
 
-        -- Handle axis zeroing if unchecked
-        if not copyX then
-        (
-            for t = startFrame to endFrame do
-            (
-                at time t
-                (
-                    with animate on
-                        rootBone.pos *= [0,1,1]  -- Zero X
-                )
-            )
-        )
-
-        if not copyY then
-        (
-            for t = startFrame to endFrame do
-            (
-                at time t
-                (
-                    with animate on
-                        rootBone.pos *= [1,0,1]  -- Zero Y
-                )
-            )
-        )
+        -- Note: Removed axis zeroing - we preserve existing animation for unchecked axes
 
         slidertime = startFrame
         local successMsg = substituteString "{success_copied}" "{{0}}" (frameCount as string)

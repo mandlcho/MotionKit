@@ -238,6 +238,8 @@ class AnimationExporterDialog:
 -- MotionKit Animation Exporter Tool
 -- ============================================
 
+global motionKitAnimExporterRollout
+
 rollout MotionKitAnimExporter "{title}" width:480 height:355
 (
     -- Animation Name
@@ -337,6 +339,9 @@ rollout MotionKitAnimExporter "{title}" width:480 height:355
     -- Set initial state on dialog open
     on MotionKitAnimExporter open do
     (
+        -- Store reference to this rollout globally
+        motionKitAnimExporterRollout = MotionKitAnimExporter
+
         -- Disable spinners if Use Timeline is checked by default
         if useTimelineCB.checked then
         (
@@ -345,9 +350,9 @@ rollout MotionKitAnimExporter "{title}" width:480 height:355
         )
 
         -- Register file callbacks to update dialog when files are opened
-        callbacks.addScript #filePostOpen "try (MotionKitAnimExporter.updateSceneInfo()) catch()" id:#motionKitAnimExporter
-        callbacks.addScript #systemPostNew "try (MotionKitAnimExporter.updateSceneInfo()) catch()" id:#motionKitAnimExporter
-        callbacks.addScript #filePostMerge "try (MotionKitAnimExporter.updateSceneInfo()) catch()" id:#motionKitAnimExporter
+        callbacks.addScript #filePostOpen "try (if motionKitAnimExporterRollout != undefined do motionKitAnimExporterRollout.updateSceneInfo()) catch()" id:#motionKitAnimExporter
+        callbacks.addScript #systemPostNew "try (if motionKitAnimExporterRollout != undefined do motionKitAnimExporterRollout.updateSceneInfo()) catch()" id:#motionKitAnimExporter
+        callbacks.addScript #filePostMerge "try (if motionKitAnimExporterRollout != undefined do motionKitAnimExporterRollout.updateSceneInfo()) catch()" id:#motionKitAnimExporter
     )
 
     -- Remove callbacks when dialog closes
@@ -356,6 +361,7 @@ rollout MotionKitAnimExporter "{title}" width:480 height:355
         callbacks.removeScripts #filePostOpen id:#motionKitAnimExporter
         callbacks.removeScripts #systemPostNew id:#motionKitAnimExporter
         callbacks.removeScripts #filePostMerge id:#motionKitAnimExporter
+        motionKitAnimExporterRollout = undefined
     )
 
     -- Pick Objects button

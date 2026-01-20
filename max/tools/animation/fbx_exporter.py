@@ -311,6 +311,29 @@ rollout MotionKitAnimExporter "{title}" width:480 height:355
         )
     )
 
+    -- Function to update dialog with current scene info
+    fn updateSceneInfo =
+    (
+        -- Update animation name from filename
+        if maxFileName != "" then
+            nameEdit.text = getFilenameFile maxFileName
+        else
+            nameEdit.text = ""
+
+        -- Update selection sets dropdown
+        local setNames = #()
+        for i = 1 to selectionSets.count do
+            append setNames selectionSets[i].name
+        selSetDDL.items = setNames
+
+        -- Update frame range if using timeline
+        if useTimelineCB.checked then
+        (
+            startSpn.value = animationRange.start.frame as integer
+            endSpn.value = animationRange.end.frame as integer
+        )
+    )
+
     -- Set initial state on dialog open
     on MotionKitAnimExporter open do
     (
@@ -320,6 +343,19 @@ rollout MotionKitAnimExporter "{title}" width:480 height:355
             startSpn.enabled = false
             endSpn.enabled = false
         )
+
+        -- Register file callbacks to update dialog when files are opened
+        callbacks.addScript #filePostOpen "try (MotionKitAnimExporter.updateSceneInfo()) catch()" id:#motionKitAnimExporter
+        callbacks.addScript #systemPostNew "try (MotionKitAnimExporter.updateSceneInfo()) catch()" id:#motionKitAnimExporter
+        callbacks.addScript #filePostMerge "try (MotionKitAnimExporter.updateSceneInfo()) catch()" id:#motionKitAnimExporter
+    )
+
+    -- Remove callbacks when dialog closes
+    on MotionKitAnimExporter close do
+    (
+        callbacks.removeScripts #filePostOpen id:#motionKitAnimExporter
+        callbacks.removeScripts #systemPostNew id:#motionKitAnimExporter
+        callbacks.removeScripts #filePostMerge id:#motionKitAnimExporter
     )
 
     -- Pick Objects button

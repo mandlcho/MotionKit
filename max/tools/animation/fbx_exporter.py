@@ -298,6 +298,24 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
         (
             startSpn.value = animationRange.start.frame as integer
             endSpn.value = animationRange.end.frame as integer
+            startSpn.enabled = false
+            endSpn.enabled = false
+        )
+        else
+        (
+            startSpn.enabled = true
+            endSpn.enabled = true
+        )
+    )
+
+    -- Set initial state on dialog open
+    on MotionKitAnimExporter open do
+    (
+        -- Disable spinners if Use Timeline is checked by default
+        if useTimelineCB.checked then
+        (
+            startSpn.enabled = false
+            endSpn.enabled = false
         )
     )
 

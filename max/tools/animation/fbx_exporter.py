@@ -771,17 +771,17 @@ def _show_file_selection_dialog(start_frame, end_frame, export_path):
         maxscript = f'''
 rollout FileSelectionDialog "Select Files to Export" width:420 height:600
 (
-    multiListBox fileList "" items:#({",".join([f'"{f}"' for f in max_files])}) selection:#{{}} pos:[10,10] width:400 height:31
+    multiListBox fileList "" items:#({",".join([f'"{f}"' for f in max_files])}) selection:#{{}} pos:[10,10] width:400 height:29
 
     -- Selection helper buttons
-    button btnSelectAll "Select All" pos:[20,530] width:90 height:25
-    button btnDeselectAll "Deselect All" pos:[120,530] width:90 height:25
-    button btnInvertSel "Invert Selection" pos:[220,530] width:110 height:25
+    button btnSelectAll "Select All" pos:[20,510] width:90 height:25
+    button btnDeselectAll "Deselect All" pos:[120,510] width:90 height:25
+    button btnInvertSel "Invert Selection" pos:[220,510] width:110 height:25
 
-    label selectionLabel "0 file(s) selected" pos:[20,560] width:380 align:#left
+    label selectionLabel "0 file(s) selected" pos:[20,545] width:380 align:#center
 
-    button btnExport "Export Selection" pos:[85,575] width:125 height:20
-    button btnCancel "Cancel" pos:[220,575] width:125 height:20
+    button btnExport "Export Selection" pos:[85,565] width:125 height:25
+    button btnCancel "Cancel" pos:[220,565] width:125 height:25
 
     -- Update selection count
     fn updateSelectionCount =

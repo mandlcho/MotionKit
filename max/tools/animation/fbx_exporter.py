@@ -238,8 +238,6 @@ class AnimationExporterDialog:
 -- MotionKit Animation Exporter Tool
 -- ============================================
 
-global animExporterDialogInstance
-
 rollout MotionKitAnimExporter "{title}" width:480 height:355
 (
     -- Animation Name
@@ -463,22 +461,18 @@ rollout MotionKitAnimExporter "{title}" width:480 height:355
     (
         try
         (
-            if animExporterDialogInstance != undefined then
-            (
-                destroyDialog MotionKitAnimExporter
-                animExporterDialogInstance = undefined
-            )
+            destroyDialog MotionKitAnimExporter
         )
-        catch err
+        catch
         (
-            print ("Error closing dialog: " + err as string)
+            -- If dialog already destroyed, ignore error
         )
     )
 )
 
 -- Create and show dialog
 try (destroyDialog MotionKitAnimExporter) catch()
-animExporterDialogInstance = createDialog MotionKitAnimExporter
+createDialog MotionKitAnimExporter
 '''
 
         # Execute the MaxScript to show the dialog

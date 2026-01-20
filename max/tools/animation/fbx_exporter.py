@@ -688,8 +688,9 @@ def _show_file_selection_dialog(start_frame, end_frame, export_path):
 
         logger.info(f"Found {len(max_files)} Max files")
 
-        # Create pipe-delimited string of files
-        files_str = "|".join(max_files)
+        # Escape paths for Python string parsing (double backslashes)
+        export_path_escaped = export_path.replace('\\', '\\\\')
+        current_max_path_escaped = current_max_path.replace('\\', '\\\\')
 
         # Show file selection dialog via MaxScript
         maxscript = f'''
@@ -732,7 +733,7 @@ rollout FileSelectionDialog "Select Files to Export" width:400 height:500
         )
 
         -- Call Python function to export selected files
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_selected_files(" + {start_frame} + ", " + {end_frame} + ", '" + "{export_path.replace(chr(92), chr(92)+chr(92))}" + "', '" + "{current_max_path.replace(chr(92), chr(92)+chr(92))}" + "', '" + filesStr + "')")
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_selected_files({start_frame}, {end_frame}, r'{export_path_escaped}', r'{current_max_path_escaped}', '" + filesStr + "')")
 
         destroyDialog FileSelectionDialog
     )

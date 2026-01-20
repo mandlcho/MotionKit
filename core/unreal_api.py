@@ -266,3 +266,35 @@ def get_unreal_api():
     port = config.get('unreal.port', 30010)
 
     return UnrealAPI(host=host, port=port)
+
+
+def notify_files_exported(exported_files):
+    """
+    Simple notification that files were exported.
+    Relies on Unreal's built-in auto-reimport feature (no plugins needed).
+
+    Args:
+        exported_files: List of exported FBX file paths
+
+    Returns:
+        str: Notification message for the user
+    """
+    if not exported_files:
+        return ""
+
+    file_names = [Path(f).stem for f in exported_files[:5]]
+    if len(exported_files) > 5:
+        file_list = "\n".join(f"  • {name}" for name in file_names)
+        file_list += f"\n  • ... and {len(exported_files) - 5} more"
+    else:
+        file_list = "\n".join(f"  • {name}" for name in file_names)
+
+    message = f"Export complete!\n\n"
+    message += f"{len(exported_files)} file(s) exported:\n{file_list}\n\n"
+    message += "If Unreal Engine is running with Auto-Reimport enabled,\n"
+    message += "the assets will be automatically reimported.\n\n"
+    message += "To enable Auto-Reimport in Unreal:\n"
+    message += "Edit > Editor Preferences > Loading & Saving\n"
+    message += "→ Enable 'Monitor Content Directories'"
+
+    return message

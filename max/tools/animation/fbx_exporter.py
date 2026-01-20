@@ -18,7 +18,7 @@ except ImportError:
 from core.logger import logger
 from core.localization import t
 from core.config import config
-from core.unreal_api import get_unreal_api
+from core.unreal_api import get_unreal_api, notify_files_exported
 
 TOOL_NAME = "Animation Exporter"
 
@@ -497,11 +497,15 @@ def _prompt_unreal_import(exported_files):
         return False
 
     try:
-        # Check if Unreal is connected
+        # Check if Unreal is connected via Web Remote Control
         unreal_api = get_unreal_api()
 
         if not unreal_api.is_connected():
-            logger.info("Unreal Engine not connected, skipping import prompt")
+            logger.info("Unreal Engine Web Remote Control not available, using simple notification")
+
+            # Fallback: Show simple notification about auto-reimport
+            message = notify_files_exported(exported_files)
+            rt.messageBox(message, title="Export Complete")
             return False
 
         # Categorize files by P4 status

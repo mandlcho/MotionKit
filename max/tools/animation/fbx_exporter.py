@@ -376,8 +376,11 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
         exportProgress.value = 0
         statusLabel.text = "Exporting current file..."
 
+        -- Escape backslashes for Python raw string
+        local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
+
         -- Call Python export current function
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_current_file(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", '" + pathValueEdit.text + "')")
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_current_file(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
 
         -- Reset UI after export
         exportProgress.value = 0
@@ -394,8 +397,11 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
             return false
         )
 
+        -- Escape backslashes for Python raw string
+        local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
+
         -- Call Python function to show file selection dialog
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._show_file_selection_dialog(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", '" + pathValueEdit.text + "')")
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._show_file_selection_dialog(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
     )
 
     -- Export All button
@@ -416,8 +422,11 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
         exportProgress.value = 0
         statusLabel.text = "Starting batch export..."
 
+        -- Escape backslashes for Python raw string
+        local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
+
         -- Call Python batch export function
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._batch_export_directory(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", '" + pathValueEdit.text + "')")
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._batch_export_directory(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
 
         -- Reset UI after export
         exportProgress.value = 0

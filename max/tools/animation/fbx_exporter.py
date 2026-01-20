@@ -18,7 +18,6 @@ except ImportError:
 from core.logger import logger
 from core.localization import t
 from core.config import config
-from core.unreal_api import get_unreal_api, notify_files_exported
 
 TOOL_NAME = "Animation Exporter"
 
@@ -435,157 +434,46 @@ def _save_export_path(path):
             rt.messageBox(f"Failed to save path:\n{str(e)}", title="Animation Exporter")
 
 
-def _check_p4_status(file_path):
+def _show_export_notification(exported_files):
     """
-    Check Perforce status of a file
-
-    Returns:
-        str: 'new' if file needs to be added, 'existing' if already in depot, 'unknown' if P4 not available
-    """
-    try:
-        # Check if file is in P4
-        env = os.environ.copy()
-        p4_server = config.get('perforce.server', '')
-        p4_user = config.get('perforce.user', '')
-        p4_workspace = config.get('perforce.workspace', '')
-
-        if not p4_server or not p4_user:
-            return 'unknown'
-
-        if p4_server:
-            env['P4PORT'] = p4_server
-        if p4_user:
-            env['P4USER'] = p4_user
-        if p4_workspace:
-            env['P4CLIENT'] = p4_workspace
-
-        # Check file status
-        result = subprocess.run(
-            ['p4', 'fstat', file_path],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            env=env
-        )
-
-        if result.returncode == 0:
-            # File exists in depot
-            if 'headAction' in result.stdout:
-                return 'existing'
-            else:
-                return 'new'
-        else:
-            # File not in depot
-            return 'new'
-
-    except Exception as e:
-        logger.debug(f"P4 status check failed: {str(e)}")
-        return 'unknown'
-
-
-def _prompt_unreal_import(exported_files):
-    """
-    Search for matching assets in Unreal and prompt to reimport
+    Show simple notification after export with option to open folder
 
     Args:
         exported_files: List of exported FBX file paths
 
     Returns:
-        bool: True if import was attempted
+        bool: True if user opened the folder
     """
     if not exported_files:
         return False
 
     try:
-        # Check if Unreal is connected via Web Remote Control
-        unreal_api = get_unreal_api()
+        export_dir = str(Path(exported_files[0]).parent)
 
-        if not unreal_api.is_connected():
-            logger.info("Unreal Engine Web Remote Control not available")
-
-            # Fallback: Show simple notification
-            file_names = [Path(f).stem for f in exported_files]
-            file_list = "\\n".join([f"  • {name}" for name in file_names[:10]])
-            if len(exported_files) > 10:
-                file_list += f"\\n  • ... and {len(exported_files) - 10} more"
-
-            message = f"Export complete!\\n\\n"
-            message += f"{len(exported_files)} file(s) exported:\\n{file_list}\\n\\n"
-            message += f"To enable Unreal integration:\\n"
-            message += f"1. Enable Web Remote Control plugin in Unreal\\n"
-            message += f"2. Set port to 30010 in Project Settings"
-
-            rt.messageBox(message, title="Export Complete")
-            return False
-
-        # Search Unreal for matching assets by filename
-        logger.info(f"Searching Unreal for {len(exported_files)} assets...")
-        results = unreal_api.search_and_reimport_by_filename(exported_files)
-
-        # Show results to user
-        found_count = len(results.get('found', []))
-        reimported_count = len(results.get('reimported', []))
-        not_found_count = len(results.get('not_found', []))
-
-        if found_count > 0:
-            message = f"Unreal Asset Search Complete!\\n\\n"
-            message += f"✓ Found: {found_count} matching asset(s)\\n"
-            message += f"✓ Reimported: {reimported_count} asset(s)\\n"
-
-            if not_found_count > 0:
-                not_found_names = results.get('not_found', [])[:5]
-                message += f"\\n✗ Not found: {not_found_count} asset(s)\\n"
-                message += "  " + "\\n  ".join(not_found_names)
-                if not_found_count > 5:
-                    message += f"\\n  ... and {not_found_count - 5} more"
-
-            message += f"\\n\\nCheck Unreal Editor Output Log for details."
-
-            rt.messageBox(message, title="Unreal Reimport")
-            return True
+        file_names = [Path(f).stem for f in exported_files[:10]]
+        if len(exported_files) > 10:
+            file_list = "\\n".join([f"  • {name}" for name in file_names])
+            file_list += f"\\n  • ... and {len(exported_files) - 10} more"
         else:
-            # No assets found - offer to import new
-            file_names = [Path(f).stem for f in exported_files]
-            file_list = "\\n".join([f"  • {name}" for name in file_names[:10]])
-            if len(exported_files) > 10:
-                file_list += f"\\n  • ... and {len(exported_files) - 10} more"
+            file_list = "\\n".join([f"  • {name}" for name in file_names])
 
-            result = rt.queryBox(
-                f"No matching assets found in Unreal!\\n\\n"
-                f"{len(exported_files)} file(s) exported:\\n{file_list}\\n\\n"
-                f"Import as new assets into Unreal?",
-                title="Unreal Import"
-            )
+        result = rt.queryBox(
+            f"Export complete!\\n\\n"
+            f"{len(exported_files)} file(s) exported:\\n{file_list}\\n\\n"
+            f"Open export folder in Windows Explorer?",
+            title="Export Complete"
+        )
 
-            if result:
-                # Import FBX files as new assets
-                content_path = config.get('unreal.content_browser_path', '/Game/Animations')
-                skeleton_path = config.get('unreal.skeleton_path', None)
-
-                logger.info(f"Importing {len(exported_files)} FBX files into Unreal...")
-                success = unreal_api.import_fbx_files(exported_files, content_path, skeleton_path)
-
-                if success:
-                    rt.messageBox(
-                        f"Import request sent to Unreal Engine for {len(exported_files)} file(s).\\n\\n"
-                        f"Check Unreal Editor for import results.",
-                        title="Unreal Import"
-                    )
-                else:
-                    rt.messageBox(
-                        f"Failed to send import request to Unreal Engine.\\n\\n"
-                        f"Make sure Web Remote Control is enabled.",
-                        title="Unreal Import Error"
-                    )
-
-                return success
+        if result:
+            # Open Windows Explorer to the export folder
+            subprocess.Popen(f'explorer /select,"{exported_files[0]}"')
+            logger.info(f"Opened Windows Explorer to: {export_dir}")
+            return True
 
         return False
 
     except Exception as e:
-        logger.error(f"Unreal import prompt error: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Export notification error: {str(e)}")
         return False
 
 
@@ -709,11 +597,11 @@ def _export_animation(name, start_frame, end_frame, objects_str):
             _update_progress(100, "Export complete!")
             logger.info(f"Export completed for: {export_file}")
 
-            # Prompt for Unreal import
+            # Show export notification
             try:
-                _prompt_unreal_import([export_file])
+                _show_export_notification([export_file])
             except Exception as e:
-                logger.error(f"Unreal prompt error: {str(e)}")
+                logger.error(f"Export notification error: {str(e)}")
 
         finally:
             logger.debug("Restoring original scene state.")

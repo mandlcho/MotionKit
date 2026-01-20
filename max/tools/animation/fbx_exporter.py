@@ -240,7 +240,7 @@ class AnimationExporterDialog:
 
 global animExporterDialogInstance
 
-rollout MotionKitAnimExporter "{title}" width:480 height:330
+rollout MotionKitAnimExporter "{title}" width:480 height:355
 (
     -- Animation Name
     group "Animation"
@@ -288,13 +288,13 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
     -- Export section
     group "Export"
     (
-        button btnExportCurrent "Current" pos:[20,295] width:100 height:30
-        button btnExportSelected "Selection" pos:[130,295] width:100 height:30
-        button btnExportAll "All" pos:[240,295] width:100 height:30
+        button btnExportCurrent "Current" pos:[20,310] width:100 height:30
+        button btnExportSelected "Selection" pos:[130,310] width:100 height:30
+        button btnExportAll "All" pos:[240,310] width:100 height:30
     )
 
     -- Close button
-    button btnClose "{close}" pos:[350,295] width:110 height:30
+    button btnClose "{close}" pos:[350,310] width:110 height:30
 
     -- Use Timeline checkbox handler
     on useTimelineCB changed state do

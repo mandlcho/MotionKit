@@ -250,13 +250,13 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
     -- Frame Range
     group "Frame Range"
     (
-        label startLbl "{start_label}:" pos:[20,70] width:100 align:#left
-        spinner startSpn "" pos:[130,68] width:80 height:20 type:#integer range:[-100000,100000,{start_frame}]
+        label startLbl "Start:" pos:[20,70] width:40 align:#left
+        spinner startSpn "" pos:[65,68] width:80 height:20 type:#integer range:[-100000,100000,{start_frame}]
 
-        checkbox useTimelineCB "{use_timeline}" pos:[230,70] checked:true width:130
+        label endLbl "End:" pos:[160,70] width:30 align:#left
+        spinner endSpn "" pos:[195,68] width:80 height:20 type:#integer range:[-100000,100000,{end_frame}]
 
-        label endLbl "{end_label}:" pos:[370,70] width:30 align:#left
-        spinner endSpn "" pos:[410,68] width:60 height:20 type:#integer range:[-100000,100000,{end_frame}]
+        checkbox useTimelineCB "{use_timeline}" pos:[290,70] checked:true width:160
     )
 
     -- Objects
@@ -283,6 +283,9 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
     progressBar exportProgress "" pos:[20,250] width:440 height:10 value:0 color:(color 100 150 255)
     label statusLabel "" pos:[20,265] width:440 height:15 align:#left
 
+    -- Batch toggle
+    checkbox batchModeCB "Batch" pos:[20,290] checked:false width:80
+
     -- Bottom buttons
     button btnExport "{export_btn}" pos:[250,290] width:100 height:30
     button btnClose "{close}" pos:[360,290] width:100 height:30
@@ -295,6 +298,15 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
             startSpn.value = animationRange.start.frame as integer
             endSpn.value = animationRange.end.frame as integer
         )
+    )
+
+    -- Batch mode checkbox handler
+    on batchModeCB changed state do
+    (
+        if state then
+            btnExport.text = "Batch Export"
+        else
+            btnExport.text = "{export_btn}"
     )
 
     -- Pick Objects button
@@ -363,35 +375,65 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
     -- Export button
     on btnExport pressed do
     (
-        -- Validation
-        if nameEdit.text == "" then
+        -- Check if batch mode is enabled
+        if batchModeCB.checked then
         (
-            messageBox "Please enter an animation name!" title:"{title}"
-            return false
-        )
+            -- Batch export mode
+            -- Validation
+            if startSpn.value >= endSpn.value then
+            (
+                messageBox "End frame must be greater than start frame!" title:"{title}"
+                return false
+            )
 
-        if startSpn.value >= endSpn.value then
+            -- Confirm batch export
+            if not (queryBox "Batch export all Max files in current directory?\\n\\nThis will:\\n1. Export current file\\n2. Open next file in directory\\n3. Select 'Fbx' selection set\\n4. Export and repeat\\n\\nContinue?" title:"Batch Export") then
+                return false
+
+            -- Reset progress and status
+            exportProgress.value = 0
+            statusLabel.text = "Starting batch export..."
+
+            -- Call Python batch export function
+            python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._batch_export_directory(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", '" + pathValueEdit.text + "')")
+
+            -- Reset UI after export
+            exportProgress.value = 0
+            statusLabel.text = ""
+        )
+        else
         (
-            messageBox "End frame must be greater than start frame!" title:"{title}"
-            return false
+            -- Single export mode
+            -- Validation
+            if nameEdit.text == "" then
+            (
+                messageBox "Please enter an animation name!" title:"{title}"
+                return false
+            )
+
+            if startSpn.value >= endSpn.value then
+            (
+                messageBox "End frame must be greater than start frame!" title:"{title}"
+                return false
+            )
+
+            if objEdit.text == "" then
+            (
+                messageBox "Please select objects to export!" title:"{title}"
+                return false
+            )
+
+            -- Reset progress and status
+            exportProgress.value = 0
+            statusLabel.text = "Starting export..."
+
+            -- Call Python export function
+            python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_animation('" + nameEdit.text + "', " + (startSpn.value as string) + ", " + (endSpn.value as string) + ", '" + objEdit.text + "')")
+
+            -- Reset UI after export
+            exportProgress.value = 0
+            statusLabel.text = ""
         )
-
-        if objEdit.text == "" then
-        (
-            messageBox "Please select objects to export!" title:"{title}"
-            return false
-        )
-
-        -- Reset progress and status
-        exportProgress.value = 0
-        statusLabel.text = "Starting export..."
-
-        -- Call Python export function
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_animation('" + nameEdit.text + "', " + (startSpn.value as string) + ", " + (endSpn.value as string) + ", '" + objEdit.text + "')")
-
-        -- Reset UI after export
-        exportProgress.value = 0
-        statusLabel.text = ""
     )
 
     -- Close button
@@ -476,6 +518,161 @@ def _show_export_notification(exported_files):
         logger.error(f"Export notification error: {str(e)}")
         return False
 
+
+
+def _batch_export_directory(start_frame, end_frame, export_path):
+    """
+    Batch export all Max files in the current directory
+
+    Args:
+        start_frame: Start frame for animation
+        end_frame: End frame for animation
+        export_path: FBX export directory path
+    """
+    try:
+        # Get current Max file directory
+        current_max_path = rt.maxFilePath
+        current_max_name = rt.maxFileName
+
+        if not current_max_path or not current_max_name:
+            rt.messageBox("Please save the current file before batch export!", title="Batch Export")
+            return
+
+        logger.info(f"Starting batch export from directory: {current_max_path}")
+
+        # Get all .max files in the directory
+        import glob
+        max_files = glob.glob(os.path.join(current_max_path, "*.max"))
+        max_files = [os.path.basename(f) for f in max_files]
+        max_files.sort()
+
+        if not max_files:
+            rt.messageBox("No Max files found in current directory!", title="Batch Export")
+            return
+
+        logger.info(f"Found {len(max_files)} Max files to process: {max_files}")
+
+        # Move current file to front of list
+        if current_max_name in max_files:
+            max_files.remove(current_max_name)
+            max_files.insert(0, current_max_name)
+
+        total_files = len(max_files)
+        exported_files = []
+
+        for idx, max_file in enumerate(max_files):
+            file_num = idx + 1
+            logger.info(f"Processing {file_num}/{total_files}: {max_file}")
+            _update_progress(int((file_num - 1) / total_files * 100), f"Processing {file_num}/{total_files}: {max_file}")
+
+            # Get animation name from filename (without extension)
+            anim_name = os.path.splitext(max_file)[0]
+
+            # Load file if not current file
+            if max_file != current_max_name:
+                logger.info(f"Loading file: {max_file}")
+                full_path = os.path.join(current_max_path, max_file)
+
+                try:
+                    # Load file without saving current
+                    rt.loadMaxFile(full_path, quiet=True)
+                    logger.info(f"Loaded: {max_file}")
+                except Exception as e:
+                    logger.error(f"Failed to load {max_file}: {str(e)}")
+                    continue
+
+            # Find "Fbx" selection set
+            fbx_set = None
+            for i in range(rt.selectionSets.count):
+                if rt.selectionSets[i].name.lower() == "fbx":
+                    fbx_set = rt.selectionSets[i]
+                    break
+
+            if not fbx_set:
+                logger.warning(f"No 'Fbx' selection set found in {max_file}, skipping...")
+                continue
+
+            # Get objects from selection set
+            objects_to_export = [obj for obj in fbx_set]
+
+            if not objects_to_export:
+                logger.warning(f"'Fbx' selection set is empty in {max_file}, skipping...")
+                continue
+
+            # Select objects
+            rt.select(objects_to_export)
+
+            # Create pipe-delimited string of object names
+            objects_str = "|".join([obj.name for obj in objects_to_export])
+
+            logger.info(f"Exporting {len(objects_to_export)} objects from 'Fbx' set: {[obj.name for obj in objects_to_export]}")
+
+            # Export this animation
+            try:
+                export_file = os.path.join(export_path, f"{anim_name}.fbx")
+
+                # Check out from P4 if needed
+                if not _p4_checkout(export_file):
+                    logger.warning(f"P4 checkout failed for {export_file}, continuing anyway...")
+
+                # Remove read-only if file exists
+                if os.path.exists(export_file):
+                    try:
+                        import stat
+                        os.chmod(export_file, stat.S_IWRITE | stat.S_IREAD)
+                    except Exception as e:
+                        logger.warning(f"Failed to remove read-only attribute: {str(e)}")
+
+                # Configure FBX export
+                original_start = rt.animationRange.start
+                original_end = rt.animationRange.end
+
+                try:
+                    rt.animationRange = rt.interval(start_frame, end_frame)
+
+                    rt.FBXExporterSetParam(rt.Name("Animation"), True)
+                    rt.FBXExporterSetParam(rt.Name("BakeAnimation"), True)
+                    rt.FBXExporterSetParam(rt.Name("BakeFrameStart"), start_frame)
+                    rt.FBXExporterSetParam(rt.Name("BakeFrameEnd"), end_frame)
+                    rt.FBXExporterSetParam(rt.Name("BakeFrameStep"), 1)
+                    rt.FBXExporterSetParam(rt.Name("Shape"), True)
+                    rt.FBXExporterSetParam(rt.Name("Skin"), True)
+                    rt.FBXExporterSetParam(rt.Name("UpAxis"), rt.Name("Z"))
+
+                    # Export
+                    rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
+
+                    exported_files.append(export_file)
+                    logger.info(f"Exported: {export_file}")
+
+                finally:
+                    rt.animationRange = rt.interval(original_start, original_end)
+
+            except Exception as e:
+                logger.error(f"Failed to export {max_file}: {str(e)}")
+                continue
+
+        # Restore original file
+        if current_max_name and current_max_name != max_files[-1]:
+            try:
+                logger.info(f"Restoring original file: {current_max_name}")
+                full_path = os.path.join(current_max_path, current_max_name)
+                rt.loadMaxFile(full_path, quiet=True)
+            except Exception as e:
+                logger.error(f"Failed to restore original file: {str(e)}")
+
+        _update_progress(100, "Batch export complete!")
+
+        # Show completion notification
+        if exported_files:
+            _show_export_notification(exported_files)
+        else:
+            rt.messageBox("No files were exported!", title="Batch Export")
+
+    except Exception as e:
+        _update_progress(0, "Batch export failed!")
+        logger.error(f"Batch export failed: {str(e)}")
+        rt.messageBox(f"Batch export failed:\n{str(e)}", title="Batch Export Error")
 
 
 def _export_animation(name, start_frame, end_frame, objects_str):

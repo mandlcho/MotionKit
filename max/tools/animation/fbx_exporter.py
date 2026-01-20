@@ -436,13 +436,20 @@ rollout MotionKitAnimExporter "{title}" width:480 height:330
     -- Close button
     on btnClose pressed do
     (
-        destroyDialog MotionKitAnimExporter
+        try
+        (
+            destroyDialog MotionKitAnimExporter
+        )
+        catch
+        (
+            print "Error closing dialog"
+        )
     )
 )
 
 -- Create and show dialog
 try (destroyDialog MotionKitAnimExporter) catch()
-createDialog MotionKitAnimExporter
+animExporterDialog = createDialog MotionKitAnimExporter
 '''
 
         # Execute the MaxScript to show the dialog

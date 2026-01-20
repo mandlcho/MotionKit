@@ -63,14 +63,19 @@
     "unreal": {
         "default_project_path": "",
         "content_browser_path": "/Game/",
+        "skeleton_path": "",
         "import_animations": true,
-        "auto_save_before_export": true
+        "auto_save_before_export": true,
+        "host": "127.0.0.1",
+        "port": 30010,
+        "live_link_host": "127.0.0.1",
+        "live_link_port": 9998
     },
     "logging": {
         "level": "INFO",
         "log_to_file": false
     },
     "ui": {
-        "language": "en"
+        "language": "zh"
     }
 }

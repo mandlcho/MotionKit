@@ -733,19 +733,19 @@ def _show_file_selection_dialog(start_frame, end_frame, export_path):
 
         # Show file selection dialog via MaxScript
         maxscript = f'''
-rollout FileSelectionDialog "Select Files to Export" width:420 height:540
+rollout FileSelectionDialog "Select Files to Export" width:420 height:600
 (
-    multiListBox fileList "" items:#({",".join([f'"{f}"' for f in max_files])}) selection:#{{}} pos:[10,10] width:400 height:26
+    multiListBox fileList "" items:#({",".join([f'"{f}"' for f in max_files])}) selection:#{{}} pos:[10,10] width:400 height:31
 
     -- Selection helper buttons
-    button btnSelectAll "Select All" pos:[20,455] width:90 height:25
-    button btnDeselectAll "Deselect All" pos:[120,455] width:90 height:25
-    button btnInvertSel "Invert Selection" pos:[220,455] width:110 height:25
+    button btnSelectAll "Select All" pos:[20,530] width:90 height:25
+    button btnDeselectAll "Deselect All" pos:[120,530] width:90 height:25
+    button btnInvertSel "Invert Selection" pos:[220,530] width:110 height:25
 
-    label selectionLabel "0 file(s) selected" pos:[20,490] width:380 align:#left
+    label selectionLabel "0 file(s) selected" pos:[20,560] width:380 align:#left
 
-    button btnExport "Export Selection" pos:[20,510] width:150 height:25
-    button btnCancel "Cancel" pos:[250,510] width:150 height:25
+    button btnExport "Export Selection" pos:[85,575] width:125 height:20
+    button btnCancel "Cancel" pos:[220,575] width:125 height:20
 
     -- Update selection count
     fn updateSelectionCount =

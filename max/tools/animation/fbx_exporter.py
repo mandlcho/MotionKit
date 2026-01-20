@@ -18,6 +18,7 @@ except ImportError:
 from core.logger import logger
 from core.localization import t
 from core.config import config
+from core.unreal_api import get_unreal_api
 
 TOOL_NAME = "Animation Exporter"
 
@@ -434,6 +435,172 @@ def _save_export_path(path):
             rt.messageBox(f"Failed to save path:\n{str(e)}", title="Animation Exporter")
 
 
+def _check_p4_status(file_path):
+    """
+    Check Perforce status of a file
+
+    Returns:
+        str: 'new' if file needs to be added, 'existing' if already in depot, 'unknown' if P4 not available
+    """
+    try:
+        # Check if file is in P4
+        env = os.environ.copy()
+        p4_server = config.get('perforce.server', '')
+        p4_user = config.get('perforce.user', '')
+        p4_workspace = config.get('perforce.workspace', '')
+
+        if not p4_server or not p4_user:
+            return 'unknown'
+
+        if p4_server:
+            env['P4PORT'] = p4_server
+        if p4_user:
+            env['P4USER'] = p4_user
+        if p4_workspace:
+            env['P4CLIENT'] = p4_workspace
+
+        # Check file status
+        result = subprocess.run(
+            ['p4', 'fstat', file_path],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            env=env
+        )
+
+        if result.returncode == 0:
+            # File exists in depot
+            if 'headAction' in result.stdout:
+                return 'existing'
+            else:
+                return 'new'
+        else:
+            # File not in depot
+            return 'new'
+
+    except Exception as e:
+        logger.debug(f"P4 status check failed: {str(e)}")
+        return 'unknown'
+
+
+def _prompt_unreal_import(exported_files):
+    """
+    Prompt user to import exported files into Unreal Engine
+
+    Args:
+        exported_files: List of exported FBX file paths
+
+    Returns:
+        bool: True if import was attempted
+    """
+    if not exported_files:
+        return False
+
+    try:
+        # Check if Unreal is connected
+        unreal_api = get_unreal_api()
+
+        if not unreal_api.is_connected():
+            logger.info("Unreal Engine not connected, skipping import prompt")
+            return False
+
+        # Categorize files by P4 status
+        new_files = []
+        existing_files = []
+
+        for file_path in exported_files:
+            status = _check_p4_status(file_path)
+            if status == 'new':
+                new_files.append(file_path)
+            elif status == 'existing':
+                existing_files.append(file_path)
+            else:
+                # Unknown status, treat as existing (safer to reimport)
+                existing_files.append(file_path)
+
+        # Prompt for existing files (reimport)
+        if existing_files:
+            file_names = [Path(f).stem for f in existing_files]
+            file_list = "\\n".join(file_names[:5])
+            if len(existing_files) > 5:
+                file_list += f"\\n... and {len(existing_files) - 5} more"
+
+            result = rt.queryBox(
+                f"Export complete!\\n\\n"
+                f"{len(existing_files)} existing file(s) were updated:\\n{file_list}\\n\\n"
+                f"Reimport in Unreal Engine?",
+                title="Unreal Import"
+            )
+
+            if result:
+                # Get Unreal asset paths (assume same structure)
+                content_path = config.get('unreal.content_browser_path', '/Game/Animations')
+                asset_paths = [f"{content_path}/{Path(f).stem}" for f in existing_files]
+
+                logger.info(f"Reimporting {len(asset_paths)} assets in Unreal...")
+                success = unreal_api.reimport_assets(asset_paths)
+
+                if success:
+                    rt.messageBox(
+                        f"Reimport request sent to Unreal Engine for {len(asset_paths)} asset(s).\\n\\n"
+                        f"Check Unreal Editor for import results.",
+                        title="Unreal Import"
+                    )
+                else:
+                    rt.messageBox(
+                        f"Failed to send reimport request to Unreal Engine.\\n\\n"
+                        f"Make sure Web Remote Control is enabled.",
+                        title="Unreal Import Error"
+                    )
+
+                return success
+
+        # Prompt for new files (import)
+        if new_files:
+            file_names = [Path(f).stem for f in new_files]
+            file_list = "\\n".join(file_names[:10])
+            if len(new_files) > 10:
+                file_list += f"\\n... and {len(new_files) - 10} more"
+
+            result = rt.queryBox(
+                f"Export complete!\\n\\n"
+                f"{len(new_files)} new file(s) were created:\\n{file_list}\\n\\n"
+                f"Import into Unreal Engine?",
+                title="Unreal Import"
+            )
+
+            if result:
+                # Import FBX files
+                content_path = config.get('unreal.content_browser_path', '/Game/Animations')
+                skeleton_path = config.get('unreal.skeleton_path', None)
+
+                logger.info(f"Importing {len(new_files)} FBX files into Unreal...")
+                success = unreal_api.import_fbx_files(new_files, content_path, skeleton_path)
+
+                if success:
+                    rt.messageBox(
+                        f"Import request sent to Unreal Engine for {len(new_files)} file(s).\\n\\n"
+                        f"Check Unreal Editor for import results.",
+                        title="Unreal Import"
+                    )
+                else:
+                    rt.messageBox(
+                        f"Failed to send import request to Unreal Engine.\\n\\n"
+                        f"Make sure Web Remote Control is enabled.",
+                        title="Unreal Import Error"
+                    )
+
+                return success
+
+        return False
+
+    except Exception as e:
+        logger.error(f"Unreal import prompt error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 
 def _export_animation(name, start_frame, end_frame, objects_str):
     """Export animation to FBX with Perforce checkout"""
@@ -553,6 +720,12 @@ def _export_animation(name, start_frame, end_frame, objects_str):
 
             _update_progress(100, "Export complete!")
             logger.info(f"Export completed for: {export_file}")
+
+            # Prompt for Unreal import
+            try:
+                _prompt_unreal_import([export_file])
+            except Exception as e:
+                logger.error(f"Unreal prompt error: {str(e)}")
 
         finally:
             logger.debug("Restoring original scene state.")

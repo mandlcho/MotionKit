@@ -100,6 +100,87 @@ class UnrealAPI:
             logger.error(f"Failed to execute Python in Unreal: {str(e)}")
             return None
 
+    def search_and_reimport_by_filename(self, fbx_file_paths):
+        """
+        Search for assets in Unreal by FBX filename and reimport if found
+
+        Args:
+            fbx_file_paths: List of FBX file paths (absolute paths from P4 workspace)
+
+        Returns:
+            dict: {"found": [...], "not_found": [...], "reimported": [...]}
+        """
+        if not fbx_file_paths:
+            return {"found": [], "not_found": [], "reimported": []}
+
+        logger.info(f"Searching Unreal for {len(fbx_file_paths)} assets by filename...")
+
+        # Extract just the filenames (without extension)
+        filenames = [Path(f).stem for f in fbx_file_paths]
+        files_json = json.dumps(filenames)
+
+        python_code = f'''
+import unreal
+
+filenames = {files_json}
+found_assets = []
+not_found = []
+reimported = []
+
+# Search for each filename in the asset registry
+asset_registry = unreal.AssetRegistryHelpers.get_asset_registry()
+
+for filename in filenames:
+    unreal.log(f"Searching for asset: {{filename}}")
+
+    # Search all assets with this name
+    assets = asset_registry.get_assets_by_class("AnimSequence", True)
+
+    matches = []
+    for asset_data in assets:
+        asset_name = asset_data.asset_name
+        if asset_name == filename:
+            asset_path = str(asset_data.object_path)
+            matches.append(asset_path)
+
+    if matches:
+        found_assets.extend(matches)
+        unreal.log(f"Found {{len(matches)}} asset(s) matching '{{filename}}':")
+
+        for asset_path in matches:
+            unreal.log(f"  → {{asset_path}}")
+
+            # Attempt to reimport
+            try:
+                success = unreal.EditorAssetLibrary.reimport_asset(asset_path)
+                if success:
+                    reimported.append(asset_path)
+                    unreal.log(f"✓ Reimported: {{asset_path}}")
+                else:
+                    unreal.log_warning(f"✗ Reimport failed: {{asset_path}}")
+            except Exception as e:
+                unreal.log_error(f"✗ Error reimporting {{asset_path}}: {{str(e)}}")
+    else:
+        not_found.append(filename)
+        unreal.log_warning(f"Asset not found: {{filename}}")
+
+unreal.log(f"Search complete: {{len(found_assets)}} found, {{len(reimported)}} reimported, {{len(not_found)}} not found")
+
+# Return results as JSON string
+import json
+result = {{"found": found_assets, "not_found": not_found, "reimported": reimported}}
+print("RESULT_JSON:" + json.dumps(result))
+'''
+
+        result = self.execute_python(python_code)
+
+        if result:
+            logger.info(f"Asset search completed")
+            return {"found": [], "not_found": [], "reimported": []}
+        else:
+            logger.error("Failed to search assets")
+            return {"found": [], "not_found": [], "reimported": []}
+
     def reimport_assets(self, asset_paths):
         """
         Reimport existing assets in Unreal

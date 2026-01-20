@@ -485,7 +485,7 @@ def _check_p4_status(file_path):
 
 def _prompt_unreal_import(exported_files):
     """
-    Prompt user to import exported files into Unreal Engine
+    Search for matching assets in Unreal and prompt to reimport
 
     Args:
         exported_files: List of exported FBX file paths
@@ -501,89 +501,73 @@ def _prompt_unreal_import(exported_files):
         unreal_api = get_unreal_api()
 
         if not unreal_api.is_connected():
-            logger.info("Unreal Engine Web Remote Control not available, using simple notification")
+            logger.info("Unreal Engine Web Remote Control not available")
 
-            # Fallback: Show simple notification about auto-reimport
-            message = notify_files_exported(exported_files)
+            # Fallback: Show simple notification
+            file_names = [Path(f).stem for f in exported_files]
+            file_list = "\\n".join([f"  • {name}" for name in file_names[:10]])
+            if len(exported_files) > 10:
+                file_list += f"\\n  • ... and {len(exported_files) - 10} more"
+
+            message = f"Export complete!\\n\\n"
+            message += f"{len(exported_files)} file(s) exported:\\n{file_list}\\n\\n"
+            message += f"To enable Unreal integration:\\n"
+            message += f"1. Enable Web Remote Control plugin in Unreal\\n"
+            message += f"2. Set port to 30010 in Project Settings"
+
             rt.messageBox(message, title="Export Complete")
             return False
 
-        # Categorize files by P4 status
-        new_files = []
-        existing_files = []
+        # Search Unreal for matching assets by filename
+        logger.info(f"Searching Unreal for {len(exported_files)} assets...")
+        results = unreal_api.search_and_reimport_by_filename(exported_files)
 
-        for file_path in exported_files:
-            status = _check_p4_status(file_path)
-            if status == 'new':
-                new_files.append(file_path)
-            elif status == 'existing':
-                existing_files.append(file_path)
-            else:
-                # Unknown status, treat as existing (safer to reimport)
-                existing_files.append(file_path)
+        # Show results to user
+        found_count = len(results.get('found', []))
+        reimported_count = len(results.get('reimported', []))
+        not_found_count = len(results.get('not_found', []))
 
-        # Prompt for existing files (reimport)
-        if existing_files:
-            file_names = [Path(f).stem for f in existing_files]
-            file_list = "\\n".join(file_names[:5])
-            if len(existing_files) > 5:
-                file_list += f"\\n... and {len(existing_files) - 5} more"
+        if found_count > 0:
+            message = f"Unreal Asset Search Complete!\\n\\n"
+            message += f"✓ Found: {found_count} matching asset(s)\\n"
+            message += f"✓ Reimported: {reimported_count} asset(s)\\n"
+
+            if not_found_count > 0:
+                not_found_names = results.get('not_found', [])[:5]
+                message += f"\\n✗ Not found: {not_found_count} asset(s)\\n"
+                message += "  " + "\\n  ".join(not_found_names)
+                if not_found_count > 5:
+                    message += f"\\n  ... and {not_found_count - 5} more"
+
+            message += f"\\n\\nCheck Unreal Editor Output Log for details."
+
+            rt.messageBox(message, title="Unreal Reimport")
+            return True
+        else:
+            # No assets found - offer to import new
+            file_names = [Path(f).stem for f in exported_files]
+            file_list = "\\n".join([f"  • {name}" for name in file_names[:10]])
+            if len(exported_files) > 10:
+                file_list += f"\\n  • ... and {len(exported_files) - 10} more"
 
             result = rt.queryBox(
-                f"Export complete!\\n\\n"
-                f"{len(existing_files)} existing file(s) were updated:\\n{file_list}\\n\\n"
-                f"Reimport in Unreal Engine?",
+                f"No matching assets found in Unreal!\\n\\n"
+                f"{len(exported_files)} file(s) exported:\\n{file_list}\\n\\n"
+                f"Import as new assets into Unreal?",
                 title="Unreal Import"
             )
 
             if result:
-                # Get Unreal asset paths (assume same structure)
-                content_path = config.get('unreal.content_browser_path', '/Game/Animations')
-                asset_paths = [f"{content_path}/{Path(f).stem}" for f in existing_files]
-
-                logger.info(f"Reimporting {len(asset_paths)} assets in Unreal...")
-                success = unreal_api.reimport_assets(asset_paths)
-
-                if success:
-                    rt.messageBox(
-                        f"Reimport request sent to Unreal Engine for {len(asset_paths)} asset(s).\\n\\n"
-                        f"Check Unreal Editor for import results.",
-                        title="Unreal Import"
-                    )
-                else:
-                    rt.messageBox(
-                        f"Failed to send reimport request to Unreal Engine.\\n\\n"
-                        f"Make sure Web Remote Control is enabled.",
-                        title="Unreal Import Error"
-                    )
-
-                return success
-
-        # Prompt for new files (import)
-        if new_files:
-            file_names = [Path(f).stem for f in new_files]
-            file_list = "\\n".join(file_names[:10])
-            if len(new_files) > 10:
-                file_list += f"\\n... and {len(new_files) - 10} more"
-
-            result = rt.queryBox(
-                f"Export complete!\\n\\n"
-                f"{len(new_files)} new file(s) were created:\\n{file_list}\\n\\n"
-                f"Import into Unreal Engine?",
-                title="Unreal Import"
-            )
-
-            if result:
-                # Import FBX files
+                # Import FBX files as new assets
                 content_path = config.get('unreal.content_browser_path', '/Game/Animations')
                 skeleton_path = config.get('unreal.skeleton_path', None)
 
-                logger.info(f"Importing {len(new_files)} FBX files into Unreal...")
-                success = unreal_api.import_fbx_files(new_files, content_path, skeleton_path)
+                logger.info(f"Importing {len(exported_files)} FBX files into Unreal...")
+                success = unreal_api.import_fbx_files(exported_files, content_path, skeleton_path)
 
                 if success:
                     rt.messageBox(
-                        f"Import request sent to Unreal Engine for {len(new_files)} file(s).\\n\\n"
+                        f"Import request sent to Unreal Engine for {len(exported_files)} file(s).\\n\\n"
                         f"Check Unreal Editor for import results.",
                         title="Unreal Import"
                     )

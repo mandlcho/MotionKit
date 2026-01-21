@@ -35,6 +35,7 @@ from pyfbsdk import (
     FBApplication, FBFbxOptions, FBModelList, FBCharacter, FBTime
 )
 from core.logger import logger
+from core.localization import t
 
 TOOL_NAME = "Anim Exporter"
 
@@ -319,7 +320,7 @@ class AddAnimationDialog(QDialog):
     def __init__(self, parent=None, default_start=0, default_end=100):
         super(AddAnimationDialog, self).__init__(parent)
 
-        self.setWindowTitle("Add Animation")
+        self.setWindowTitle(t('tools.anim_exporter.add_animation_title', 'Add Animation'))
         self.setFixedSize(650, 120)  # Fixed size - no resizing
 
         # Store the input values
@@ -336,18 +337,18 @@ class AddAnimationDialog(QDialog):
         # Top row - Animation Name and Frame Range
         top_row = QHBoxLayout()
         top_row.setSpacing(5)
-        top_row.addWidget(QLabel("Animation Name:"))
+        top_row.addWidget(QLabel(t('tools.anim_exporter.animation_name_label', 'Animation Name:')))
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g., Idle, Walk, Run")
         self.name_input.setText(current_take_name)  # Set default to current take name
         top_row.addWidget(self.name_input, stretch=1)
-        top_row.addWidget(QLabel("Start:"))
+        top_row.addWidget(QLabel(t('tools.anim_exporter.start_label', 'Start:')))
         self.start_frame_input = QLineEdit()
         self.start_frame_input.setText(str(default_start))
         self.start_frame_input.setAlignment(Qt.AlignCenter)
         self.start_frame_input.setMaximumWidth(60)
         top_row.addWidget(self.start_frame_input)
-        top_row.addWidget(QLabel("End:"))
+        top_row.addWidget(QLabel(t('tools.anim_exporter.end_label', 'End:')))
         self.end_frame_input = QLineEdit()
         self.end_frame_input.setText(str(default_end))
         self.end_frame_input.setAlignment(Qt.AlignCenter)
@@ -358,7 +359,7 @@ class AddAnimationDialog(QDialog):
         # Middle row - Take and Namespace
         middle_row = QHBoxLayout()
         middle_row.setSpacing(5)
-        middle_row.addWidget(QLabel("Take:"))
+        middle_row.addWidget(QLabel(t('tools.anim_exporter.take_label', 'Take:')))
         self.take_combo = QComboBox()
         self.take_combo.setEditable(False)  # Not editable - dropdown only
         self.take_combo.setMinimumWidth(150)
@@ -376,7 +377,7 @@ class AddAnimationDialog(QDialog):
                 print(f"[AddAnimationDialog] Set current take to: {current_take_name}")
 
         middle_row.addWidget(self.take_combo)
-        middle_row.addWidget(QLabel("Namespace:"))
+        middle_row.addWidget(QLabel(t('tools.anim_exporter.namespace_label', 'Namespace:')))
         self.namespace_combo = QComboBox()
         self.namespace_combo.setEditable(False)  # Not editable - dropdown only
         self.namespace_combo.addItem("")  # Empty default
@@ -396,7 +397,7 @@ class AddAnimationDialog(QDialog):
 
         # Rename OK button to "Add"
         add_button = button_box.button(QDialogButtonBox.Ok)
-        add_button.setText("Add")
+        add_button.setText(t('tools.anim_exporter.add_button', 'Add'))
 
         middle_row.addStretch()
         middle_row.addWidget(button_box)
@@ -519,7 +520,7 @@ class AnimExporterDialog(QDialog):
 
     def setup_ui(self):
         """Setup the user interface"""
-        self.setWindowTitle("Anim Exporter")
+        self.setWindowTitle(t('tools.anim_exporter.title', 'Anim Exporter'))
         self.resize(960, 500)
         self.setMinimumSize(960, 400)
 
@@ -530,19 +531,19 @@ class AnimExporterDialog(QDialog):
         table_layout = QVBoxLayout()
 
         # === Animations GroupBox ===
-        animations_group = QtWidgets.QGroupBox("Animations")
+        animations_group = QtWidgets.QGroupBox(t('tools.anim_exporter.animations_group', 'Animations'))
         animations_group_layout = QVBoxLayout()
 
         # Create table widget with specified columns
         self.animation_table = QTableWidget()
         self.animation_table.setColumnCount(6)
         self.animation_table.setHorizontalHeaderLabels([
-            "Animation Name",
-            "Take",
-            "Start Frame",
-            "End Frame",
-            "Namespace",
-            "Path"
+            t('tools.anim_exporter.header_animation_name', 'Animation Name'),
+            t('tools.anim_exporter.header_take', 'Take'),
+            t('tools.anim_exporter.header_start_frame', 'Start Frame'),
+            t('tools.anim_exporter.header_end_frame', 'End Frame'),
+            t('tools.anim_exporter.header_namespace', 'Namespace'),
+            t('tools.anim_exporter.header_path', 'Path')
         ])
 
         # Configure table
@@ -586,23 +587,23 @@ class AnimExporterDialog(QDialog):
         button_layout = QVBoxLayout()
 
         # === Animation GroupBox ===
-        anim_group = QtWidgets.QGroupBox("Animation")
+        anim_group = QtWidgets.QGroupBox(t('tools.anim_exporter.animation_group', 'Animation'))
         anim_group_layout = QVBoxLayout()
 
         # Add Animation button
-        self.add_animation_btn = QPushButton("Add Animation")
+        self.add_animation_btn = QPushButton(t('tools.anim_exporter.add_animation', 'Add Animation'))
         self.add_animation_btn.setMinimumWidth(120)
         self.add_animation_btn.clicked.connect(self.on_add_animation)
         anim_group_layout.addWidget(self.add_animation_btn)
 
         # Delete Selected button
-        self.delete_selected_btn = QPushButton("Delete Selected")
+        self.delete_selected_btn = QPushButton(t('tools.anim_exporter.delete_selected', 'Delete Selected'))
         self.delete_selected_btn.setMinimumWidth(120)
         self.delete_selected_btn.clicked.connect(self.on_delete_selected)
         anim_group_layout.addWidget(self.delete_selected_btn)
 
         # Delete All button
-        self.delete_all_btn = QPushButton("Delete All")
+        self.delete_all_btn = QPushButton(t('tools.anim_exporter.delete_all', 'Delete All'))
         self.delete_all_btn.setMinimumWidth(120)
         self.delete_all_btn.clicked.connect(self.on_delete_all)
         anim_group_layout.addWidget(self.delete_all_btn)
@@ -614,17 +615,17 @@ class AnimExporterDialog(QDialog):
         button_layout.addStretch()
 
         # === Export GroupBox ===
-        export_group = QtWidgets.QGroupBox("Export")
+        export_group = QtWidgets.QGroupBox(t('tools.anim_exporter.export_group', 'Export'))
         export_group_layout = QVBoxLayout()
 
         # Export Selected button
-        self.export_selected_btn = QPushButton("Export Selected")
+        self.export_selected_btn = QPushButton(t('tools.anim_exporter.export_selected', 'Export Selected'))
         self.export_selected_btn.setMinimumWidth(120)
         self.export_selected_btn.clicked.connect(self.on_export_selected)
         export_group_layout.addWidget(self.export_selected_btn)
 
         # Export All button
-        self.export_all_btn = QPushButton("Export All")
+        self.export_all_btn = QPushButton(t('tools.anim_exporter.export_all', 'Export All'))
         self.export_all_btn.setMinimumWidth(120)
         self.export_all_btn.clicked.connect(self.on_export_all)
         export_group_layout.addWidget(self.export_all_btn)

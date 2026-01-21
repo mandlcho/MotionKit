@@ -62,26 +62,30 @@
     "save_failed": "Failed to save settings:\n{0}"
   },
   "tools": {
-    "fbx_exporter": {
-      "name": "Animation Exporter",
-      "title": "Animation Exporter",
+    "anim_exporter": {
+      "name": "Anim Exporter",
+      "title": "Anim Exporter",
       "animations_group": "Animations",
+      "animation_group": "Animation",
+      "export_group": "Export",
       "add_animation": "Add Animation",
-      "edit_selected": "Edit Selected",
       "delete_selected": "Delete Selected",
       "delete_all": "Delete All",
-      "export_group": "Export",
       "export_selected": "Export Selected",
       "export_all": "Export All",
       "add_animation_title": "Add Animation",
-      "edit_animation_title": "Edit Animation",
-      "animation_name": "Animation Name",
-      "start_frame": "Start Frame",
-      "end_frame": "End Frame",
-      "objects": "Objects",
-      "export_path": "Export Path",
-      "use_selection": "Use Selection",
-      "use_timeline": "Use Timeline"
+      "animation_name_label": "Animation Name:",
+      "start_label": "Start:",
+      "end_label": "End:",
+      "take_label": "Take:",
+      "namespace_label": "Namespace:",
+      "add_button": "Add",
+      "header_animation_name": "Animation Name",
+      "header_take": "Take",
+      "header_start_frame": "Start Frame",
+      "header_end_frame": "End Frame",
+      "header_namespace": "Namespace",
+      "header_path": "Path"
     },
     "root_anim_copy": {
       "name": "Root Animation Copy",

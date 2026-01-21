@@ -62,26 +62,30 @@
     "save_failed": "설정 저장 실패：\n{0}"
   },
   "tools": {
-    "fbx_exporter": {
+    "anim_exporter": {
       "name": "애니메이션 내보내기",
       "title": "애니메이션 내보내기",
       "animations_group": "애니메이션 목록",
+      "animation_group": "애니메이션",
+      "export_group": "내보내기",
       "add_animation": "애니메이션 추가",
-      "edit_selected": "선택 편집",
       "delete_selected": "선택 삭제",
       "delete_all": "전체 삭제",
-      "export_group": "내보내기",
       "export_selected": "선택 내보내기",
       "export_all": "전체 내보내기",
       "add_animation_title": "애니메이션 추가",
-      "edit_animation_title": "애니메이션 편집",
-      "animation_name": "애니메이션 이름",
-      "start_frame": "시작 프레임",
-      "end_frame": "종료 프레임",
-      "objects": "오브젝트",
-      "export_path": "내보내기 경로",
-      "use_selection": "선택 사용",
-      "use_timeline": "타임라인 사용"
+      "animation_name_label": "애니메이션 이름:",
+      "start_label": "시작:",
+      "end_label": "끝:",
+      "take_label": "테이크:",
+      "namespace_label": "네임스페이스:",
+      "add_button": "추가",
+      "header_animation_name": "애니메이션 이름",
+      "header_take": "테이크",
+      "header_start_frame": "시작 프레임",
+      "header_end_frame": "종료 프레임",
+      "header_namespace": "네임스페이스",
+      "header_path": "경로"
     },
     "root_anim_copy": {
       "name": "루트 애니메이션 복사",

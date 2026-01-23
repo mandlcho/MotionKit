@@ -87,6 +87,17 @@
       "header_namespace": "네임스페이스",
       "header_path": "경로"
     },
+    "fbx_exporter": {
+      "name": "애니메이션 내보내기 도구",
+      "title": "애니메이션 내보내기 도구 - MotionKit",
+      "animation_name": "애니메이션 이름:",
+      "start_frame": "시작 프레임:",
+      "end_frame": "종료 프레임:",
+      "objects": "객체:",
+      "use_selection": "현재 선택 사용",
+      "use_timeline": "타임라인 범위 사용",
+      "export_selected": "애니메이션 내보내기"
+    },
     "root_anim_copy": {
       "name": "루트 애니메이션 복사",
       "title": "루트 애니메이션 복사 - MotionKit",

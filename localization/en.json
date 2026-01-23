@@ -87,6 +87,17 @@
       "header_namespace": "Namespace",
       "header_path": "Path"
     },
+    "fbx_exporter": {
+      "name": "Animation Exporter",
+      "title": "Animation Exporter - MotionKit",
+      "animation_name": "Animation Name:",
+      "start_frame": "Start Frame:",
+      "end_frame": "End Frame:",
+      "objects": "Objects:",
+      "use_selection": "Use Current Selection",
+      "use_timeline": "Use Timeline Range",
+      "export_selected": "Export Animation"
+    },
     "root_anim_copy": {
       "name": "Root Animation Copy",
       "title": "Root Animation Copy - MotionKit",

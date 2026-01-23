@@ -738,19 +738,6 @@ rollout FootSyncDialog "{title}" width:480 height:560
     
     -- Buttons
     button generateBtn "Generate Foot Sync" pos:[10,520] width:220 height:30
-    button closeBtn "Close" pos:[250,520] width:220 height:30
-    
-    -- Initialize
-    on FootSyncDialog open do
-    (
-        FootSyncTool = FootSyncToolStruct()
-        statusLabel.text = "Ready. Select a Biped and click Generate."
-
-        -- Load Generic preset by default
-        FootSyncTool.loadCharacterPreset "Generic"
-        updateUIFromTool()
-    )
-    
     -- Update UI from tool values
     fn updateUIFromTool =
     (
@@ -765,7 +752,7 @@ rollout FootSyncDialog "{title}" width:480 height:560
         heightToleranceSpin.value = FootSyncTool.heightTolerance
         speedToleranceSpin.value = FootSyncTool.speedTolerance
     )
-    
+
     -- Update tool from UI values
     fn updateToolFromUI =
     (
@@ -779,6 +766,19 @@ rollout FootSyncDialog "{title}" width:480 height:560
         FootSyncTool.minMovement = minMovementSpin.value
         FootSyncTool.heightTolerance = heightToleranceSpin.value
         FootSyncTool.speedTolerance = speedToleranceSpin.value
+    )
+
+    button closeBtn "Close" pos:[250,520] width:220 height:30
+
+    -- Initialize
+    on FootSyncDialog open do
+    (
+        FootSyncTool = FootSyncToolStruct()
+        statusLabel.text = "Ready. Select a Biped and click Generate."
+
+        -- Load Generic preset by default
+        FootSyncTool.loadCharacterPreset "Generic"
+        updateUIFromTool()
     )
     
     -- Preset changed

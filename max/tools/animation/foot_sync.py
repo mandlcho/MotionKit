@@ -745,10 +745,10 @@ rollout FootSyncDialog "{title}" width:480 height:560
     (
         FootSyncTool = FootSyncToolStruct()
         statusLabel.text = "Ready. Select a Biped and click Generate."
-        
+
         -- Load Generic preset by default
         FootSyncTool.loadCharacterPreset "Generic"
-        this.updateUIFromTool()
+        updateUIFromTool()
     )
     
     -- Update UI from tool values
@@ -786,7 +786,7 @@ rollout FootSyncDialog "{title}" width:480 height:560
     (
         local presetName = presetDropdown.items[sel]
         FootSyncTool.loadCharacterPreset presetName
-        this.updateUIFromTool()
+        updateUIFromTool()
         statusLabel.text = "Loaded preset: " + presetName
     )
     
@@ -809,7 +809,7 @@ rollout FootSyncDialog "{title}" width:480 height:560
         statusLabel.text = "Generating foot sync data..."
         
         -- Update tool parameters from UI
-        this.updateToolFromUI()
+        updateToolFromUI()
         
         -- Generate foot sync
         local result = FootSyncTool.generateFootSync bipedPicker.object

@@ -87,6 +87,17 @@
       "header_namespace": "命名空间",
       "header_path": "路径"
     },
+    "fbx_exporter": {
+      "name": "动画导出器",
+      "title": "动画导出器 - MotionKit",
+      "animation_name": "动画名称:",
+      "start_frame": "起始帧:",
+      "end_frame": "结束帧:",
+      "objects": "对象:",
+      "use_selection": "使用当前选择",
+      "use_timeline": "使用时间轴范围",
+      "export_selected": "导出动画"
+    },
     "root_anim_copy": {
       "name": "根节点动画拷贝",
       "title": "根节点动画拷贝 - MotionKit",

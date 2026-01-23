@@ -98,6 +98,35 @@
       "use_timeline": "Use Timeline Range",
       "export_selected": "Export Animation"
     },
+    "foot_sync": {
+      "name": "Generate Foot Sync",
+      "title": "Generate Foot Sync - MotionKit",
+      "error_select_biped": "Please select a Biped object!",
+      "error_no_nodes": "Could not find biped foot/toe nodes!",
+      "error_access_nodes": "Error accessing biped nodes. Make sure a Biped is selected!",
+      "error_no_root": "Could not find root node for custom attributes!",
+      "error_pick_biped": "Please pick a Biped object first!",
+      "success": "Foot sync data generated successfully!"
+    },
+    "calibrate_foot_sync": {
+      "name": "Calibrate Foot Sync Parameters",
+      "title": "Calibrate Foot Sync Parameters - MotionKit",
+      "error_select_biped": "Please select a Biped object!",
+      "error_no_nodes": "Could not find biped foot/toe nodes!",
+      "error_access_nodes": "Error accessing biped nodes. Make sure a Biped is selected!",
+      "error_no_results": "No calibration results to export!",
+      "error_pick_biped": "Please pick a Biped object first!",
+      "error_enter_name": "Please enter a character name!",
+      "success_calibration": "Calibration complete!\\n\\nReview the results and click 'Export to JSON' to save.",
+      "success_export": "Calibration data exported to:\\n{0}\\n\\nCopy the contents to config/foot_sync_presets.json"
+    },
+    "send_to_unreal": {
+      "name": "Send to Unreal",
+      "title": "Send to Unreal",
+      "error_no_selection": "Please select at least one object to send to Unreal.",
+      "info_selected": "Send to Unreal - {0} object(s) selected\\n\\nThis feature requires Unreal Engine setup.",
+      "error": "Error: {0}"
+    },
     "root_anim_copy": {
       "name": "Root Animation Copy",
       "title": "Root Animation Copy - MotionKit",

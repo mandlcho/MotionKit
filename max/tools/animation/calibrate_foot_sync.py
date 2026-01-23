@@ -30,6 +30,25 @@ from core.localization import t
 TOOL_NAME = "Calibrate Foot Sync Parameters"
 
 
+def get_localized_message(key, *args):
+    """Get localized message with optional arguments"""
+    try:
+        return t(f'tools.calibrate_foot_sync.{key}').format(*args) if args else t(f'tools.calibrate_foot_sync.{key}')
+    except:
+        # Fallback to English if localization fails
+        fallbacks = {
+            'error_select_biped': 'Please select a Biped object!',
+            'error_no_nodes': 'Could not find biped foot/toe nodes!',
+            'error_access_nodes': 'Error accessing biped nodes. Make sure a Biped is selected!',
+            'error_no_results': 'No calibration results to export!',
+            'error_pick_biped': 'Please pick a Biped object first!',
+            'error_enter_name': 'Please enter a character name!',
+            'success_calibration': 'Calibration complete!\\n\\nReview the results and click \'Export to JSON\' to save.',
+            'success_export': 'Calibration data exported to:\\n{0}\\n\\nCopy the contents to config/foot_sync_presets.json'
+        }
+        return fallbacks.get(key, key).format(*args) if args else fallbacks.get(key, key)
+
+
 def execute(control=None, event=None):
     """Execute the Calibrate Foot Sync tool"""
     if not pymxs or not rt:
@@ -79,7 +98,7 @@ struct CalibrateToolStruct
     (
         if bipedObj == undefined then
         (
-            messageBox "Please select a Biped object!" title:"Calibration Error"
+            messageBox (get_localized_message "error_select_biped") title:"Calibration Error"
             return undefined
         )
 
@@ -94,7 +113,7 @@ struct CalibrateToolStruct
             if csLeftFeet == undefined or csLeftToe == undefined or \\
                csRightFeet == undefined or csRightToe == undefined then
             (
-                messageBox "Could not find biped foot/toe nodes!" title:"Calibration Error"
+                messageBox (get_localized_message "error_no_nodes") title:"Calibration Error"
                 return undefined
             )
 
@@ -103,7 +122,7 @@ struct CalibrateToolStruct
         )
         catch
         (
-            messageBox "Error accessing biped nodes. Make sure a Biped is selected!" title:"Calibration Error"
+            messageBox (get_localized_message "error_access_nodes") title:"Calibration Error"
             return undefined
         )
     ),
@@ -302,7 +321,7 @@ struct CalibrateToolStruct
         format "[Calibrate] Calibration Complete!\\n"
         format "[Calibrate] ==========================================\\n"
 
-        messageBox "Calibration complete!\\n\\nReview the results and click 'Export to JSON' to save." \\
+        messageBox (get_localized_message "success_calibration") \\
             title:"Calibration Complete"
 
         return results
@@ -353,7 +372,7 @@ struct CalibrateToolStruct
     (
         if results == undefined then
         (
-            messageBox "No calibration results to export!" title:"Export Error"
+            messageBox (get_localized_message "error_no_results") title:"Export Error"
             return false
         )
 
@@ -495,13 +514,13 @@ rollout CalibrateDialog "{title}" width:520 height:540
     (
         if bipedPicker.object == undefined then
         (
-            messageBox "Please pick a Biped object first!" title:"Calibration Error"
+            messageBox (get_localized_message "error_pick_biped") title:"Calibration Error"
             return false
         )
 
         if characterNameEdit.text == "" then
         (
-            messageBox "Please enter a character name!" title:"Calibration Error"
+            messageBox (get_localized_message "error_enter_name") title:"Calibration Error"
             return false
         )
 
@@ -537,7 +556,7 @@ rollout CalibrateDialog "{title}" width:520 height:540
         (
             if CalibrateTool.exportToJson exportPath then
             (
-                messageBox ("Calibration data exported to:\\n" + exportPath + "\\n\\nCopy the contents to config/foot_sync_presets.json") \\
+                messageBox (get_localized_message "success_export" exportPath) \\
                     title:"Export Complete"
                 statusLabel.text = "Exported: " + (filenameFromPath exportPath)
             )

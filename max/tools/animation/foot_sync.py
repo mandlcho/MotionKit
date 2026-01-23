@@ -273,7 +273,7 @@ class FootSyncDialog:
         presets = load_character_presets()
         presets_ms = convert_presets_to_maxscript(presets)
         preset_names = list(presets.keys())
-        preset_names_ms = ', '.join([f'"{name}"' for name in preset_names])
+        preset_names_ms = '(' + ', '.join([f'"{name}"' for name in preset_names]) + ')'
 
         # Get translations
         title = "Generate Foot Sync"

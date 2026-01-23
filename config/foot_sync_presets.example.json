@@ -1,0 +1,65 @@
+{
+  "$schema": "foot_sync_presets_schema.json",
+  "version": "1.0.0",
+  "description": "Character presets for foot sync generation. Copy this file to 'foot_sync_presets.json' and add your custom characters.",
+  "presets": {
+    "Generic": {
+      "description": "Default preset for standard biped characters",
+      "height_cm": null,
+      "toe": {
+        "min": 0.0,
+        "neutral": 5.0,
+        "max": 10.0
+      },
+      "feet": {
+        "min": 5.0,
+        "neutral": 10.0,
+        "max": 15.0
+      },
+      "thresholds": {
+        "angle_speed": 1.2,
+        "min_movement": 0.22,
+        "height_tolerance": 2.0,
+        "speed_tolerance": 0.4
+      },
+      "motion_range": {
+        "feet": 4.5,
+        "toe": 1.4
+      }
+    },
+    "YourCharacterName": {
+      "description": "Add your character description here",
+      "height_cm": 170,
+      "toe": {
+        "min": 0.0,
+        "neutral": 5.0,
+        "max": 10.0
+      },
+      "feet": {
+        "min": 5.0,
+        "neutral": 10.0,
+        "max": 15.0
+      },
+      "thresholds": {
+        "angle_speed": 1.2,
+        "min_movement": 0.22,
+        "height_tolerance": 2.0,
+        "speed_tolerance": 0.4
+      },
+      "motion_range": {
+        "feet": 4.5,
+        "toe": 1.4
+      }
+    }
+  },
+  "notes": {
+    "toe": "Toe height parameters - min: heel strike, neutral: flat, max: toe lift",
+    "feet": "Foot height parameters - min: contact, neutral: ground, max: swing phase",
+    "angle_speed": "Angular velocity threshold in degrees per frame for rotation detection",
+    "min_movement": "Minimum displacement per frame to detect movement (units)",
+    "height_tolerance": "Vertical tolerance for ground contact detection (units)",
+    "speed_tolerance": "Speed threshold for determining lift-off (units/frame)",
+    "motion_range.feet": "Feet amplitude threshold - above this value = large motion",
+    "motion_range.toe": "Toe amplitude threshold - above this value = large motion"
+  }
+}

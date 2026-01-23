@@ -363,65 +363,66 @@ struct CalibrateToolStruct
                 characterName = item[2]
 
         -- Build JSON string manually (MaxScript doesn't have native JSON support)
-        local jsonStr = "{\\n"
-        jsonStr += "  \\"" + characterName + "\\": {\\n"
-        jsonStr += "    \\"description\\": \\"Calibrated from animation\\",\\n"
-        jsonStr += "    \\"height_cm\\": null,\\n"
+        -- Use string concatenation to avoid backslash escaping issues
+        local jsonStr = "{"
+        jsonStr += "\n  \"" + characterName + "\": {"
+        jsonStr += "\n    \"description\": \"Calibrated from animation\","
+        jsonStr += "\n    \"height_cm\": null,"
 
         -- Toe
-        jsonStr += "    \\"toe\\": {\\n"
+        jsonStr += "\n    \"toe\": {"
         for item in results do
         (
             if item[1] == "toe_min" then
-                jsonStr += "      \\"min\\": " + (item[2] as string) + ",\\n"
+                jsonStr += "\n      \"min\": " + (item[2] as string) + ","
             else if item[1] == "toe_neutral" then
-                jsonStr += "      \\"neutral\\": " + (item[2] as string) + ",\\n"
+                jsonStr += "\n      \"neutral\": " + (item[2] as string) + ","
             else if item[1] == "toe_max" then
-                jsonStr += "      \\"max\\": " + (item[2] as string) + "\\n"
+                jsonStr += "\n      \"max\": " + (item[2] as string)
         )
-        jsonStr += "    },\\n"
+        jsonStr += "\n    },"
 
         -- Feet
-        jsonStr += "    \\"feet\\": {\\n"
+        jsonStr += "\n    \"feet\": {"
         for item in results do
         (
             if item[1] == "feet_min" then
-                jsonStr += "      \\"min\\": " + (item[2] as string) + ",\\n"
+                jsonStr += "\n      \"min\": " + (item[2] as string) + ","
             else if item[1] == "feet_neutral" then
-                jsonStr += "      \\"neutral\\": " + (item[2] as string) + ",\\n"
+                jsonStr += "\n      \"neutral\": " + (item[2] as string) + ","
             else if item[1] == "feet_max" then
-                jsonStr += "      \\"max\\": " + (item[2] as string) + "\\n"
+                jsonStr += "\n      \"max\": " + (item[2] as string)
         )
-        jsonStr += "    },\\n"
+        jsonStr += "\n    },"
 
         -- Thresholds
-        jsonStr += "    \\"thresholds\\": {\\n"
+        jsonStr += "\n    \"thresholds\": {"
         for item in results do
         (
             if item[1] == "angle_speed" then
-                jsonStr += "      \\"angle_speed\\": " + (item[2] as string) + ",\\n"
+                jsonStr += "\n      \"angle_speed\": " + (item[2] as string) + ","
             else if item[1] == "min_movement" then
-                jsonStr += "      \\"min_movement\\": " + (item[2] as string) + ",\\n"
+                jsonStr += "\n      \"min_movement\": " + (item[2] as string) + ","
             else if item[1] == "height_tolerance" then
-                jsonStr += "      \\"height_tolerance\\": " + (item[2] as string) + ",\\n"
+                jsonStr += "\n      \"height_tolerance\": " + (item[2] as string) + ","
             else if item[1] == "speed_tolerance" then
-                jsonStr += "      \\"speed_tolerance\\": " + (item[2] as string) + "\\n"
+                jsonStr += "\n      \"speed_tolerance\": " + (item[2] as string)
         )
-        jsonStr += "    },\\n"
+        jsonStr += "\n    },"
 
         -- Motion range
-        jsonStr += "    \\"motion_range\\": {\\n"
+        jsonStr += "\n    \"motion_range\": {"
         for item in results do
         (
             if item[1] == "tiny_range_feet" then
-                jsonStr += "      \\"feet\\": " + (item[2] as string) + ",\\n"
+                jsonStr += "\n      \"feet\": " + (item[2] as string) + ","
             else if item[1] == "tiny_range_toe" then
-                jsonStr += "      \\"toe\\": " + (item[2] as string) + "\\n"
+                jsonStr += "\n      \"toe\": " + (item[2] as string)
         )
-        jsonStr += "    }\\n"
+        jsonStr += "\n    }"
 
-        jsonStr += "  }\\n"
-        jsonStr += "}\\n"
+        jsonStr += "\n  }"
+        jsonStr += "\n}"
 
         -- Write to file
         local outFile = createFile filePath

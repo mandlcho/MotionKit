@@ -35,6 +35,23 @@ from core.localization import t
 TOOL_NAME = "Generate Foot Sync"
 
 
+def get_localized_message(key, *args):
+    """Get localized message with optional arguments"""
+    try:
+        return t(f'tools.foot_sync.{key}').format(*args) if args else t(f'tools.foot_sync.{key}')
+    except:
+        # Fallback to English if localization fails
+        fallbacks = {
+            'error_select_biped': 'Please select a Biped object!',
+            'error_no_nodes': 'Could not find biped foot/toe nodes!',
+            'error_access_nodes': 'Error accessing biped nodes. Make sure a Biped is selected!',
+            'error_no_root': 'Could not find root node for custom attributes!',
+            'error_pick_biped': 'Please pick a Biped object first!',
+            'success': 'Foot sync data generated successfully!'
+        }
+        return fallbacks.get(key, key)
+
+
 def validate_preset(name, preset):
     """
     Validate a character preset and return warnings/errors
@@ -325,7 +342,7 @@ struct FootSyncToolStruct
     (
         if bipedObj == undefined then
         (
-            messageBox "Please select a Biped object!" title:"Foot Sync Error"
+            messageBox (get_localized_message "error_select_biped") title:"Foot Sync Error"
             return undefined
         )
         
@@ -340,7 +357,7 @@ struct FootSyncToolStruct
             if csLeftFeet == undefined or csLeftToe == undefined or \\
                csRightFeet == undefined or csRightToe == undefined then
             (
-                messageBox "Could not find biped foot/toe nodes!" title:"Foot Sync Error"
+                messageBox (get_localized_message "error_no_nodes") title:"Foot Sync Error"
                 return undefined
             )
             
@@ -349,7 +366,7 @@ struct FootSyncToolStruct
         )
         catch
         (
-            messageBox "Error accessing biped nodes. Make sure a Biped is selected!" title:"Foot Sync Error"
+            messageBox (get_localized_message "error_access_nodes") title:"Foot Sync Error"
             return undefined
         )
     ),
@@ -631,7 +648,7 @@ struct FootSyncToolStruct
         
         if rootNode == undefined then
         (
-            messageBox "Could not find root node for custom attributes!" title:"Foot Sync Error"
+            messageBox (get_localized_message "error_no_root") title:"Foot Sync Error"
             return false
         )
         
@@ -650,7 +667,7 @@ struct FootSyncToolStruct
         format "[FootSync] Foot Sync Generation Complete!\\n"
         format "[FootSync] ================================================\\n"
         
-        messageBox "Foot sync data generated successfully!\\n\\nLeft Foot: " + (allLeftFeetKeys.count as string) + " keys\\nRight Foot: " + (allRightFeetKeys.count as string) + " keys" \\
+        messageBox ((get_localized_message "success") + "\\n\\nLeft Foot: " + (allLeftFeetKeys.count as string) + " keys\\nRight Foot: " + (allRightFeetKeys.count as string) + " keys") \\
             title:"Foot Sync Complete"
         
         return true
@@ -802,7 +819,7 @@ rollout FootSyncDialog "{title}" width:480 height:560
     (
         if bipedPicker.object == undefined then
         (
-            messageBox "Please pick a Biped object first!" title:"Foot Sync Error"
+            messageBox (get_localized_message "error_pick_biped") title:"Foot Sync Error"
             return false
         )
         

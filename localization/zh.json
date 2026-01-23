@@ -98,6 +98,35 @@
       "use_timeline": "使用时间轴范围",
       "export_selected": "导出动画"
     },
+    "foot_sync": {
+      "name": "生成脚步同步",
+      "title": "生成脚步同步 - MotionKit",
+      "error_select_biped": "请选择一个 Biped 对象！",
+      "error_no_nodes": "找不到 biped 脚趾/脚节点！",
+      "error_access_nodes": "访问 biped 节点时出错。请确保选择了 Biped！",
+      "error_no_root": "找不到用于自定义属性的根节点！",
+      "error_pick_biped": "请先选择一个 Biped 对象！",
+      "success": "脚步同步数据生成成功！"
+    },
+    "calibrate_foot_sync": {
+      "name": "校准脚步同步参数",
+      "title": "校准脚步同步参数 - MotionKit",
+      "error_select_biped": "请选择一个 Biped 对象！",
+      "error_no_nodes": "找不到 biped 脚趾/脚节点！",
+      "error_access_nodes": "访问 biped 节点时出错。请确保选择了 Biped！",
+      "error_no_results": "没有校准结果可导出！",
+      "error_pick_biped": "请先选择一个 Biped 对象！",
+      "error_enter_name": "请输入角色名称！",
+      "success_calibration": "校准完成！\\n\\n查看结果并点击 '导出到 JSON' 保存。",
+      "success_export": "校准数据已导出到：\\n{0}\\n\\n将内容复制到 config/foot_sync_presets.json"
+    },
+    "send_to_unreal": {
+      "name": "发送到虚幻引擎",
+      "title": "发送到虚幻引擎",
+      "error_no_selection": "请至少选择一个要发送到虚幻引擎的对象。",
+      "info_selected": "发送到虚幻引擎 - 已选择 {0} 个对象\\n\\n此功能需要虚幻引擎设置。",
+      "error": "错误：{0}"
+    },
     "root_anim_copy": {
       "name": "根节点动画拷贝",
       "title": "根节点动画拷贝 - MotionKit",

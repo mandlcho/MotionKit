@@ -44,7 +44,7 @@ def execute(control=None, event=None):
     except Exception as e:
         logger.error(f"Failed to open Calibrate Foot Sync: {str(e)}")
         rt.messageBox(
-            f"Failed to open Calibrate Foot Sync:\n{str(e)}",
+            f"Failed to open Calibrate Foot Sync: {str(e)}",
             title="MotionKit Error"
         )
 

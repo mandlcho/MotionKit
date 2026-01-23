@@ -9,6 +9,9 @@ __pycache__/
 # User-specific configuration (contains credentials)
 config/local_config.json
 
+# Character presets (may contain proprietary/NDA data)
+config/foot_sync_presets.json
+
 # MotionBuilder files
 *.mb~
 
@@ -17,3 +20,4 @@ config/local_config.json
 
 # Reverse engineered/proprietary code (DO NOT COMMIT)
 ANIMAX_EXTRACTED_FUNCTIONS.txt
+AniMax_Tools_Analysis.md

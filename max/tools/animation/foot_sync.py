@@ -304,6 +304,21 @@ class FootSyncDialog:
 
 global FootSyncTool
 
+-- Localization helper function
+fn get_localized_message key =
+(
+    case key of
+    (
+        "error_select_biped": "Please select a Biped object!"
+        "error_no_nodes": "Could not find biped foot/toe nodes!"
+        "error_access_nodes": "Error accessing biped nodes. Make sure a Biped is selected!"
+        "error_no_root": "Could not find root node for custom attributes!"
+        "error_pick_biped": "Please pick a Biped object first!"
+        "success": "Foot sync data generated successfully!"
+        default: key
+    )
+)
+
 struct FootSyncToolStruct
 (
     -- Character parameter presets

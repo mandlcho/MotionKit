@@ -724,7 +724,7 @@ def _export_current_file(start_frame, end_frame, export_path):
             logger.info(f"Exported: {export_file}")
 
             # Show completion notification
-            _show_export_notification([export_file])
+            # _show_export_notification([export_file])
 
         finally:
             rt.animationRange = rt.interval(original_start, original_end)
@@ -1009,7 +1009,8 @@ def _export_selected_files(start_frame, end_frame, export_path, source_directory
 
         # Show completion notification
         if exported_files:
-            _show_export_notification(exported_files)
+            # _show_export_notification(exported_files)
+            logger.info(f"Exported {len(exported_files)} files successfully")
         else:
             rt.messageBox("No files were exported!", title="Export Selected")
 
@@ -1164,7 +1165,8 @@ def _batch_export_directory(start_frame, end_frame, export_path):
 
         # Show completion notification
         if exported_files:
-            _show_export_notification(exported_files)
+            # _show_export_notification(exported_files)
+            logger.info(f"Batch export complete: {len(exported_files)} files exported")
         else:
             rt.messageBox("No files were exported!", title="Batch Export")
 
@@ -1294,10 +1296,10 @@ def _export_animation(name, start_frame, end_frame, objects_str):
             logger.info(f"Export completed for: {export_file}")
 
             # Show export notification
-            try:
-                _show_export_notification([export_file])
-            except Exception as e:
-                logger.error(f"Export notification error: {str(e)}")
+            # try:
+            #     _show_export_notification([export_file])
+            # except Exception as e:
+            #     logger.error(f"Export notification error: {str(e)}")
 
         finally:
             logger.debug("Restoring original scene state.")

@@ -88,6 +88,29 @@ class CalibrateFootSyncDialog:
 
 global CalibrateTool
 
+-- Localization helper function
+fn get_localized_message key arg1:undefined =
+(
+    local msg = case key of
+    (
+        "error_select_biped": "Please select a Biped object!"
+        "error_no_nodes": "Could not find biped foot/toe nodes!"
+        "error_access_nodes": "Error accessing biped nodes. Make sure a Biped is selected!"
+        "error_no_results": "No calibration results to export!"
+        "error_pick_biped": "Please pick a Biped object first!"
+        "error_enter_name": "Please enter a character name!"
+        "success_calibration": "Calibration complete!\\n\\nReview the results and click 'Export to JSON' to save."
+        "success_export": "Calibration data exported to:\\n{0}\\n\\nCopy the contents to config/foot_sync_presets.json"
+        default: key
+    )
+    
+    -- Replace {0} with arg1 if provided
+    if arg1 != undefined then
+        msg = substituteString msg "{0}" (arg1 as string)
+    
+    return msg
+)
+
 struct CalibrateToolStruct
 (
     -- Results storage
@@ -556,7 +579,7 @@ rollout CalibrateDialog "{title}" width:520 height:540
         (
             if CalibrateTool.exportToJson exportPath then
             (
-                messageBox (get_localized_message "success_export" exportPath) \\
+                messageBox (get_localized_message "success_export" arg1:exportPath) \\
                     title:"Export Complete"
                 statusLabel.text = "Exported: " + (filenameFromPath exportPath)
             )

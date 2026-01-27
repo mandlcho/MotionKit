@@ -155,6 +155,33 @@
       "success_copied": "Successfully copied {0} frames from CS Pelvis to Root bone!",
       "cancelled": "Animation copy cancelled at frame {0}",
       "height_calculated": "Height offset calculated: {0} units\n\nCS Pelvis Z: {1}\nRoot Z: {2}"
+    },
+    "extract_trajectory": {
+      "title": "Extract Animation Trajectory",
+      "description": "Extract animation data from objects and bake to dummy helpers",
+      "source_object": "Source Object",
+      "pick_object": "Pick Object",
+      "extraction_mode": "Extraction Mode",
+      "world_space": "World Space",
+      "relative_to_object": "Relative to Object",
+      "reference_object": "Reference Object:",
+      "pick_reference": "Pick Reference",
+      "components_to_extract": "Components to Extract",
+      "position": "Position",
+      "rotation": "Rotation",
+      "frame_range": "Frame Range",
+      "use_timeline": "Use Timeline Range",
+      "output": "Output",
+      "helper_name": "Helper Name:",
+      "show_preview": "Show Trajectory Preview",
+      "preview_btn": "Preview Trajectory",
+      "extract_btn": "Extract & Bake",
+      "error_no_source": "Please pick a source object first!",
+      "error_no_reference": "Please pick a reference object for relative mode!",
+      "error_no_components": "Please enable at least Position or Rotation!",
+      "error_no_name": "Please enter a name for the helper object!",
+      "error_need_position": "Position must be enabled to preview trajectory!",
+      "success_extracted": "Trajectory extracted successfully!\n\nHelper created: {0}\n\nYou can now use 'Apply Animation Trajectory' to apply this to another object."
     }
   },
   "about": {

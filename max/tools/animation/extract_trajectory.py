@@ -218,9 +218,9 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
     group "Source Object"
     (
         label sourceLbl "Object to Extract:" pos:[20,20] width:120 align:#left
-        pickbutton sourcePickBtn "Pick Object" pos:[20,38] width:100 height:24
-        button sourceSelBtn "Use Selected" pos:[130,38] width:90 height:24
-        edittext sourceEdit "" pos:[230,38] width:160 height:20 readOnly:true
+        pickbutton sourcePickBtn "Pick Object" pos:[20,40] width:100 height:24
+        button sourceSelBtn "Use Selected" pos:[130,40] width:90 height:24
+        edittext sourceEdit "" pos:[230,40] width:160 height:20 readOnly:true
     )
     
     -- Extraction Mode
@@ -228,38 +228,38 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
     (
         radiobuttons modeRadio labels:#("World Space", "Relative to Object") pos:[20,95] default:1
         
-        label refLbl "Reference Object:" pos:[40,135] width:120 align:#left enabled:false
-        pickbutton refPickBtn "Pick Reference" pos:[40,153] width:120 height:24 enabled:false
-        button refSelBtn "Use Selected" pos:[170,153] width:90 height:24 enabled:false
-        edittext refEdit "" pos:[270,153] width:120 height:20 readOnly:true enabled:false
+        label refLbl "Reference Object:" pos:[40,137] width:120 align:#left enabled:false
+        pickbutton refPickBtn "Pick Reference" pos:[40,155] width:120 height:24 enabled:false
+        button refSelBtn "Use Selected" pos:[170,155] width:90 height:24 enabled:false
+        edittext refEdit "" pos:[270,155] width:120 height:20 readOnly:true enabled:false
     )
     
     -- Components to Extract
     group "Components to Extract"
     (
-        checkbox posCheck "Position" pos:[20,215] checked:true
-        checkbox rotCheck "Rotation" pos:[120,215] checked:true
+        checkbox posCheck "Position" pos:[20,217] checked:true
+        checkbox rotCheck "Rotation" pos:[120,217] checked:true
     )
     
     -- Frame Range
     group "Frame Range"
     (
-        label startLbl "Start:" pos:[20,265] width:40 align:#left
-        spinner startSpn "" pos:[65,263] width:80 height:20 type:#integer range:[-100000,100000,{start_frame}]
+        label startLbl "Start:" pos:[20,267] width:40 align:#left
+        spinner startSpn "" pos:[65,265] width:80 height:20 type:#integer range:[-100000,100000,{start_frame}]
         
-        label endLbl "End:" pos:[160,265] width:30 align:#left
-        spinner endSpn "" pos:[195,263] width:80 height:20 type:#integer range:[-100000,100000,{end_frame}]
+        label endLbl "End:" pos:[160,267] width:30 align:#left
+        spinner endSpn "" pos:[195,265] width:80 height:20 type:#integer range:[-100000,100000,{end_frame}]
         
-        checkbox useTimelineCB "Use Timeline Range" pos:[290,265] checked:true width:120
+        checkbox useTimelineCB "Use Timeline Range" pos:[290,267] checked:true width:120
     )
     
     -- Output Options
     group "Output"
     (
-        label nameLbl "Helper Name:" pos:[20,315] width:80 align:#left
-        edittext nameEdit "" pos:[110,313] width:280 height:20
+        label nameLbl "Helper Name:" pos:[20,317] width:80 align:#left
+        edittext nameEdit "" pos:[110,315] width:280 height:20
         
-        checkbox previewCheck "Show Trajectory Preview" pos:[20,340] checked:true
+        checkbox previewCheck "Show Trajectory Preview" pos:[20,342] checked:true
     )
     
     -- Progress

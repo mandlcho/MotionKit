@@ -269,72 +269,70 @@ struct ExtractTrajectoryToolStruct
 ExtractTrajectoryTool = ExtractTrajectoryToolStruct()
 
 -- Dialog rollout
-rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:700 height:520
+rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:600 height:520
 (
     -- Left side: Trajectory Manager
     group "Trajectory Manager"
     (
         label trajLbl "Trajectories in Scene:" pos:[15,20] width:200 align:#left
-        multiListBox trajList "" pos:[15,40] width:230 height:19
+        multiListBox trajList "" pos:[15,40] width:210 height:19
         
-        button btnSelect "Select in Scene" pos:[15,355] width:110 height:26
-        button btnRefresh "Refresh List" pos:[135,355] width:110 height:26
+        button btnSelect "Select in Scene" pos:[15,355] width:100 height:26
+        button btnRefresh "Refresh List" pos:[125,355] width:100 height:26
         
-        button btnRebake "Re-Bake" pos:[15,387] width:110 height:26
-        button btnDelete "Delete" pos:[135,387] width:110 height:26
+        button btnRebake "Re-Bake" pos:[15,387] width:100 height:26
+        button btnDelete "Delete" pos:[125,387] width:100 height:26
     )
     
     -- Right side: Extract New Trajectory
     group "Extract New Trajectory"
     (
         -- Source Object
-        label sourceLbl "Source Object:" pos:[270,20] width:100 align:#left
-        pickbutton sourcePickBtn "Pick Object" pos:[270,42] width:100 height:26
-        button sourceSelBtn "Use Selected" pos:[380,42] width:100 height:26
-        edittext sourceEdit "" pos:[270,72] width:210 height:20 readOnly:true
+        label sourceLbl "Source Object:" pos:[250,20] width:100 align:#left
+        pickbutton sourcePickBtn "Pick Object" pos:[250,42] width:100 height:26
+        button sourceSelBtn "Use Selected" pos:[360,42] width:100 height:26
+        edittext sourceEdit "" pos:[250,72] width:210 height:20 readOnly:true
         
         -- Extraction Mode
-        label modeLbl "Mode:" pos:[270,100] width:50 align:#left
-        radiobuttons modeRadio labels:#("World Space", "Relative to Object") pos:[320,98] default:1
+        label modeLbl "Mode:" pos:[250,100] width:50 align:#left
+        radiobuttons modeRadio labels:#("World Space", "Relative to Object") pos:[300,98] default:1
         
         -- Reference Object (indented, initially disabled)
-        label refLbl "Reference Object:" pos:[290,145] width:120 align:#left enabled:false
-        pickbutton refPickBtn "Pick Reference" pos:[290,167] width:100 height:26 enabled:false
-        button refSelBtn "Use Selected" pos:[400,167] width:100 height:26 enabled:false
-        edittext refEdit "" pos:[290,197] width:190 height:20 readOnly:true enabled:false
+        label refLbl "Reference Object:" pos:[270,145] width:120 align:#left enabled:false
+        pickbutton refPickBtn "Pick Reference" pos:[270,167] width:100 height:26 enabled:false
+        button refSelBtn "Use Selected" pos:[380,167] width:100 height:26 enabled:false
+        edittext refEdit "" pos:[270,197] width:190 height:20 readOnly:true enabled:false
         
         -- Components
-        label compLbl "Extract Components:" pos:[270,225] width:120 align:#left
-        checkbox posCheck "Position" pos:[270,247] checked:true
-        checkbox rotCheck "Rotation" pos:[360,247] checked:true
+        label compLbl "Extract Components:" pos:[250,225] width:120 align:#left
+        checkbox posCheck "Position" pos:[250,247] checked:true
+        checkbox rotCheck "Rotation" pos:[340,247] checked:true
         
         -- Frame Range
-        label rangeLbl "Frame Range:" pos:[270,272] width:80 align:#left
-        label startLbl "Start:" pos:[270,294] width:40 align:#left
-        spinner startSpn "" pos:[315,292] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}]
+        label rangeLbl "Frame Range:" pos:[250,272] width:80 align:#left
+        label startLbl "Start:" pos:[250,294] width:40 align:#left
+        spinner startSpn "" pos:[295,292] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}]
         
-        label endLbl "End:" pos:[400,294] width:30 align:#left
-        spinner endSpn "" pos:[435,292] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}]
+        label endLbl "End:" pos:[380,294] width:30 align:#left
+        spinner endSpn "" pos:[415,292] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}]
         
-        checkbox useTimelineCB "Use Timeline Range" pos:[520,294] checked:true width:150
+        checkbox useTimelineCB "Use Timeline Range" pos:[250,317] checked:true width:150
         
         -- Output
-        label nameLbl "Helper Name:" pos:[270,322] width:80 align:#left
-        edittext nameEdit "" pos:[360,320] width:310 height:20
+        label nameLbl "Helper Name:" pos:[250,342] width:80 align:#left
+        edittext nameEdit "" pos:[340,340] width:240 height:20
         
-        checkbox previewCheck "Show Trajectory Preview" pos:[270,347] checked:true
-        
-        -- Action Buttons
-        button previewBtn "Preview Trajectory" pos:[270,375] width:130 height:28
-        button extractBtn "Extract & Bake" pos:[410,375] width:130 height:28
+        checkbox previewCheck "Show Trajectory Preview" pos:[250,367] checked:true
     )
     
     -- Progress Bar
-    progressBar extractProgress "" pos:[20,430] width:660 height:14 value:0 color:(color 100 150 255)
-    label statusLabel "" pos:[20,450] width:660 height:20 align:#center
+    progressBar extractProgress "" pos:[20,420] width:560 height:14 value:0 color:(color 100 150 255)
+    label statusLabel "" pos:[20,440] width:560 height:20 align:#center
     
-    -- Close Button
-    button closeBtn "Close" pos:[295,480] width:110 height:32
+    -- Main Action Buttons (centered at bottom)
+    button previewBtn "Preview Trajectory" pos:[70,470] width:140 height:32
+    button extractBtn "Extract & Bake" pos:[230,470] width:140 height:32
+    button closeBtn "Close" pos:[390,470] width:140 height:32
     
     -- Initialize dialog
     on ExtractTrajectoryDialog open do

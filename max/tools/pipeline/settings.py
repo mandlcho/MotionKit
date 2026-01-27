@@ -112,13 +112,20 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:280
         button btnLoadWorkspaces "{load_workspaces}" width:150 height:24 align:#left
         button btnTestConnection "{test_connection}" width:150 height:24 align:#left offset:[160, -28]
 
-        label lblStatus "{status} {status_not_connected}" align:#left
+        label lblStatusDot "●" align:#left across:2 offset:[0,2]
+        label lblStatus "{status} {status_not_connected}" align:#left offset:[5,0]
     )
 
     -- Buttons
     button btnSave "{save}" width:80 height:28 pos:[180, 240]
     button btnApplyClose "{save_close}" width:110 height:28 pos:[270, 240]
     button btnCancel "{cancel}" width:80 height:28 pos:[390, 240]
+
+    -- Initialize status dot color (red = not connected)
+    on MotionKitSettingsRollout open do
+    (
+        lblStatusDot.color = (color 220 60 60)
+    )
 
     -- Event handlers
     on btnLoadWorkspaces pressed do
@@ -145,6 +152,7 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:280
         if server == "" or user == "" or workspace == "(Not loaded)" then
         (
             messageBox "{error_fill_all}" title:"{title}"
+            lblStatusDot.color = (color 220 60 60)  -- Red
         )
         else
         (
@@ -154,6 +162,7 @@ rollout MotionKitSettingsRollout "{title}" width:480 height:280
             python.execute ("import os; os.environ['P4CLIENT'] = '" + workspace + "'")
 
             lblStatus.text = "{status} {status_connected}"
+            lblStatusDot.color = (color 60 220 60)  -- Green
             local msg = substituteString "{p4_configured}" "{{0}}" server
             msg = substituteString msg "{{1}}" user
             msg = substituteString msg "{{2}}" workspace

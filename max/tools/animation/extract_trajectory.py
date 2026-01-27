@@ -228,10 +228,10 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
     (
         radiobuttons modeRadio labels:#("World Space", "Relative to Object") pos:[20,95] default:1
         
-        label refLbl "Reference Object:" pos:[40,137] width:120 align:#left enabled:false
+        label refLbl "Reference Object:" pos:[40,135] width:120 align:#left enabled:false
         pickbutton refPickBtn "Pick Reference" pos:[40,155] width:120 height:24 enabled:false
         button refSelBtn "Use Selected" pos:[170,155] width:90 height:24 enabled:false
-        edittext refEdit "" pos:[270,155] width:120 height:20 readOnly:true enabled:false
+        edittext refEdit "" pos:[270,157] width:120 height:20 readOnly:true enabled:false
     )
     
     -- Components to Extract

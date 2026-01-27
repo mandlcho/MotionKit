@@ -218,9 +218,9 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
     group "Source Object"
     (
         label sourceLbl "Object to Extract:" pos:[20,20] width:120 align:#left
-        pickbutton sourcePickBtn "Pick Object" pos:[20,40] width:100 height:24
-        button sourceSelBtn "Use Selected" pos:[130,40] width:90 height:24
-        edittext sourceEdit "" pos:[230,40] width:160 height:20 readOnly:true
+        pickbutton sourcePickBtn "Pick Object" pos:[20,42] width:100 height:24
+        button sourceSelBtn "Use Selected" pos:[130,42] width:90 height:24
+        edittext sourceEdit "" pos:[230,44] width:160 height:20 readOnly:true
     )
     
     -- Extraction Mode
@@ -267,9 +267,9 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
     label statusLabel "" pos:[20,388] width:380 height:20 align:#center
     
     -- Buttons
-    button previewBtn "Preview Trajectory" pos:[20,410] width:120 height:26
-    button extractBtn "Extract & Bake" pos:[150,410] width:120 height:26
-    button closeBtn "Close" pos:[280,410] width:120 height:26
+    button previewBtn "Preview Trajectory" pos:[30,410] width:120 height:26
+    button extractBtn "Extract & Bake" pos:[160,410] width:120 height:26
+    button closeBtn "Close" pos:[290,410] width:120 height:26
     
     -- Update timeline spinners when checkbox changes
     on useTimelineCB changed state do

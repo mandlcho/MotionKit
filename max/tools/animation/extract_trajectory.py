@@ -205,6 +205,63 @@ struct ExtractTrajectoryToolStruct
         if this.previewSpline != undefined and isValidNode this.previewSpline then
             delete this.previewSpline
         this.previewSpline = undefined
+    ),
+    
+    -- Find all trajectory helpers in scene
+    fn findAllTrajectories =
+    (
+        local trajectories = #()
+        for obj in objects do
+        (
+            if classOf obj == Dummy then
+            (
+                -- Check if it has TrajectoryData custom attributes
+                if custAttributes.count obj > 0 then
+                (
+                    for i = 1 to custAttributes.count obj do
+                    (
+                        local ca = custAttributes.get obj i
+                        if ca.name == "TrajectoryData" then
+                        (
+                            append trajectories obj
+                            exit
+                        )
+                    )
+                )
+            )
+        )
+        return trajectories
+    ),
+    
+    -- Get trajectory info string
+    fn getTrajectoryInfo traj =
+    (
+        local info = traj.name
+        if custAttributes.count traj > 0 then
+        (
+            for i = 1 to custAttributes.count traj do
+            (
+                local ca = custAttributes.get traj i
+                if ca.name == "TrajectoryData" then
+                (
+                    local mode = if traj.isRelative then " (Relative)" else " (World)"
+                    info = traj.name + mode
+                    exit
+                )
+            )
+        )
+        return info
+    ),
+    
+    -- Delete trajectory helper
+    fn deleteTrajectory traj =
+    (
+        if traj != undefined and isValidNode traj then
+        (
+            delete traj
+            return true
+        )
+        return false
     )
 )
 
@@ -212,64 +269,220 @@ struct ExtractTrajectoryToolStruct
 ExtractTrajectoryTool = ExtractTrajectoryToolStruct()
 
 -- Dialog rollout
-rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:440
+rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:650 height:500
 (
-    -- Source Object
-    group "Source Object"
+    -- Left side: Trajectory Manager
+    group "Trajectory Manager"
     (
-        label sourceLbl "Object to Extract:" pos:[20,20] width:120 align:#left
-        pickbutton sourcePickBtn "Pick Object" pos:[20,42] width:100 height:24
-        button sourceSelBtn "Use Selected" pos:[130,42] width:90 height:24
-        edittext sourceEdit "" pos:[230,44] width:160 height:20 readOnly:true
+        label trajLbl "Trajectories in Scene:" pos:[20,20] width:200 align:#left
+        multiListBox trajList "" pos:[20,40] width:200 height:18
+        
+        button btnSelect "Select in Scene" pos:[20,330] width:95 height:24
+        button btnRefresh "Refresh List" pos:[125,330] width:95 height:24
+        
+        button btnRebake "Re-Bake" pos:[20,360] width:95 height:24
+        button btnDelete "Delete" pos:[125,360] width:95 height:24
     )
     
-    -- Extraction Mode
-    group "Extraction Mode"
+    -- Right side: Extract New Trajectory
+    group "Extract New Trajectory"
     (
-        radiobuttons modeRadio labels:#("World Space", "Relative to Object") pos:[20,95] default:1
+        label sourceLbl "Source Object:" pos:[250,20] width:100 align:#left
+        pickbutton sourcePickBtn "Pick" pos:[250,42] width:70 height:24
+        button sourceSelBtn "Use Selected" pos:[330,42] width:90 height:24
+        edittext sourceEdit "" pos:[250,70] width:170 height:20 readOnly:true
         
-        label refLbl "Reference Object:" pos:[40,135] width:120 align:#left enabled:false
-        pickbutton refPickBtn "Pick Reference" pos:[40,155] width:120 height:24 enabled:false
-        button refSelBtn "Use Selected" pos:[170,155] width:90 height:24 enabled:false
-        edittext refEdit "" pos:[270,157] width:120 height:20 readOnly:true enabled:false
-    )
-    
-    -- Components to Extract
-    group "Components to Extract"
-    (
-        checkbox posCheck "Position" pos:[20,217] checked:true
-        checkbox rotCheck "Rotation" pos:[120,217] checked:true
-    )
-    
-    -- Frame Range
-    group "Frame Range"
-    (
-        label startLbl "Start:" pos:[20,267] width:40 align:#left
-        spinner startSpn "" pos:[65,265] width:80 height:20 type:#integer range:[-100000,100000,{start_frame}]
+        radiobuttons modeRadio labels:#("World Space", "Relative to Object") pos:[250,100] default:1
         
-        label endLbl "End:" pos:[160,267] width:30 align:#left
-        spinner endSpn "" pos:[195,265] width:80 height:20 type:#integer range:[-100000,100000,{end_frame}]
+        label refLbl "Reference:" pos:[270,140] width:80 align:#left enabled:false
+        pickbutton refPickBtn "Pick" pos:[270,160] width:70 height:24 enabled:false
+        button refSelBtn "Use Selected" pos:[350,160] width:90 height:24 enabled:false
+        edittext refEdit "" pos:[270,188] width:170 height:20 readOnly:true enabled:false
         
-        checkbox useTimelineCB "Use Timeline Range" pos:[290,267] checked:true width:120
-    )
-    
-    -- Output Options
-    group "Output"
-    (
-        label nameLbl "Helper Name:" pos:[20,317] width:80 align:#left
-        edittext nameEdit "" pos:[110,315] width:280 height:20
+        checkbox posCheck "Position" pos:[250,220] checked:true
+        checkbox rotCheck "Rotation" pos:[330,220] checked:true
         
-        checkbox previewCheck "Show Trajectory Preview" pos:[20,342] checked:true
+        label startLbl "Start:" pos:[250,250] width:40 align:#left
+        spinner startSpn "" pos:[295,248] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}]
+        
+        label endLbl "End:" pos:[380,250] width:30 align:#left
+        spinner endSpn "" pos:[415,248] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}]
+        
+        checkbox useTimelineCB "Use Timeline" pos:[500,250] checked:true width:130
+        
+        label nameLbl "Name:" pos:[250,280] width:40 align:#left
+        edittext nameEdit "" pos:[295,278] width:335 height:20
+        
+        checkbox previewCheck "Show Preview" pos:[250,305] checked:true
+        
+        button previewBtn "Preview" pos:[250,335] width:85 height:26
+        button extractBtn "Extract & Bake" pos:[345,335] width:140 height:26
     )
     
     -- Progress
-    progressBar extractProgress "" pos:[20,370] width:380 height:12 value:0 color:(color 100 150 255)
-    label statusLabel "" pos:[20,388] width:380 height:20 align:#center
+    progressBar extractProgress "" pos:[20,400] width:610 height:12 value:0 color:(color 100 150 255)
+    label statusLabel "" pos:[20,418] width:610 height:20 align:#center
     
-    -- Buttons
-    button previewBtn "Preview Trajectory" pos:[30,410] width:120 height:26
-    button extractBtn "Extract & Bake" pos:[160,410] width:120 height:26
-    button closeBtn "Close" pos:[290,410] width:120 height:26
+    -- Close button
+    button closeBtn "Close" pos:[270,460] width:110 height:30
+    
+    -- Initialize dialog
+    on ExtractTrajectoryDialog open do
+    (
+        -- Disable timeline spinners by default
+        startSpn.enabled = false
+        endSpn.enabled = false
+        
+        -- Refresh trajectory list
+        local trajectories = ExtractTrajectoryTool.findAllTrajectories()
+        local trajNames = #()
+        for traj in trajectories do
+        (
+            append trajNames (ExtractTrajectoryTool.getTrajectoryInfo traj)
+        )
+        trajList.items = trajNames
+    )
+    
+    -- Refresh trajectory list
+    on btnRefresh pressed do
+    (
+        local trajectories = ExtractTrajectoryTool.findAllTrajectories()
+        local trajNames = #()
+        for traj in trajectories do
+        (
+            append trajNames (ExtractTrajectoryTool.getTrajectoryInfo traj)
+        )
+        trajList.items = trajNames
+        statusLabel.text = "Found " + (trajectories.count as string) + " trajectories"
+    )
+    
+    -- Select trajectory in scene
+    on btnSelect pressed do
+    (
+        if trajList.selection == 0 then
+        (
+            messageBox "Please select a trajectory from the list!" title:"Trajectory Manager"
+            return false
+        )
+        
+        local trajectories = ExtractTrajectoryTool.findAllTrajectories()
+        if trajList.selection > 0 and trajList.selection <= trajectories.count then
+        (
+            local traj = trajectories[trajList.selection]
+            select traj
+            statusLabel.text = "Selected: " + traj.name
+        )
+    )
+    
+    -- Re-bake selected trajectory
+    on btnRebake pressed do
+    (
+        if trajList.selection == 0 then
+        (
+            messageBox "Please select a trajectory from the list!" title:"Trajectory Manager"
+            return false
+        )
+        
+        local trajectories = ExtractTrajectoryTool.findAllTrajectories()
+        if trajList.selection > 0 and trajList.selection <= trajectories.count then
+        (
+            local traj = trajectories[trajList.selection]
+            
+            -- Get stored metadata
+            local srcName = traj.sourceName
+            local refName = traj.referenceName
+            local isRel = traj.isRelative
+            local hasPos = traj.hasPosition
+            local hasRot = traj.hasRotation
+            local startF = traj.extractStartFrame
+            local endF = traj.extractEndFrame
+            
+            -- Find source and reference objects
+            local srcObj = getNodeByName srcName
+            local refObj = if refName != "" then getNodeByName refName else undefined
+            
+            if srcObj == undefined then
+            (
+                messageBox ("Source object '" + srcName + "' not found in scene!") title:"Re-Bake Error"
+                return false
+            )
+            
+            if isRel and refObj == undefined then
+            (
+                messageBox ("Reference object '" + refName + "' not found in scene!") title:"Re-Bake Error"
+                return false
+            )
+            
+            -- Delete old animation keys
+            deleteKeys traj
+            
+            -- Re-bake animation
+            statusLabel.text = "Re-baking trajectory..."
+            with animate on
+            (
+                for f = startF to endF do
+                (
+                    at time f
+                    (
+                        if isRel then
+                        (
+                            local refTM = refObj.transform
+                            local srcTM = srcObj.transform
+                            local relativeTM = srcTM * (inverse refTM)
+                            
+                            if hasPos then
+                                traj.pos = relativeTM.translation
+                            if hasRot then
+                                traj.rotation = relativeTM.rotation
+                        )
+                        else
+                        (
+                            if hasPos then
+                                traj.pos = srcObj.pos
+                            if hasRot then
+                                traj.rotation = srcObj.rotation
+                        )
+                    )
+                )
+            )
+            
+            statusLabel.text = "Re-baked: " + traj.name
+        )
+    )
+    
+    -- Delete selected trajectory
+    on btnDelete pressed do
+    (
+        if trajList.selection == 0 then
+        (
+            messageBox "Please select a trajectory from the list!" title:"Trajectory Manager"
+            return false
+        )
+        
+        local trajectories = ExtractTrajectoryTool.findAllTrajectories()
+        if trajList.selection > 0 and trajList.selection <= trajectories.count then
+        (
+            local traj = trajectories[trajList.selection]
+            local trajName = traj.name
+            
+            if queryBox ("Delete trajectory '" + trajName + "'?") title:"Confirm Delete" then
+            (
+                if ExtractTrajectoryTool.deleteTrajectory traj then
+                (
+                    statusLabel.text = "Deleted: " + trajName
+                    
+                    -- Refresh list
+                    trajectories = ExtractTrajectoryTool.findAllTrajectories()
+                    local trajNames = #()
+                    for t in trajectories do
+                    (
+                        append trajNames (ExtractTrajectoryTool.getTrajectoryInfo t)
+                    )
+                    trajList.items = trajNames
+                )
+            )
+        )
+    )
     
     -- Update timeline spinners when checkbox changes
     on useTimelineCB changed state do
@@ -477,6 +690,16 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
         if helper != undefined then
         (
             statusLabel.text = "Extraction complete!"
+            
+            -- Refresh trajectory list
+            local trajectories = ExtractTrajectoryTool.findAllTrajectories()
+            local trajNames = #()
+            for traj in trajectories do
+            (
+                append trajNames (ExtractTrajectoryTool.getTrajectoryInfo traj)
+            )
+            trajList.items = trajNames
+            
             messageBox ("Trajectory extracted successfully!\\n\\n" + \\
                        "Helper created: " + helper.name + "\\n\\n" + \\
                        "You can now use 'Apply Animation Trajectory' to apply this to another object.") \\
@@ -506,14 +729,6 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
     on ExtractTrajectoryDialog close do
     (
         ExtractTrajectoryTool.cleanupPreview()
-    )
-    
-    -- Initialize dialog
-    on ExtractTrajectoryDialog open do
-    (
-        -- Disable timeline spinners by default
-        startSpn.enabled = false
-        endSpn.enabled = false
     )
 )
 

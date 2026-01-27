@@ -161,6 +161,7 @@
       "description": "Extract animation data from objects and bake to dummy helpers",
       "source_object": "Source Object",
       "pick_object": "Pick Object",
+      "use_selected": "Use Selected",
       "extraction_mode": "Extraction Mode",
       "world_space": "World Space",
       "relative_to_object": "Relative to Object",
@@ -181,6 +182,8 @@
       "error_no_components": "Please enable at least Position or Rotation!",
       "error_no_name": "Please enter a name for the helper object!",
       "error_need_position": "Position must be enabled to preview trajectory!",
+      "error_no_selection": "Please select an object in the viewport first!",
+      "error_multiple_selection": "Please select only one object!",
       "success_extracted": "Trajectory extracted successfully!\n\nHelper created: {0}\n\nYou can now use 'Apply Animation Trajectory' to apply this to another object."
     }
   },

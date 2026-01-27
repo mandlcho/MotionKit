@@ -219,7 +219,8 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
     (
         label sourceLbl "Object to Extract:" pos:[20,20] width:120 align:#left
         pickbutton sourcePickBtn "Pick Object" pos:[20,38] width:100 height:24
-        edittext sourceEdit "" pos:[130,38] width:260 height:20 readOnly:true
+        button sourceSelBtn "Use Selected" pos:[130,38] width:90 height:24
+        edittext sourceEdit "" pos:[230,38] width:160 height:20 readOnly:true
     )
     
     -- Extraction Mode
@@ -229,7 +230,8 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
         
         label refLbl "Reference Object:" pos:[40,135] width:120 align:#left enabled:false
         pickbutton refPickBtn "Pick Reference" pos:[40,153] width:120 height:24 enabled:false
-        edittext refEdit "" pos:[170,153] width:220 height:20 readOnly:true enabled:false
+        button refSelBtn "Use Selected" pos:[170,153] width:90 height:24 enabled:false
+        edittext refEdit "" pos:[270,153] width:120 height:20 readOnly:true enabled:false
     )
     
     -- Components to Extract
@@ -292,6 +294,7 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
         local isRelative = (state == 2)
         refLbl.enabled = isRelative
         refPickBtn.enabled = isRelative
+        refSelBtn.enabled = isRelative
         refEdit.enabled = isRelative
     )
     
@@ -306,9 +309,53 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:420 height:
             nameEdit.text = obj.name + "_Trajectory"
     )
     
+    -- Use selected source object
+    on sourceSelBtn pressed do
+    (
+        if selection.count == 0 then
+        (
+            messageBox "Please select an object in the viewport first!" title:"Extract Trajectory"
+            return false
+        )
+        
+        if selection.count > 1 then
+        (
+            messageBox "Please select only one object!" title:"Extract Trajectory"
+            return false
+        )
+        
+        local obj = selection[1]
+        ExtractTrajectoryTool.sourceObj = obj
+        sourceEdit.text = obj.name
+        
+        -- Auto-generate output name
+        if nameEdit.text == "" then
+            nameEdit.text = obj.name + "_Trajectory"
+    )
+    
     -- Pick reference object
     on refPickBtn picked obj do
     (
+        ExtractTrajectoryTool.referenceObj = obj
+        refEdit.text = obj.name
+    )
+    
+    -- Use selected reference object
+    on refSelBtn pressed do
+    (
+        if selection.count == 0 then
+        (
+            messageBox "Please select an object in the viewport first!" title:"Extract Trajectory"
+            return false
+        )
+        
+        if selection.count > 1 then
+        (
+            messageBox "Please select only one object!" title:"Extract Trajectory"
+            return false
+        )
+        
+        local obj = selection[1]
         ExtractTrajectoryTool.referenceObj = obj
         refEdit.text = obj.name
     )

@@ -168,17 +168,12 @@ class DCCKitInstaller:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("DCCKit Installer")
-        self.root.geometry("450x620")
+        self.root.title("MotionKit Installer")
+        self.root.geometry("450x520")
         self.root.resizable(False, False)
 
-        # Dark theme colors - all white text
-        self.bg_color = "#2b2b2b"
-        self.fg_color = "#ffffff"
-        self.accent_color = "#0d7377"
-
-        # Configure root
-        self.root.configure(bg=self.bg_color)
+        # Use default system colors - no custom theming
+        # Don't configure root background - use system default
 
         # Language
         self.current_language = tk.StringVar(value="EN")
@@ -258,24 +253,22 @@ class DCCKitInstaller:
 
     def create_ui(self):
         """Create the user interface."""
-        # Main container
-        main_frame = tk.Frame(self.root, bg=self.bg_color)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        # Main container with padding
+        main_frame = tk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Header with language selector
-        header_frame = tk.Frame(main_frame, bg=self.bg_color)
-        header_frame.pack(fill=tk.X, pady=(0, 10))
+        # Header section
+        header_frame = tk.Frame(main_frame)
+        header_frame.pack(fill=tk.X, pady=(0, 5))
 
-        # Left side - title
-        title_frame = tk.Frame(header_frame, bg=self.bg_color)
+        # Left side - title and version
+        title_frame = tk.Frame(header_frame)
         title_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         self.title_label = tk.Label(
             title_frame,
             text=self.get_text('title'),
             font=("Arial", 14, "bold"),
-            bg=self.bg_color,
-            fg=self.fg_color,
             anchor=tk.W
         )
         self.title_label.pack(anchor=tk.W)
@@ -284,8 +277,6 @@ class DCCKitInstaller:
             title_frame,
             text=f"{self.get_text('version')} {self.version}",
             font=("Arial", 8),
-            bg=self.bg_color,
-            fg=self.fg_color,
             anchor=tk.W
         )
         self.version_label.pack(anchor=tk.W)
@@ -294,22 +285,18 @@ class DCCKitInstaller:
             title_frame,
             text=self.get_text('subtitle'),
             font=("Arial", 8),
-            bg=self.bg_color,
-            fg=self.fg_color,
             anchor=tk.W
         )
         self.subtitle_label.pack(anchor=tk.W)
 
         # Right side - language selector
-        lang_frame = tk.Frame(header_frame, bg=self.bg_color)
+        lang_frame = tk.Frame(header_frame)
         lang_frame.pack(side=tk.RIGHT)
 
         self.lang_label = tk.Label(
             lang_frame,
             text=self.get_text('language'),
-            font=("Arial", 8),
-            bg=self.bg_color,
-            fg=self.fg_color
+            font=("Arial", 8)
         )
         self.lang_label.pack(side=tk.LEFT, padx=(0, 5))
 
@@ -324,7 +311,7 @@ class DCCKitInstaller:
         lang_combo.pack(side=tk.LEFT)
 
         # Separator
-        sep1 = tk.Frame(main_frame, height=1, bg="#404040")
+        sep1 = tk.Frame(main_frame, height=2, relief=tk.SUNKEN, bd=1)
         sep1.pack(fill=tk.X, pady=5)
 
         # DCC Detection with checkboxes
@@ -332,25 +319,21 @@ class DCCKitInstaller:
             main_frame,
             text=self.get_text('dcc_detected'),
             font=("Arial", 10, "bold"),
-            bg=self.bg_color,
-            fg=self.fg_color,
             anchor=tk.W
         )
-        self.dcc_label.pack(anchor=tk.W, pady=(5, 5))
+        self.dcc_label.pack(anchor=tk.W, pady=(3, 2))
 
         self.install_to_label = tk.Label(
             main_frame,
             text=self.get_text('install_to'),
             font=("Arial", 8),
-            bg=self.bg_color,
-            fg=self.fg_color,
             anchor=tk.W
         )
-        self.install_to_label.pack(anchor=tk.W, pady=(0, 5))
+        self.install_to_label.pack(anchor=tk.W, pady=(0, 3))
 
         # DCC Checkboxes frame
-        dcc_frame = tk.Frame(main_frame, bg="#1e1e1e", relief=tk.FLAT)
-        dcc_frame.pack(fill=tk.X, pady=(0, 10))
+        dcc_frame = tk.Frame(main_frame, relief=tk.GROOVE, bd=2)
+        dcc_frame.pack(fill=tk.X, pady=(0, 5))
 
         # MotionBuilder
         if self.detected_dccs['motionbuilder']:
@@ -363,20 +346,14 @@ class DCCKitInstaller:
                     text=f"  ✓ {dcc['name']}",
                     variable=var,
                     font=("Arial", 9),
-                    bg="#1e1e1e",
-                    fg=self.fg_color,
-                    selectcolor="#1e1e1e",
-                    activebackground="#1e1e1e",
-                    activeforeground=self.fg_color
+
                 )
                 cb.pack(anchor=tk.W, padx=5, pady=2)
         else:
             lbl = tk.Label(
                 dcc_frame,
                 text="  ✗ MotionBuilder not detected",
-                font=("Arial", 9),
-                bg="#1e1e1e",
-                fg=self.fg_color
+                font=("Arial", 9)
             )
             lbl.pack(anchor=tk.W, padx=5, pady=2)
 
@@ -391,26 +368,20 @@ class DCCKitInstaller:
                     text=f"  ✓ {dcc['name']}",
                     variable=var,
                     font=("Arial", 9),
-                    bg="#1e1e1e",
-                    fg=self.fg_color,
-                    selectcolor="#1e1e1e",
-                    activebackground="#1e1e1e",
-                    activeforeground=self.fg_color
+
                 )
                 cb.pack(anchor=tk.W, padx=5, pady=2)
         else:
             lbl = tk.Label(
                 dcc_frame,
                 text="  ✗ 3ds Max not detected",
-                font=("Arial", 9),
-                bg="#1e1e1e",
-                fg=self.fg_color
+                font=("Arial", 9)
             )
             lbl.pack(anchor=tk.W, padx=5, pady=2)
 
         # Unreal Engine Section
-        ue_frame = tk.Frame(main_frame, bg="#1e1e1e", relief=tk.FLAT)
-        ue_frame.pack(fill=tk.X, pady=(5, 10))
+        ue_frame = tk.Frame(main_frame, relief=tk.GROOVE, bd=2)
+        ue_frame.pack(fill=tk.X, pady=(3, 5))
         
         # Checkbox for Unreal Engine
         ue_check = tk.Checkbutton(
@@ -418,24 +389,19 @@ class DCCKitInstaller:
             text="  ⚡ Install Unreal Engine Max LiveLink",
             variable=self.install_unreal,
             font=("Arial", 9),
-            bg="#1e1e1e",
-            fg=self.fg_color,
-            selectcolor="#1e1e1e",
-            activebackground="#1e1e1e",
-            activeforeground=self.fg_color
+
         )
         ue_check.pack(anchor=tk.W, padx=5, pady=2)
         
         # Path entry frame
-        ue_path_frame = tk.Frame(ue_frame, bg="#1e1e1e")
+        ue_path_frame = tk.Frame(ue_frame)
         ue_path_frame.pack(fill=tk.X, padx=25, pady=(0, 5))
         
         ue_path_label = tk.Label(
             ue_path_frame,
             text="UE Python Path:",
             font=("Arial", 8),
-            bg="#1e1e1e",
-            fg=self.fg_color
+
         )
         ue_path_label.pack(side=tk.LEFT, padx=(0, 5))
         
@@ -443,9 +409,6 @@ class DCCKitInstaller:
             ue_path_frame,
             textvariable=self.unreal_path,
             font=("Arial", 8),
-            bg="#2b2b2b",
-            fg=self.fg_color,
-            insertbackground=self.fg_color,
             width=30
         )
         self.ue_path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -454,11 +417,6 @@ class DCCKitInstaller:
             ue_path_frame,
             text="...",
             font=("Arial", 8),
-            bg="#404040",
-            fg=self.fg_color,
-            activebackground="#4a4a4a",
-            activeforeground=self.fg_color,
-            relief=tk.FLAT,
             padx=8,
             pady=2,
             command=self.browse_unreal_path
@@ -466,7 +424,7 @@ class DCCKitInstaller:
         ue_browse_btn.pack(side=tk.LEFT, padx=(5, 0))
 
         # Separator
-        sep2 = tk.Frame(main_frame, height=1, bg="#404040")
+        sep2 = tk.Frame(main_frame, height=2, relief=tk.SUNKEN, bd=1)
         sep2.pack(fill=tk.X, pady=10)
 
         # Profile Selection - Combobox
@@ -474,8 +432,6 @@ class DCCKitInstaller:
             main_frame,
             text=self.get_text('profile'),
             font=("Arial", 10, "bold"),
-            bg=self.bg_color,
-            fg=self.fg_color,
             anchor=tk.W
         )
         self.profile_label.pack(anchor=tk.W, pady=(0, 5))
@@ -500,8 +456,6 @@ class DCCKitInstaller:
             main_frame,
             text="",
             font=("Arial", 8),
-            bg=self.bg_color,
-            fg=self.fg_color,
             wraplength=380,
             justify=tk.LEFT,
             anchor=tk.W
@@ -510,7 +464,7 @@ class DCCKitInstaller:
         self.update_profile_description()
 
         # Separator
-        sep3 = tk.Frame(main_frame, height=1, bg="#404040")
+        sep3 = tk.Frame(main_frame, height=2, relief=tk.SUNKEN, bd=1)
         sep3.pack(fill=tk.X, pady=10)
 
         # Progress
@@ -518,33 +472,19 @@ class DCCKitInstaller:
             main_frame,
             text=self.get_text('ready'),
             font=("Arial", 8),
-            bg=self.bg_color,
-            fg=self.fg_color,
             anchor=tk.W
         )
         self.status_label.pack(anchor=tk.W, pady=(0, 5))
 
-        style = ttk.Style()
-        style.theme_use('clam')
-        style.configure(
-            "custom.Horizontal.TProgressbar",
-            troughcolor='#1e1e1e',
-            background=self.accent_color,
-            bordercolor='#404040',
-            lightcolor=self.accent_color,
-            darkcolor=self.accent_color
-        )
-
         self.progress_bar = ttk.Progressbar(
             main_frame,
-            style="custom.Horizontal.TProgressbar",
             length=380,
             mode='determinate'
         )
-        self.progress_bar.pack(fill=tk.X, pady=(0, 15))
+        self.progress_bar.pack(fill=tk.X, pady=(0, 8))
 
         # Buttons
-        button_frame = tk.Frame(main_frame, bg=self.bg_color)
+        button_frame = tk.Frame(main_frame)
         button_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
         # Install button
@@ -552,13 +492,8 @@ class DCCKitInstaller:
             button_frame,
             text=self.get_text('install'),
             font=("Arial", 9, "bold"),
-            bg=self.accent_color,
-            fg=self.fg_color,
-            activebackground="#14a085",
-            activeforeground=self.fg_color,
-            relief=tk.FLAT,
-            padx=15,
-            pady=6,
+            padx=30,
+            pady=20,
             command=lambda: self.start_installation(mode='install')
         )
         self.install_btn.pack(side=tk.RIGHT)
@@ -568,45 +503,30 @@ class DCCKitInstaller:
             button_frame,
             text=self.get_text('reinstall'),
             font=("Arial", 9),
-            bg="#0d7377",
-            fg=self.fg_color,
-            activebackground="#14a085",
-            activeforeground=self.fg_color,
-            relief=tk.FLAT,
-            padx=15,
-            pady=6,
+            padx=30,
+            pady=20,
             command=lambda: self.start_installation(mode='reinstall')
         )
-        self.reinstall_btn.pack(side=tk.RIGHT, padx=(0, 5))
+        self.reinstall_btn.pack(side=tk.RIGHT, padx=(0, 3))
 
         # Fix button
         self.fix_btn = tk.Button(
             button_frame,
             text=self.get_text('fix'),
             font=("Arial", 9),
-            bg="#505050",
-            fg=self.fg_color,
-            activebackground="#606060",
-            activeforeground=self.fg_color,
-            relief=tk.FLAT,
-            padx=15,
-            pady=6,
+            padx=30,
+            pady=20,
             command=lambda: self.start_installation(mode='fix')
         )
-        self.fix_btn.pack(side=tk.RIGHT, padx=(0, 5))
+        self.fix_btn.pack(side=tk.RIGHT, padx=(0, 3))
 
         # Exit button (pack last on right side)
         self.exit_btn = tk.Button(
             button_frame,
             text=self.get_text('exit'),
             font=("Arial", 9),
-            bg="#404040",
-            fg=self.fg_color,
-            activebackground="#4a4a4a",
-            activeforeground=self.fg_color,
-            relief=tk.FLAT,
-            padx=15,
-            pady=6,
+            padx=30,
+            pady=20,
             command=self.root.quit
         )
         self.exit_btn.pack(side=tk.LEFT)

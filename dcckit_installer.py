@@ -30,6 +30,8 @@ TRANSLATIONS = {
         'profile_desc_expert': 'Complete: All tools + Debug utilities + Experimental features',
         'ready': 'Ready to install',
         'install': 'Install',
+        'reinstall': 'Reinstall',
+        'fix': 'Fix Installation',
         'exit': 'Exit',
         'no_dcc_title': 'No DCC Detected',
         'no_dcc_msg': 'No supported DCC applications were detected.\n\nContinue anyway?',
@@ -58,6 +60,8 @@ TRANSLATIONS = {
         'profile_desc_expert': '完全版: 所有工具 + 调试工具 + 实验性功能',
         'ready': '准备安装',
         'install': '安装',
+        'reinstall': '重新安装',
+        'fix': '修复安装',
         'exit': '退出',
         'no_dcc_title': '未检测到DCC',
         'no_dcc_msg': '未检测到支持的DCC应用程序。\n\n仍要继续吗？',
@@ -86,6 +90,8 @@ TRANSLATIONS = {
         'profile_desc_expert': '완전판: 모든 도구 + 디버그 유틸리티 + 실험적 기능',
         'ready': '설치 준비 완료',
         'install': '설치',
+        'reinstall': '재설치',
+        'fix': '설치 수정',
         'exit': '종료',
         'no_dcc_title': 'DCC 미감지',
         'no_dcc_msg': '지원되는 DCC 애플리케이션이 감지되지 않았습니다.\n\n계속하시겠습니까?',
@@ -144,6 +150,18 @@ class DCCDetector:
 
         return sorted(versions, key=lambda x: x['year'], reverse=True)
 
+    @staticmethod
+    def detect_unreal():
+        """Detect Unreal Engine Python startup path.
+        
+        Returns the default Python startup path for Unreal Engine as documented
+        in the official UE documentation:
+        https://docs.unrealengine.com/5.0/en-US/scripting-the-unreal-editor-using-python/
+        """
+        # Official UE Python startup path (verified from Epic docs)
+        ue_python_path = Path(os.path.expanduser("~")) / "Documents" / "UnrealEngine" / "Python"
+        return str(ue_python_path)
+
 
 class DCCKitInstaller:
     """Main installer application."""
@@ -151,7 +169,7 @@ class DCCKitInstaller:
     def __init__(self, root):
         self.root = root
         self.root.title("DCCKit Installer")
-        self.root.geometry("420x450")
+        self.root.geometry("450x620")
         self.root.resizable(False, False)
 
         # Dark theme colors - all white text
@@ -177,6 +195,10 @@ class DCCKitInstaller:
 
         # DCC checkboxes
         self.dcc_vars = {}
+        
+        # Unreal Engine path
+        self.unreal_path = tk.StringVar(value=DCCDetector.detect_unreal())
+        self.install_unreal = tk.BooleanVar(value=False)
 
         # Profile selection
         self.selected_profile = tk.StringVar(value="Animator")
@@ -213,6 +235,8 @@ class DCCKitInstaller:
         self.profile_label.config(text=self.get_text('profile'))
         self.status_label.config(text=self.get_text('ready'))
         self.install_btn.config(text=self.get_text('install'))
+        self.reinstall_btn.config(text=self.get_text('reinstall'))
+        self.fix_btn.config(text=self.get_text('fix'))
         self.exit_btn.config(text=self.get_text('exit'))
 
         # Update profile combobox
@@ -236,7 +260,7 @@ class DCCKitInstaller:
         """Create the user interface."""
         # Main container
         main_frame = tk.Frame(self.root, bg=self.bg_color)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
         # Header with language selector
         header_frame = tk.Frame(main_frame, bg=self.bg_color)
@@ -384,6 +408,63 @@ class DCCKitInstaller:
             )
             lbl.pack(anchor=tk.W, padx=5, pady=2)
 
+        # Unreal Engine Section
+        ue_frame = tk.Frame(main_frame, bg="#1e1e1e", relief=tk.FLAT)
+        ue_frame.pack(fill=tk.X, pady=(5, 10))
+        
+        # Checkbox for Unreal Engine
+        ue_check = tk.Checkbutton(
+            ue_frame,
+            text="  ⚡ Install Unreal Engine Max LiveLink",
+            variable=self.install_unreal,
+            font=("Arial", 9),
+            bg="#1e1e1e",
+            fg=self.fg_color,
+            selectcolor="#1e1e1e",
+            activebackground="#1e1e1e",
+            activeforeground=self.fg_color
+        )
+        ue_check.pack(anchor=tk.W, padx=5, pady=2)
+        
+        # Path entry frame
+        ue_path_frame = tk.Frame(ue_frame, bg="#1e1e1e")
+        ue_path_frame.pack(fill=tk.X, padx=25, pady=(0, 5))
+        
+        ue_path_label = tk.Label(
+            ue_path_frame,
+            text="UE Python Path:",
+            font=("Arial", 8),
+            bg="#1e1e1e",
+            fg=self.fg_color
+        )
+        ue_path_label.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.ue_path_entry = tk.Entry(
+            ue_path_frame,
+            textvariable=self.unreal_path,
+            font=("Arial", 8),
+            bg="#2b2b2b",
+            fg=self.fg_color,
+            insertbackground=self.fg_color,
+            width=30
+        )
+        self.ue_path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        ue_browse_btn = tk.Button(
+            ue_path_frame,
+            text="...",
+            font=("Arial", 8),
+            bg="#404040",
+            fg=self.fg_color,
+            activebackground="#4a4a4a",
+            activeforeground=self.fg_color,
+            relief=tk.FLAT,
+            padx=8,
+            pady=2,
+            command=self.browse_unreal_path
+        )
+        ue_browse_btn.pack(side=tk.LEFT, padx=(5, 0))
+
         # Separator
         sep2 = tk.Frame(main_frame, height=1, bg="#404040")
         sep2.pack(fill=tk.X, pady=10)
@@ -466,7 +547,7 @@ class DCCKitInstaller:
         button_frame = tk.Frame(main_frame, bg=self.bg_color)
         button_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
-        # Install button (pack first on right side)
+        # Install button
         self.install_btn = tk.Button(
             button_frame,
             text=self.get_text('install'),
@@ -476,13 +557,45 @@ class DCCKitInstaller:
             activebackground="#14a085",
             activeforeground=self.fg_color,
             relief=tk.FLAT,
-            padx=20,
+            padx=15,
             pady=6,
-            command=self.start_installation
+            command=lambda: self.start_installation(mode='install')
         )
         self.install_btn.pack(side=tk.RIGHT)
 
-        # Exit button (pack second on right side)
+        # Reinstall button
+        self.reinstall_btn = tk.Button(
+            button_frame,
+            text=self.get_text('reinstall'),
+            font=("Arial", 9),
+            bg="#0d7377",
+            fg=self.fg_color,
+            activebackground="#14a085",
+            activeforeground=self.fg_color,
+            relief=tk.FLAT,
+            padx=15,
+            pady=6,
+            command=lambda: self.start_installation(mode='reinstall')
+        )
+        self.reinstall_btn.pack(side=tk.RIGHT, padx=(0, 5))
+
+        # Fix button
+        self.fix_btn = tk.Button(
+            button_frame,
+            text=self.get_text('fix'),
+            font=("Arial", 9),
+            bg="#505050",
+            fg=self.fg_color,
+            activebackground="#606060",
+            activeforeground=self.fg_color,
+            relief=tk.FLAT,
+            padx=15,
+            pady=6,
+            command=lambda: self.start_installation(mode='fix')
+        )
+        self.fix_btn.pack(side=tk.RIGHT, padx=(0, 5))
+
+        # Exit button (pack last on right side)
         self.exit_btn = tk.Button(
             button_frame,
             text=self.get_text('exit'),
@@ -492,11 +605,11 @@ class DCCKitInstaller:
             activebackground="#4a4a4a",
             activeforeground=self.fg_color,
             relief=tk.FLAT,
-            padx=20,
+            padx=15,
             pady=6,
             command=self.root.quit
         )
-        self.exit_btn.pack(side=tk.RIGHT, padx=(0, 5))
+        self.exit_btn.pack(side=tk.LEFT)
 
     def on_profile_change(self, event):
         """Handle profile selection change."""
@@ -518,6 +631,19 @@ class DCCKitInstaller:
         desc_key = f'profile_desc_{profile.lower()}'
         self.profile_desc_label.config(text=self.get_text(desc_key))
 
+    def browse_unreal_path(self):
+        """Browse for Unreal Engine Python directory."""
+        from tkinter import filedialog
+        
+        initial_dir = self.unreal_path.get() or str(Path.home() / "Documents")
+        directory = filedialog.askdirectory(
+            title="Select Unreal Engine Python Folder",
+            initialdir=initial_dir
+        )
+        
+        if directory:
+            self.unreal_path.set(directory)
+
     def get_selected_dccs(self):
         """Get list of selected DCCs."""
         selected = []
@@ -526,50 +652,150 @@ class DCCKitInstaller:
                 selected.append({'name': name, 'path': data['path']})
         return selected
 
-    def start_installation(self):
-        """Start installation process."""
+    def start_installation(self, mode='install'):
+        """Start installation process.
+        
+        Args:
+            mode: 'install', 'reinstall', or 'fix'
+        """
         # Get selected DCCs
         selected_dccs = self.get_selected_dccs()
+        
+        # Check Unreal Engine installation
+        install_ue = self.install_unreal.get()
+        ue_path = self.unreal_path.get()
 
-        if not selected_dccs:
+        if not selected_dccs and not install_ue:
             messagebox.showwarning(
                 self.get_text('no_selection_title'),
-                self.get_text('no_selection_msg')
+                "Please select at least one DCC version or Unreal Engine to install."
             )
             return
+        
+        # Validate UE path if selected
+        if install_ue:
+            if not ue_path:
+                messagebox.showwarning(
+                    "Unreal Engine Path Required",
+                    "Please specify the Unreal Engine Python path.\n\n"
+                    "Example: C:\\Users\\YourName\\Documents\\UnrealEngine\\Python"
+                )
+                return
 
         # Disable buttons
         self.install_btn.config(state=tk.DISABLED)
+        self.reinstall_btn.config(state=tk.DISABLED)
+        self.fix_btn.config(state=tk.DISABLED)
 
         # Start installation in background thread
         profile = self.selected_profile.get()
-        thread = threading.Thread(target=self.run_installation, args=(profile, selected_dccs))
+        thread = threading.Thread(
+            target=self.run_installation, 
+            args=(profile, selected_dccs, mode, install_ue, ue_path)
+        )
         thread.daemon = True
         thread.start()
 
-    def run_installation(self, profile, selected_dccs):
-        """Run the installation."""
+    def run_installation(self, profile, selected_dccs, mode='install', install_ue=False, ue_path=""):
+        """Run the installation.
+        
+        Args:
+            profile: Installation profile
+            selected_dccs: List of selected DCCs
+            mode: 'install', 'reinstall', or 'fix'
+            install_ue: Whether to install Unreal Engine support
+            ue_path: Unreal Engine Python path
+        """
         import time
+        import shutil
 
-        steps = [
-            (self.get_text('installing'), 20),
-            (self.get_text('copying'), 50),
-            (self.get_text('configuring'), 80),
-            (self.get_text('finalizing'), 100)
-        ]
+        # Different steps based on mode
+        if mode == 'reinstall':
+            steps = [
+                ('Removing old installation...', 15),
+                (self.get_text('installing'), 30),
+                (self.get_text('copying'), 60),
+                (self.get_text('configuring'), 85),
+                (self.get_text('finalizing'), 100)
+            ]
+        elif mode == 'fix':
+            steps = [
+                ('Checking installation...', 20),
+                ('Repairing files...', 50),
+                (self.get_text('configuring'), 80),
+                (self.get_text('finalizing'), 100)
+            ]
+        else:  # install
+            steps = [
+                (self.get_text('installing'), 20),
+                (self.get_text('copying'), 50),
+                (self.get_text('configuring'), 80),
+                (self.get_text('finalizing'), 100)
+            ]
 
         for status, progress in steps:
             self.status_label.config(text=status)
             self.progress_bar['value'] = progress
             self.root.update_idletasks()
             time.sleep(0.5)
+        
+        # Install Unreal Engine support if selected
+        if install_ue and ue_path:
+            self.status_label.config(text="Installing Unreal Engine support...")
+            self.progress_bar['value'] = 90
+            self.root.update_idletasks()
+            
+            try:
+                # Create Python directory if it doesn't exist
+                ue_python_dir = Path(ue_path)
+                ue_python_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Copy init_unreal.py to the UE Python directory
+                source_file = Path(__file__).parent / "unreal_scripts" / "init_unreal.py"
+                dest_file = ue_python_dir / "init_unreal.py"
+                
+                if source_file.exists():
+                    shutil.copy2(source_file, dest_file)
+                    print(f"[Installer] Copied {source_file} to {dest_file}")
+                else:
+                    print(f"[Installer] WARNING: Source file not found: {source_file}")
+                    
+            except Exception as e:
+                print(f"[Installer] Error installing UE support: {str(e)}")
+                messagebox.showwarning(
+                    "Unreal Engine Installation Warning",
+                    f"Failed to install Unreal Engine support:\n{str(e)}\n\n"
+                    f"You can manually copy:\n{source_file}\n\nTo:\n{ue_python_dir}"
+                )
 
         self.status_label.config(text=self.get_text('complete_title'))
+        self.progress_bar['value'] = 100
+        
+        # Re-enable buttons after installation
+        self.install_btn.config(state=tk.NORMAL)
+        self.reinstall_btn.config(state=tk.NORMAL)
+        self.fix_btn.config(state=tk.NORMAL)
+        
+        # Show completion message
+        mode_text = {
+            'install': 'installed',
+            'reinstall': 'reinstalled',
+            'fix': 'repaired'
+        }
+        
+        install_summary = []
+        if selected_dccs:
+            install_summary.append(f"• {len(selected_dccs)} DCC(s)")
+        if install_ue:
+            install_summary.append(f"• Unreal Engine Max LiveLink")
+        
+        summary_text = "\n".join(install_summary)
+        completion_msg = f"DCCKit has been {mode_text.get(mode, 'installed')} successfully!\n\nInstalled:\n{summary_text}"
+        
         messagebox.showinfo(
             self.get_text('complete_title'),
-            self.get_text('complete_msg')
+            completion_msg
         )
-        self.root.quit()
 
 
 def main():

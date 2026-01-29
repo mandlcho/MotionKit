@@ -481,19 +481,19 @@ class DCCKitInstaller:
             length=380,
             mode='determinate'
         )
-        self.progress_bar.pack(fill=tk.X, pady=(0, 8))
+        self.progress_bar.pack(fill=tk.X, pady=(0, 2))
 
         # Buttons
         button_frame = tk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        button_frame.pack(fill=tk.X, pady=(10, 10))
 
         # Install button
         self.install_btn = tk.Button(
             button_frame,
             text=self.get_text('install'),
             font=("Arial", 9, "bold"),
-            padx=30,
-            pady=20,
+            padx=20,
+            pady=8,
             command=lambda: self.start_installation(mode='install')
         )
         self.install_btn.pack(side=tk.RIGHT)
@@ -503,8 +503,8 @@ class DCCKitInstaller:
             button_frame,
             text=self.get_text('reinstall'),
             font=("Arial", 9),
-            padx=30,
-            pady=20,
+            padx=20,
+            pady=8,
             command=lambda: self.start_installation(mode='reinstall')
         )
         self.reinstall_btn.pack(side=tk.RIGHT, padx=(0, 3))
@@ -514,8 +514,8 @@ class DCCKitInstaller:
             button_frame,
             text=self.get_text('fix'),
             font=("Arial", 9),
-            padx=30,
-            pady=20,
+            padx=20,
+            pady=8,
             command=lambda: self.start_installation(mode='fix')
         )
         self.fix_btn.pack(side=tk.RIGHT, padx=(0, 3))
@@ -525,8 +525,8 @@ class DCCKitInstaller:
             button_frame,
             text=self.get_text('exit'),
             font=("Arial", 9),
-            padx=30,
-            pady=20,
+            padx=20,
+            pady=8,
             command=self.root.quit
         )
         self.exit_btn.pack(side=tk.LEFT)

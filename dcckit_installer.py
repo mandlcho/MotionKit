@@ -268,7 +268,7 @@ class DCCKitInstaller:
         self.title_label = tk.Label(
             title_frame,
             text=self.get_text('title'),
-            font=("Arial", 14, "bold"),
+            font=("Arial", 12, "bold"),
             anchor=tk.W
         )
         self.title_label.pack(anchor=tk.W)
@@ -276,18 +276,18 @@ class DCCKitInstaller:
         self.version_label = tk.Label(
             title_frame,
             text=f"{self.get_text('version')} {self.version}",
-            font=("Arial", 8),
+            font=("Arial", 9),
             anchor=tk.W
         )
-        self.version_label.pack(anchor=tk.W)
+        self.version_label.pack(anchor=tk.W, pady=(2, 0))
 
         self.subtitle_label = tk.Label(
             title_frame,
             text=self.get_text('subtitle'),
-            font=("Arial", 8),
+            font=("Arial", 9),
             anchor=tk.W
         )
-        self.subtitle_label.pack(anchor=tk.W)
+        self.subtitle_label.pack(anchor=tk.W, pady=(0, 0))
 
         # Right side - language selector
         lang_frame = tk.Frame(header_frame)
@@ -296,7 +296,7 @@ class DCCKitInstaller:
         self.lang_label = tk.Label(
             lang_frame,
             text=self.get_text('language'),
-            font=("Arial", 8)
+            font=("Arial", 9)
         )
         self.lang_label.pack(side=tk.LEFT, padx=(0, 5))
 
@@ -306,13 +306,13 @@ class DCCKitInstaller:
             values=['EN', 'CN', 'KR'],
             state='readonly',
             width=5,
-            font=("Arial", 8)
+            font=("Arial", 9)
         )
         lang_combo.pack(side=tk.LEFT)
 
         # Separator
-        sep1 = tk.Frame(main_frame, height=2, relief=tk.SUNKEN, bd=1)
-        sep1.pack(fill=tk.X, pady=5)
+        sep1 = tk.Frame(main_frame, height=2, relief=tk.GROOVE, bd=1)
+        sep1.pack(fill=tk.X, pady=8)
 
         # DCC Detection with checkboxes
         self.dcc_label = tk.Label(
@@ -326,14 +326,14 @@ class DCCKitInstaller:
         self.install_to_label = tk.Label(
             main_frame,
             text=self.get_text('install_to'),
-            font=("Arial", 8),
+            font=("Arial", 9),
             anchor=tk.W
         )
         self.install_to_label.pack(anchor=tk.W, pady=(0, 3))
 
         # DCC Checkboxes frame
-        dcc_frame = tk.Frame(main_frame, relief=tk.GROOVE, bd=2)
-        dcc_frame.pack(fill=tk.X, pady=(0, 5))
+        dcc_frame = tk.Frame(main_frame, relief=tk.RIDGE, bd=1)
+        dcc_frame.pack(fill=tk.X, pady=(0, 8))
 
         # MotionBuilder
         if self.detected_dccs['motionbuilder']:
@@ -380,8 +380,8 @@ class DCCKitInstaller:
             lbl.pack(anchor=tk.W, padx=5, pady=2)
 
         # Unreal Engine Section
-        ue_frame = tk.Frame(main_frame, relief=tk.GROOVE, bd=2)
-        ue_frame.pack(fill=tk.X, pady=(3, 5))
+        ue_frame = tk.Frame(main_frame, relief=tk.RIDGE, bd=1)
+        ue_frame.pack(fill=tk.X, pady=(0, 8))
         
         # Checkbox for Unreal Engine
         ue_check = tk.Checkbutton(
@@ -424,8 +424,8 @@ class DCCKitInstaller:
         ue_browse_btn.pack(side=tk.LEFT, padx=(5, 0))
 
         # Separator
-        sep2 = tk.Frame(main_frame, height=2, relief=tk.SUNKEN, bd=1)
-        sep2.pack(fill=tk.X, pady=10)
+        sep2 = tk.Frame(main_frame, height=2, relief=tk.GROOVE, bd=1)
+        sep2.pack(fill=tk.X, pady=8)
 
         # Profile Selection - Combobox
         self.profile_label = tk.Label(
@@ -464,14 +464,14 @@ class DCCKitInstaller:
         self.update_profile_description()
 
         # Separator
-        sep3 = tk.Frame(main_frame, height=2, relief=tk.SUNKEN, bd=1)
-        sep3.pack(fill=tk.X, pady=10)
+        sep3 = tk.Frame(main_frame, height=2, relief=tk.GROOVE, bd=1)
+        sep3.pack(fill=tk.X, pady=8)
 
         # Progress
         self.status_label = tk.Label(
             main_frame,
             text=self.get_text('ready'),
-            font=("Arial", 8),
+            font=("Arial", 9),
             anchor=tk.W
         )
         self.status_label.pack(anchor=tk.W, pady=(0, 5))
@@ -491,9 +491,12 @@ class DCCKitInstaller:
         self.install_btn = tk.Button(
             button_frame,
             text=self.get_text('install'),
-            font=("Arial", 9, "bold"),
-            padx=20,
-            pady=8,
+            font=("Arial", 10, "bold"),
+            width=12,
+            padx=10,
+            pady=5,
+            relief=tk.RAISED,
+            bd=2,
             command=lambda: self.start_installation(mode='install')
         )
         self.install_btn.pack(side=tk.RIGHT)
@@ -502,31 +505,40 @@ class DCCKitInstaller:
         self.reinstall_btn = tk.Button(
             button_frame,
             text=self.get_text('reinstall'),
-            font=("Arial", 9),
-            padx=20,
-            pady=8,
+            font=("Arial", 10),
+            width=12,
+            padx=10,
+            pady=5,
+            relief=tk.RAISED,
+            bd=2,
             command=lambda: self.start_installation(mode='reinstall')
         )
-        self.reinstall_btn.pack(side=tk.RIGHT, padx=(0, 3))
+        self.reinstall_btn.pack(side=tk.RIGHT, padx=(0, 5))
 
         # Fix button
         self.fix_btn = tk.Button(
             button_frame,
             text=self.get_text('fix'),
-            font=("Arial", 9),
-            padx=20,
-            pady=8,
+            font=("Arial", 10),
+            width=12,
+            padx=10,
+            pady=5,
+            relief=tk.RAISED,
+            bd=2,
             command=lambda: self.start_installation(mode='fix')
         )
-        self.fix_btn.pack(side=tk.RIGHT, padx=(0, 3))
+        self.fix_btn.pack(side=tk.RIGHT, padx=(0, 5))
 
         # Exit button (pack last on right side)
         self.exit_btn = tk.Button(
             button_frame,
             text=self.get_text('exit'),
-            font=("Arial", 9),
-            padx=20,
-            pady=8,
+            font=("Arial", 10),
+            width=12,
+            padx=10,
+            pady=5,
+            relief=tk.RAISED,
+            bd=2,
             command=self.root.quit
         )
         self.exit_btn.pack(side=tk.LEFT)

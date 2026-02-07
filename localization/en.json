@@ -185,6 +185,9 @@
       "error_no_selection": "Please select an object in the viewport first!",
       "error_multiple_selection": "Please select only one object!",
       "success_extracted": "Trajectory extracted successfully!\n\nHelper created: {0}\n\nYou can now use 'Apply Animation Trajectory' to apply this to another object."
+    },
+    "bone_speed_calculator": {
+      "name": "Bone Speed Calculator"
     }
   },
   "about": {

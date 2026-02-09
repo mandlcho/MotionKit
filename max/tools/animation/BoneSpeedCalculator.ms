@@ -287,7 +287,9 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		(
 			-- Calculate direction in X (positive or negative)
 			local deltaX = lastFramePos.x - currentTargetPos.x
-			local directionX = if deltaX != 0 then (deltaX / abs deltaX) else 0
+			local directionX = 0
+			if deltaX != 0 then
+				directionX = deltaX / abs deltaX
 			-- Move back by target distance
 			targetFramePos.x = lastFramePos.x - (directionX * targetDistancePerFrame)
 		)
@@ -300,7 +302,9 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		if chkY.checked then
 		(
 			local deltaY = lastFramePos.y - currentTargetPos.y
-			local directionY = if deltaY != 0 then (deltaY / abs deltaY) else 0
+			local directionY = 0
+			if deltaY != 0 then
+				directionY = deltaY / abs deltaY
 			targetFramePos.y = lastFramePos.y - (directionY * targetDistancePerFrame)
 		)
 		else
@@ -311,7 +315,9 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		if chkZ.checked then
 		(
 			local deltaZ = lastFramePos.z - currentTargetPos.z
-			local directionZ = if deltaZ != 0 then (deltaZ / abs deltaZ) else 0
+			local directionZ = 0
+			if deltaZ != 0 then
+				directionZ = deltaZ / abs deltaZ
 			targetFramePos.z = lastFramePos.z - (directionZ * targetDistancePerFrame)
 		)
 		else

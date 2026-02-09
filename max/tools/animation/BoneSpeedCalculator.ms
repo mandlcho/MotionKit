@@ -2,6 +2,16 @@
 -- For 3ds Max 2023
 -- Just drag this file into 3ds Max viewport to run
 
+-- Close existing instance if open
+try
+(
+	if boneSpeedDialog != undefined then
+	(
+		destroyDialog boneSpeedDialog
+	)
+)
+catch()
+
 rollout boneSpeedRollout "Bone Axis Speed Calculator"
 (
 	-- UI Elements
@@ -215,5 +225,5 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 	)
 )
 
--- Create Dialog
-createDialog boneSpeedRollout 200 320
+-- Create Dialog and store reference
+global boneSpeedDialog = createDialog boneSpeedRollout 200 320

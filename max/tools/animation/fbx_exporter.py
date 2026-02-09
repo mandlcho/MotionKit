@@ -669,6 +669,402 @@ def _export_all_takes(export_path):
         logger.error(f"Failed to export all takes: {str(e)}")
 
 
+def _show_multitake_manager():
+    """Show the multi-take manager window"""
+    try:
+        # Load existing takes
+        takes_data = _load_takes_from_scene()
+        
+        # Get selection sets
+        selection_sets = []
+        for i in range(rt.selectionSets.count):
+            selection_sets.append(rt.selectionSets[i].name)
+        
+        if not selection_sets:
+            selection_sets = ["(No selection sets)"]
+        
+        selection_sets_str = "#(" + ", ".join([f'"{s}"' for s in selection_sets]) + ")"
+        
+        # Format takes for display
+        take_items = []
+        for take in takes_data:
+            enabled_icon = "☑" if take.get("enabled", True) else "☐"
+            take_str = f"{enabled_icon} {take['name']} | {take['start_frame']}-{take['end_frame']} | {take['selection_set']}"
+            take_items.append(take_str)
+        
+        if not take_items:
+            take_items = ["(No takes defined - click 'Add Take')"]
+        
+        items_str = "#(" + ", ".join([f'"{s}"' for s in take_items]) + ")"
+        
+        maxscript = f'''
+global motionKitMultiTakeManager
+
+rollout MultiTakeManager "Multi-Take Manager" width:750 height:500
+(
+    -- Table header
+    label headerEnabled "✓" pos:[10,10] width:30 height:20 align:#center
+    label headerName "Take Name" pos:[50,10] width:200 height:20 align:#left
+    label headerStart "Start" pos:[260,10] width:60 height:20 align:#center
+    label headerEnd "End" pos:[330,10] width:60 height:20 align:#center
+    label headerSelSet "Selection Set" pos:[400,10] width:150 height:20 align:#left
+    label headerActions "Actions" pos:[560,10] width:180 height:20 align:#center
+    
+    -- Separator line
+    label separator "" pos:[10,32] width:730 height:2
+    
+    -- Scrollable dotNetControl for table rows
+    dotNetControl tableControl "System.Windows.Forms.DataGridView" pos:[10,40] width:730 height:350
+    
+    -- Management buttons at bottom
+    button btnAddTake "Add Take" pos:[10,405] width:90 height:28
+    button btnMoveUp "Move Up" pos:[110,405] width:90 height:28
+    button btnMoveDown "Move Down" pos:[210,405] width:90 height:28
+    button btnRefresh "Refresh" pos:[310,405] width:90 height:28
+    
+    -- Close button
+    button btnClose "Close" pos:[660,405] width:80 height:28
+    
+    -- Help text
+    label helpText "Double-click a cell to edit. Check/uncheck to enable/disable takes." pos:[10,445] width:730 height:20 align:#left
+    
+    -- Initialize DataGridView
+    fn initDataGrid =
+    (
+        tableControl.AllowUserToAddRows = false
+        tableControl.SelectionMode = tableControl.SelectionMode.FullRowSelect
+        tableControl.MultiSelect = true
+        tableControl.RowHeadersVisible = false
+        tableControl.BackgroundColor = (dotNetClass "System.Drawing.Color").FromArgb 240 240 240
+        
+        -- Add columns with proper dotNet column type
+        local DataGridViewCheckBoxColumn = dotNetClass "System.Windows.Forms.DataGridViewCheckBoxColumn"
+        local DataGridViewTextBoxColumn = dotNetClass "System.Windows.Forms.DataGridViewTextBoxColumn"
+        
+        -- Enabled column (checkbox)
+        local colEnabled = DataGridViewCheckBoxColumn()
+        colEnabled.Name = "Enabled"
+        colEnabled.HeaderText = "✓"
+        colEnabled.Width = 40
+        tableControl.Columns.Add colEnabled
+        
+        -- Name column
+        local colName = DataGridViewTextBoxColumn()
+        colName.Name = "Name"
+        colName.HeaderText = "Take Name"
+        colName.Width = 180
+        tableControl.Columns.Add colName
+        
+        -- Start column
+        local colStart = DataGridViewTextBoxColumn()
+        colStart.Name = "Start"
+        colStart.HeaderText = "Start"
+        colStart.Width = 70
+        tableControl.Columns.Add colStart
+        
+        -- End column
+        local colEnd = DataGridViewTextBoxColumn()
+        colEnd.Name = "End"
+        colEnd.HeaderText = "End"
+        colEnd.Width = 70
+        tableControl.Columns.Add colEnd
+        
+        -- Selection Set column
+        local colSelSet = DataGridViewTextBoxColumn()
+        colSelSet.Name = "SelectionSet"
+        colSelSet.HeaderText = "Selection Set"
+        colSelSet.Width = 180
+        tableControl.Columns.Add colSelSet
+        
+        -- Actions column
+        local colActions = DataGridViewTextBoxColumn()
+        colActions.Name = "Actions"
+        colActions.HeaderText = "Actions"
+        colActions.Width = 100
+        colActions.ReadOnly = true
+        tableControl.Columns.Add colActions
+        
+        -- Load takes data
+        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._populate_multitake_grid()"
+    )
+    
+    -- Add Take button
+    on btnAddTake pressed do
+    (
+        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._add_new_take()"
+        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._populate_multitake_grid()"
+    )
+    
+    -- Move Up button
+    on btnMoveUp pressed do
+    (
+        if tableControl.SelectedRows.Count > 0 then
+        (
+            local rowIndex = tableControl.SelectedRows.item[0].Index
+            if rowIndex > 0 then
+            (
+                python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._move_take_up(" + (rowIndex as string) + ")")
+                python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._populate_multitake_grid()"
+            )
+        )
+    )
+    
+    -- Move Down button
+    on btnMoveDown pressed do
+    (
+        if tableControl.SelectedRows.Count > 0 then
+        (
+            local rowIndex = tableControl.SelectedRows.item[0].Index
+            python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._move_take_down(" + (rowIndex as string) + ")")
+            python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._populate_multitake_grid()"
+        )
+    )
+    
+    -- Refresh button
+    on btnRefresh pressed do
+    (
+        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._populate_multitake_grid()"
+    )
+    
+    -- Handle cell value changes
+    on tableControl CellValueChanged args do
+    (
+        local rowIndex = args.RowIndex
+        local colIndex = args.ColumnIndex
+        
+        -- Save changes to scene (with small delay to ensure value is committed)
+        dotNet.setLifetimeControl args #dotNet
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._update_take_from_grid(" + (rowIndex as string) + ")")
+    )
+    
+    -- Handle checkbox clicks in Enabled column
+    on tableControl CellContentClick args do
+    (
+        local rowIndex = args.RowIndex
+        local colIndex = args.ColumnIndex
+        
+        -- Enabled column (index 0) - toggle checkbox
+        if colIndex == 0 then
+        (
+            -- Commit the edit so value changes
+            tableControl.CommitEdit tableControl.CommitEdit.CurrentCellChange
+        )
+        -- Actions column (index 5) - delete button
+        else if colIndex == 5 then
+        (
+            local result = queryBox "Delete this take?" title:"Confirm Delete"
+            if result then
+            (
+                python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._delete_take_at_index(" + (rowIndex as string) + ")")
+                python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._populate_multitake_grid()"
+            )
+        )
+    )
+    
+    -- Handle cell click to begin edit mode immediately
+    on tableControl CellClick args do
+    (
+        local rowIndex = args.RowIndex
+        local colIndex = args.ColumnIndex
+        
+        -- For enabled column (checkbox), begin edit immediately
+        if colIndex == 0 then
+        (
+            tableControl.BeginEdit false
+        )
+    )
+    
+    -- Close button
+    on btnClose pressed do
+    (
+        try
+        (
+            destroyDialog MultiTakeManager
+        )
+        catch
+        (
+            -- Ignore if already closed
+        )
+    )
+    
+    -- Initialize on open
+    on MultiTakeManager open do
+    (
+        motionKitMultiTakeManager = MultiTakeManager
+        initDataGrid()
+    )
+    
+    on MultiTakeManager close do
+    (
+        motionKitMultiTakeManager = undefined
+    )
+)
+
+try (destroyDialog MultiTakeManager) catch()
+createDialog MultiTakeManager
+'''
+        
+        rt.execute(maxscript)
+        
+    except Exception as e:
+        logger.error(f"Failed to show multi-take manager: {str(e)}")
+        rt.messageBox(f"Failed to show multi-take manager:\n{str(e)}", title="Multi-Take Manager Error")
+
+
+def _populate_multitake_grid():
+    """Populate the DataGridView with takes data"""
+    try:
+        takes_data = _load_takes_from_scene()
+        
+        # Get selection sets for dropdown
+        selection_sets = []
+        for i in range(rt.selectionSets.count):
+            selection_sets.append(rt.selectionSets[i].name)
+        
+        maxscript = '''
+(
+    if motionKitMultiTakeManager != undefined then
+    (
+        local grid = motionKitMultiTakeManager.tableControl
+        grid.Rows.Clear()
+        
+        -- Get takes data from Python
+        python.execute "import max.tools.animation.fbx_exporter; takes_data = max.tools.animation.fbx_exporter._load_takes_from_scene()"
+        local takesCount = python.execute "len(takes_data)"
+        
+        for i = 0 to (takesCount - 1) do
+        (
+            local takeData = python.execute ("takes_data[" + (i as string) + "]")
+            local enabled = python.execute ("takes_data[" + (i as string) + "].get('enabled', True)")
+            local name = python.execute ("takes_data[" + (i as string) + "]['name']")
+            local startFrame = python.execute ("takes_data[" + (i as string) + "]['start_frame']")
+            local endFrame = python.execute ("takes_data[" + (i as string) + "]['end_frame']")
+            local selSet = python.execute ("takes_data[" + (i as string) + "]['selection_set']")
+            
+            local rowIndex = grid.Rows.Add()
+            local row = grid.Rows.item[rowIndex]
+            
+            row.Cells.item[0].Value = enabled
+            row.Cells.item[1].Value = name
+            row.Cells.item[2].Value = startFrame
+            row.Cells.item[3].Value = endFrame
+            row.Cells.item[4].Value = selSet
+            row.Cells.item[5].Value = "[Delete]"
+        )
+    )
+)
+'''
+        rt.execute(maxscript)
+        
+    except Exception as e:
+        logger.error(f"Failed to populate multi-take grid: {str(e)}")
+
+
+def _update_take_from_grid(row_index):
+    """Update take data from grid row"""
+    try:
+        maxscript = f'''
+(
+    local grid = motionKitMultiTakeManager.tableControl
+    local row = grid.Rows.item[{row_index}]
+    
+    local enabled = row.Cells.item[0].Value
+    local name = row.Cells.item[1].Value as string
+    local startFrame = row.Cells.item[2].Value as integer
+    local endFrame = row.Cells.item[3].Value as integer
+    local selSet = row.Cells.item[4].Value as string
+    
+    -- Pass data to Python
+    python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_take_at_index({row_index}, '" + name + "', " + (startFrame as string) + ", " + (endFrame as string) + ", '" + selSet + "', " + (enabled as string) + ")")
+)
+'''
+        rt.execute(maxscript)
+        
+    except Exception as e:
+        logger.error(f"Failed to update take from grid: {str(e)}")
+
+
+def _save_take_at_index(index, name, start_frame, end_frame, selection_set, enabled):
+    """Save updated take data at specific index"""
+    try:
+        takes_data = _load_takes_from_scene()
+        
+        if 0 <= index < len(takes_data):
+            takes_data[index] = {
+                "name": name,
+                "start_frame": int(start_frame),
+                "end_frame": int(end_frame),
+                "selection_set": selection_set,
+                "enabled": enabled
+            }
+            _save_takes_to_scene(takes_data)
+            logger.info(f"Updated take at index {index}: {name}")
+        
+    except Exception as e:
+        logger.error(f"Failed to save take at index: {str(e)}")
+
+
+def _delete_take_at_index(index):
+    """Delete take at specific index"""
+    try:
+        takes_data = _load_takes_from_scene()
+        
+        if 0 <= index < len(takes_data):
+            removed_take = takes_data.pop(index)
+            _save_takes_to_scene(takes_data)
+            logger.info(f"Deleted take: {removed_take['name']}")
+        
+    except Exception as e:
+        logger.error(f"Failed to delete take: {str(e)}")
+
+
+def _move_take_up(index):
+    """Move take up in the list"""
+    try:
+        takes_data = _load_takes_from_scene()
+        
+        if 0 < index < len(takes_data):
+            takes_data[index], takes_data[index - 1] = takes_data[index - 1], takes_data[index]
+            _save_takes_to_scene(takes_data)
+            logger.info(f"Moved take up: {takes_data[index]['name']}")
+        
+    except Exception as e:
+        logger.error(f"Failed to move take up: {str(e)}")
+
+
+def _move_take_down(index):
+    """Move take down in the list"""
+    try:
+        takes_data = _load_takes_from_scene()
+        
+        if 0 <= index < len(takes_data) - 1:
+            takes_data[index], takes_data[index + 1] = takes_data[index + 1], takes_data[index]
+            _save_takes_to_scene(takes_data)
+            logger.info(f"Moved take down: {takes_data[index]['name']}")
+        
+    except Exception as e:
+        logger.error(f"Failed to move take down: {str(e)}")
+
+
+def _toggle_takes_enabled(indices_str):
+    """Toggle enabled/disabled state for takes"""
+    try:
+        indices = [int(i) for i in indices_str.split('|') if i.strip()]
+        takes_data = _load_takes_from_scene()
+        
+        for index in indices:
+            if 0 <= index < len(takes_data):
+                current_state = takes_data[index].get('enabled', True)
+                takes_data[index]['enabled'] = not current_state
+                logger.info(f"Toggled take '{takes_data[index]['name']}' enabled state to {not current_state}")
+        
+        _save_takes_to_scene(takes_data)
+        
+    except Exception as e:
+        logger.error(f"Failed to toggle takes: {str(e)}")
+        rt.messageBox(f"Failed to toggle takes:\n{str(e)}", title="Toggle Takes Error")
+
+
 def _batch_export_with_multitake(start_frame, end_frame, export_path, selected_files_str=None):
     """
     Batch export files using multi-take data if available
@@ -961,7 +1357,7 @@ class AnimationExporterDialog:
 
 global motionKitAnimExporterRollout
 
-rollout MotionKitAnimExporter "{title}" width:500 height:405
+rollout MotionKitAnimExporter "{title}" width:500 height:430
 (
     -- Animation Name
     group "Animation"
@@ -1002,48 +1398,28 @@ rollout MotionKitAnimExporter "{title}" width:500 height:405
         button btnChangePath "Change..." pos:[410,238] width:65 height:22
     )
     
+    -- Multi-Take Export Button
+    button btnManageMultiTake "Manage Takes..." pos:[15,275] width:120 height:28
+    checkbox enableMultiTakeCB "Use Multi-Take Export" pos:[145,280] width:180 checked:false
+
     -- Progress Bar and Status
-    progressBar exportProgress "" pos:[15,285] width:470 height:14 value:0 color:(color 100 150 255)
-    label statusLabel "" pos:[15,305] width:470 height:22 align:#center
-    
-    -- Multi-Take Export Section
-    checkbox enableMultiTakeCB "▼ Multi-Take Export" pos:[15,335] width:200 checked:false
-    
-    -- Multi-take list (initially hidden)
-    multiListBox takeListBox "" pos:[20,360] width:460 height:10 visible:false
-    
-    -- Multi-take management buttons (initially hidden)
-    button btnAddTake "Add Take" pos:[20,475] width:80 height:25 visible:false
-    button btnDuplicateTake "Duplicate" pos:[110,475] width:80 height:25 visible:false
-    button btnRemoveTake "Remove" pos:[200,475] width:80 height:25 visible:false
-    button btnEditTake "Edit..." pos:[290,475] width:80 height:25 visible:false
+    progressBar exportProgress "" pos:[15,315] width:470 height:14 value:0 color:(color 100 150 255)
+    label statusLabel "" pos:[15,335] width:470 height:22 align:#center
 
     -- Export section
     group "Export"
     (
-        button btnExportCurrent "Current" pos:[20,350] width:105 height:32
-        button btnExportSelected "Selection" pos:[135,350] width:105 height:32
-        button btnExportAll "All" pos:[250,350] width:105 height:32
+        button btnExportCurrent "Current" pos:[20,375] width:105 height:32
+        button btnExportSelected "Selection" pos:[135,375] width:105 height:32
+        button btnExportAll "All" pos:[250,375] width:105 height:32
     )
 
     -- Close button
-    button btnClose "{close}" pos:[365,350] width:115 height:32
+    button btnClose "{close}" pos:[365,375] width:115 height:32
 
     -- ============================================
     -- Function Definitions (must be before event handlers)
     -- ============================================
-    
-    -- Function to load takes from scene and populate list
-    fn loadTakesFromScene =
-    (
-        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._refresh_take_list()"
-    )
-    
-    -- Function to update take list display
-    fn refreshTakeList takeItems =
-    (
-        takeListBox.items = takeItems
-    )
     
     -- Function to update dialog with current scene info
     fn updateSceneInfo =
@@ -1089,108 +1465,10 @@ rollout MotionKitAnimExporter "{title}" width:500 height:405
         )
     )
     
-    -- Multi-Take Export checkbox handler
-    on enableMultiTakeCB changed state do
+    -- Manage Multi-Take button
+    on btnManageMultiTake pressed do
     (
-        -- Show/hide multi-take controls
-        takeListBox.visible = state
-        btnAddTake.visible = state
-        btnDuplicateTake.visible = state
-        btnRemoveTake.visible = state
-        btnEditTake.visible = state
-        
-        -- Resize dialog to fit multi-take section
-        if state then
-        (
-            -- Expand dialog to show multi-take controls
-            MotionKitAnimExporter.height = 575
-            
-            -- Move multi-take section down below Export section
-            enableMultiTakeCB.pos = [15, 395]
-            takeListBox.pos = [20, 420]
-            btnAddTake.pos = [20, 535]
-            btnDuplicateTake.pos = [110, 535]
-            btnRemoveTake.pos = [200, 535]
-            btnEditTake.pos = [290, 535]
-            
-            -- Load takes from scene
-            loadTakesFromScene()
-        )
-        else
-        (
-            -- Collapse dialog back to original size
-            MotionKitAnimExporter.height = 405
-            
-            -- Move multi-take section back to original position
-            enableMultiTakeCB.pos = [15, 335]
-            takeListBox.pos = [20, 360]
-            btnAddTake.pos = [20, 475]
-            btnDuplicateTake.pos = [110, 475]
-            btnRemoveTake.pos = [200, 475]
-            btnEditTake.pos = [290, 475]
-        )
-    )
-    
-    -- Add Take button
-    on btnAddTake pressed do
-    (
-        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._add_new_take()"
-    )
-    
-    -- Duplicate Take button
-    on btnDuplicateTake pressed do
-    (
-        local selectedIndices = takeListBox.selection as bitArray
-        if selectedIndices.numberSet == 0 then
-        (
-            messageBox "Please select a take to duplicate!" title:"{title}"
-            return false
-        )
-        
-        -- Get first selected index (1-based to 0-based)
-        local firstIndex = (selectedIndices as array)[1] - 1
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._duplicate_take(" + (firstIndex as string) + ")")
-    )
-    
-    -- Remove Take button
-    on btnRemoveTake pressed do
-    (
-        local selectedIndices = takeListBox.selection as bitArray
-        if selectedIndices.numberSet == 0 then
-        (
-            messageBox "Please select take(s) to remove!" title:"{title}"
-            return false
-        )
-        
-        -- Convert bitArray to 0-based indices
-        local indicesArray = #()
-        for i in selectedIndices do
-            append indicesArray (i - 1)
-        
-        -- Create pipe-delimited string
-        local indicesStr = ""
-        for i = 1 to indicesArray.count do
-        (
-            indicesStr += (indicesArray[i] as string)
-            if i < indicesArray.count then indicesStr += "|"
-        )
-        
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._remove_takes('" + indicesStr + "')")
-    )
-    
-    -- Edit Take button
-    on btnEditTake pressed do
-    (
-        local selectedIndices = takeListBox.selection as bitArray
-        if selectedIndices.numberSet == 0 then
-        (
-            messageBox "Please select a take to edit!" title:"{title}"
-            return false
-        )
-        
-        -- Get first selected index (1-based to 0-based)
-        local firstIndex = (selectedIndices as array)[1] - 1
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._edit_take(" + (firstIndex as string) + ")")
+        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._show_multitake_manager()"
     )
 
     -- Set initial state on dialog open

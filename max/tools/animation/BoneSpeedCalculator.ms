@@ -249,6 +249,134 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 			return false
 		)
 		
+		-- Check which axes are selected
+		if not chkX.checked and not chkY.checked and not chkZ.checked then
+		(
+			messageBox "Please select at least one axis (X, Y, or Z) to smooth!" title:"Root Smoothing"
+			return false
+		)
+		
+		local targetSpeedMS = spnTargetSpeed.value
+		local blendFrames = spnBlendFrames.value as integer
+		local endFrame = animationRange.end.frame as integer
+		local targetFrame = endFrame - 1  -- We adjust up to the frame BEFORE last
+		local startFrame = endFrame - blendFrames  -- Count back N frames from last frame
+		
+		if startFrame < animationRange.start.frame then
+		(
+			messageBox "Not enough frames for blending! Reduce blend frames or extend timeline." title:"Root Smoothing"
+			return false
+		)
+		
+		local fps = frameRate as float
+		local conversionFactor = 100.0
+		local targetDistancePerFrame = (targetSpeedMS * conversionFactor) / fps
+		
+		-- Get the FIXED last frame position (this won't change)
+		local lastFramePos = at time endFrame (in coordsys world selectedBone.pos)
+		
+		-- Get the current target frame position
+		local currentTargetPos = at time targetFrame (in coordsys world selectedBone.pos)
+		
+		-- Calculate where targetFrame should be based on selected axes
+		-- We move BACK from lastFrame by targetDistance in the selected axes
+		local targetFramePos = copy currentTargetPos
+		
+		-- For each selected axis, calculate where it should be
+		if chkX.checked then
+		(
+			-- Calculate direction in X (positive or negative)
+			local deltaX = lastFramePos.x - currentTargetPos.x
+			local directionX = if deltaX != 0 then (deltaX / abs deltaX) else 0
+			-- Move back by target distance
+			targetFramePos.x = lastFramePos.x - (directionX * targetDistancePerFrame)
+		)
+		else
+		(
+			-- Keep original X
+			targetFramePos.x = currentTargetPos.x
+		)
+		
+		if chkY.checked then
+		(
+			local deltaY = lastFramePos.y - currentTargetPos.y
+			local directionY = if deltaY != 0 then (deltaY / abs deltaY) else 0
+			targetFramePos.y = lastFramePos.y - (directionY * targetDistancePerFrame)
+		)
+		else
+		(
+			targetFramePos.y = currentTargetPos.y
+		)
+		
+		if chkZ.checked then
+		(
+			local deltaZ = lastFramePos.z - currentTargetPos.z
+			local directionZ = if deltaZ != 0 then (deltaZ / abs deltaZ) else 0
+			targetFramePos.z = lastFramePos.z - (directionZ * targetDistancePerFrame)
+		)
+		else
+		(
+			targetFramePos.z = currentTargetPos.z
+		)
+		
+		-- Store the start position
+		local startPos = at time startFrame (in coordsys world selectedBone.pos)
+		
+		-- Debug output
+		format "\n=== Root Smoothing ===\n"
+		format "Selected Axes: X=% Y=% Z=%\n" chkX.checked chkY.checked chkZ.checked
+		format "Start Frame: %\n" startFrame
+		format "Target Frame: %\n" targetFrame
+		format "Last Frame: % [FIXED]\n" endFrame
+		format "Start Pos: %\n" startPos
+		format "Target Pos: %\n" targetFramePos
+		format "Last Pos: % [UNCHANGED]\n" lastFramePos
+		format "Target Speed: % m/s (% cm/frame)\n" targetSpeedMS targetDistancePerFrame
+		format "Blend Frames: %\n" blendFrames
+		
+		with undo on
+		(
+			-- Apply smoothed positions
+			for f = startFrame to targetFrame do
+			(
+				-- Calculate blend factor (0 to 1)
+				local t = (f - startFrame) as float / blendFrames as float
+				
+				-- Get current position at this frame
+				local currentPos = at time f (in coordsys world selectedBone.pos)
+				
+				-- Interpolate only the selected axes
+				local newPos = copy currentPos
+				
+				if chkX.checked then
+					newPos.x = startPos.x + ((targetFramePos.x - startPos.x) * t)
+				
+				if chkY.checked then
+					newPos.y = startPos.y + ((targetFramePos.y - startPos.y) * t)
+				
+				if chkZ.checked then
+					newPos.z = startPos.z + ((targetFramePos.z - startPos.z) * t)
+				
+				-- Set position at this frame
+				at time f
+				(
+					animate on
+					(
+						in coordsys world selectedBone.pos = newPos
+					)
+				)
+			)
+			
+			format "Smoothing complete!\n"
+			messageBox ("Root smoothed to " + (targetSpeedMS as string) + " m/s in selected axes over " + (blendFrames as string) + " frames.") title:"Root Smoothing Complete"
+		)
+		
+		-- Recalculate speeds to show updated values
+		calculateSpeed()
+		
+		return true
+	)
+		
 		local targetSpeedMS = spnTargetSpeed.value
 		local blendFrames = spnBlendFrames.value as integer
 		local endFrame = animationRange.end.frame as integer

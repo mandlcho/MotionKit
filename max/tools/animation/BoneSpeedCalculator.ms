@@ -44,7 +44,7 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 	group "Root Smoothing"
 	(
 		label lblRootHelp "Smooth root animation to target speed:" align:#left offset:[5,5]
-		spinner spnTargetSpeed "Target Speed (m/s):" range:[0,100,10] type:#float fieldwidth:60 offset:[0,5]
+		spinner spnTargetSpeed "Target Speed (m/s):" range:[-100,100,10] type:#float fieldwidth:60 offset:[0,5]
 		spinner spnBlendFrames "Blend Frames:" range:[1,100,30] type:#integer fieldwidth:60 offset:[0,5]
 		button btnSmoothRoot "Smooth Root to Target" width:160 height:30 offset:[0,5]
 	)
@@ -259,111 +259,107 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		local targetSpeedMS = spnTargetSpeed.value
 		local blendFrames = spnBlendFrames.value as integer
 		local endFrame = animationRange.end.frame as integer
-		local targetFrame = endFrame - 1  -- We adjust up to the frame BEFORE last
-		local startFrame = endFrame - blendFrames  -- Count back N frames from last frame
+		local startFrame = endFrame - blendFrames
 		
-		if startFrame < animationRange.start.frame then
+		if startFrame < (animationRange.start.frame + 1) then
 		(
 			messageBox "Not enough frames for blending! Reduce blend frames or extend timeline." title:"Root Smoothing"
 			return false
 		)
 		
 		local fps = frameRate as float
-		local conversionFactor = 100.0
-		local targetDistancePerFrame = (targetSpeedMS * conversionFactor) / fps
+		-- Target speed in cm/frame (the unit Max works in)
+		local targetCmPerFrame = (targetSpeedMS * 100.0) / fps
 		
-		-- Get the FIXED last frame position (this won't change)
+		-- Get original speed at the start of blend range (speed INTO startFrame)
+		local posBeforeStart = at time (startFrame - 1) (in coordsys world selectedBone.pos)
+		local posAtStart = at time startFrame (in coordsys world selectedBone.pos)
+		local origSpeedX = posAtStart.x - posBeforeStart.x
+		local origSpeedY = posAtStart.y - posBeforeStart.y
+		local origSpeedZ = posAtStart.z - posBeforeStart.z
+		
+		-- FIXED last frame position - never changes
 		local lastFramePos = at time endFrame (in coordsys world selectedBone.pos)
 		
-		-- Get the current target frame position
-		local currentTargetPos = at time targetFrame (in coordsys world selectedBone.pos)
+		-- Convert original speeds to m/s for debug display
+		local origMsX = origSpeedX / 100.0 * fps
+		local origMsY = origSpeedY / 100.0 * fps
+		local origMsZ = origSpeedZ / 100.0 * fps
 		
-		-- Calculate where targetFrame should be based on selected axes
-		-- We move BACK from lastFrame by targetDistance in the selected axes
-		local targetFramePos = copy currentTargetPos
+		format "\n=== Root Smoothing (Backward Extrapolation) ===\n"
+		format "End frame: % [FIXED pos: %]\n" endFrame lastFramePos
+		format "Blend: frame % to frame % (% frames)\n" startFrame (endFrame - 1) blendFrames
+		format "Original speed at start: X=% Y=% Z=% cm/frame\n" origSpeedX origSpeedY origSpeedZ
+		format "Original speed at start: X=% Y=% Z=% m/s\n" origMsX origMsY origMsZ
+		format "Target speed: % m/s = % cm/frame\n" targetSpeedMS targetCmPerFrame
 		
-		-- For each selected axis, calculate where it should be
-		if chkX.checked then
-		(
-			-- Calculate direction in X (positive or negative)
-			local deltaX = lastFramePos.x - currentTargetPos.x
-			local directionX = 0
-			if deltaX != 0 then
-				directionX = deltaX / abs deltaX
-			-- Move back by target distance
-			targetFramePos.x = lastFramePos.x - (directionX * targetDistancePerFrame)
-		)
-		else
-		(
-			-- Keep original X
-			targetFramePos.x = currentTargetPos.x
-		)
+		-- ============================================================
+		-- Algorithm:
+		-- We have N = blendFrames steps from startFrame to endFrame.
+		-- Step i (1-based) goes from frame (startFrame + i - 1) to (startFrame + i).
+		-- Step N is the LAST step, going into endFrame.
+		--
+		-- Speed at step i = lerp(origSpeed, targetSpeed, i / N)
+		--   step 1: mostly original speed
+		--   step N: exactly target speed
+		--
+		-- We build positions BACKWARDS from the fixed endFrame:
+		--   pos[endFrame] = lastFramePos  (fixed)
+		--   pos[endFrame - 1] = pos[endFrame] - speed_at_step_N
+		--   pos[endFrame - 2] = pos[endFrame - 1] - speed_at_step_(N-1)
+		--   ...
+		--   pos[startFrame] = pos[startFrame + 1] - speed_at_step_1
+		-- ============================================================
 		
-		if chkY.checked then
-		(
-			local deltaY = lastFramePos.y - currentTargetPos.y
-			local directionY = 0
-			if deltaY != 0 then
-				directionY = deltaY / abs deltaY
-			targetFramePos.y = lastFramePos.y - (directionY * targetDistancePerFrame)
-		)
-		else
-		(
-			targetFramePos.y = currentTargetPos.y
-		)
+		-- Build positions array backward (index 1 = endFrame, last = startFrame)
+		local numSteps = blendFrames  -- N steps
+		local framePositions = #()  -- array of #(frameNum, x, y, z)
 		
-		if chkZ.checked then
-		(
-			local deltaZ = lastFramePos.z - currentTargetPos.z
-			local directionZ = 0
-			if deltaZ != 0 then
-				directionZ = deltaZ / abs deltaZ
-			targetFramePos.z = lastFramePos.z - (directionZ * targetDistancePerFrame)
-		)
-		else
-		(
-			targetFramePos.z = currentTargetPos.z
-		)
+		-- Start from fixed end
+		local curX = lastFramePos.x
+		local curY = lastFramePos.y
+		local curZ = lastFramePos.z
 		
-		-- Store the start position
-		local startPos = at time startFrame (in coordsys world selectedBone.pos)
+		-- endFrame itself (fixed, we store it but won't key it)
+		append framePositions #(endFrame, curX, curY, curZ)
 		
-		-- Debug output
-		format "\n=== Root Smoothing ===\n"
-		format "Selected Axes: X=% Y=% Z=%\n" chkX.checked chkY.checked chkZ.checked
-		format "Start Frame: %\n" startFrame
-		format "Target Frame: %\n" targetFrame
-		format "Last Frame: % [FIXED]\n" endFrame
-		format "Start Pos: %\n" startPos
-		format "Target Pos: %\n" targetFramePos
-		format "Last Pos: % [UNCHANGED]\n" lastFramePos
-		format "Target Speed: % m/s (% cm/frame)\n" targetSpeedMS targetDistancePerFrame
-		format "Blend Frames: %\n" blendFrames
+		-- Walk backward: step N, N-1, ..., 1
+		for step = numSteps to 1 by -1 do
+		(
+			local t = step as float / numSteps as float
+			
+			-- Speed for this step (lerp between original and target)
+			local speedX = origSpeedX + (targetCmPerFrame - origSpeedX) * t
+			local speedY = origSpeedY + (targetCmPerFrame - origSpeedY) * t
+			local speedZ = origSpeedZ + (targetCmPerFrame - origSpeedZ) * t
+			
+			-- Subtract to go backward
+			curX = curX - speedX
+			curY = curY - speedY
+			curZ = curZ - speedZ
+			
+			local f = startFrame + step - 1
+			append framePositions #(f, curX, curY, curZ)
+			
+			local speedMS = speedX / 100.0 * fps
+			local speedMSY = speedY / 100.0 * fps
+			local speedMSZ = speedZ / 100.0 * fps
+			format "  Step %: frame % -> speed X=% Y=% Z=% m/s\n" step f speedMS speedMSY speedMSZ
+		)
 		
 		with undo on
 		(
-			-- Apply smoothed positions
-			for f = startFrame to targetFrame do
+			-- Apply positions (skip endFrame - it's fixed)
+			for i = 2 to framePositions.count do
 			(
-				-- Calculate blend factor (0 to 1)
-				local t = (f - startFrame) as float / blendFrames as float
-				
-				-- Get current position at this frame
+				local f = framePositions[i][1]
 				local currentPos = at time f (in coordsys world selectedBone.pos)
-				
-				-- Interpolate only the selected axes
 				local newPos = copy currentPos
 				
-				if chkX.checked then
-					newPos.x = startPos.x + ((targetFramePos.x - startPos.x) * t)
+				if chkX.checked then newPos.x = framePositions[i][2]
+				if chkY.checked then newPos.y = framePositions[i][3]
+				if chkZ.checked then newPos.z = framePositions[i][4]
 				
-				if chkY.checked then
-					newPos.y = startPos.y + ((targetFramePos.y - startPos.y) * t)
-				
-				if chkZ.checked then
-					newPos.z = startPos.z + ((targetFramePos.z - startPos.z) * t)
-				
-				-- Set position at this frame
 				at time f
 				(
 					animate on
@@ -372,96 +368,10 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 					)
 				)
 			)
-			
-			format "Smoothing complete!\n"
-			messageBox ("Root smoothed to " + (targetSpeedMS as string) + " m/s in selected axes over " + (blendFrames as string) + " frames.") title:"Root Smoothing Complete"
 		)
 		
-		-- Recalculate speeds to show updated values
-		calculateSpeed()
-		
-		return true
-	)
-		
-		local targetSpeedMS = spnTargetSpeed.value
-		local blendFrames = spnBlendFrames.value as integer
-		local endFrame = animationRange.end.frame as integer
-		local targetFrame = endFrame - 1  -- We adjust up to the frame BEFORE last
-		local startFrame = targetFrame - blendFrames
-		
-		if startFrame < animationRange.start.frame then
-		(
-			messageBox "Not enough frames for blending! Reduce blend frames or extend timeline." title:"Root Smoothing"
-			return false
-		)
-		
-		-- Check if bone has position controller
-		if selectedBone.transform.controller == undefined then
-		(
-			messageBox "Selected bone has no transform controller!" title:"Root Smoothing"
-			return false
-		)
-		
-		local fps = frameRate as float
-		local conversionFactor = 100.0
-		
-		-- Calculate target distance per frame in scene units (cm)
-		local targetDistancePerFrame = (targetSpeedMS * conversionFactor) / fps
-		
-		-- Get the FIXED last frame position (this won't change)
-		local lastFramePos = at time endFrame (in coordsys world selectedBone.pos)
-		
-		-- Calculate where targetFrame (N-1) needs to be to achieve target speed into lastFrame
-		local targetDistancePerFrame = (targetSpeedMS * conversionFactor) / fps
-		
-		-- Get current direction of travel
-		local currentTargetPos = at time targetFrame (in coordsys world selectedBone.pos)
-		local currentDirection = normalize (lastFramePos - currentTargetPos)
-		
-		-- Where should targetFrame be? (distance back from lastFrame)
-		local targetFramePos = lastFramePos - (currentDirection * targetDistancePerFrame)
-		
-		-- Store the start position
-		local startPos = at time startFrame (in coordsys world selectedBone.pos)
-		
-		-- Debug output
-		format "Start Frame: %, Target Frame: %, Last Frame: %\n" startFrame targetFrame endFrame
-		format "Last Frame (%) Pos: % [FIXED]\n" endFrame lastFramePos
-		format "Target Frame (%) Pos: %\n" targetFrame targetFramePos
-		format "Start Frame (%) Pos: %\n" startFrame startPos
-		format "Target Speed: % m/s (% cm/frame)\n" targetSpeedMS targetDistancePerFrame
-		
-		with undo on
-		(
-			-- Enable animation mode
-			setCommandPanelTaskMode mode:#modify
-			
-			-- Apply smoothed positions (from startFrame to targetFrame, NOT including endFrame)
-			for f = startFrame to targetFrame do
-			(
-				-- Calculate blend factor (0 to 1)
-				local t = (f - startFrame) as float / blendFrames as float
-				
-				-- Linear interpolation from startPos to targetFramePos
-				local newPos = startPos + ((targetFramePos - startPos) * t)
-				
-				-- Set position at this frame with animate on
-				at time f
-				(
-					animate on
-					(
-						in coordsys world selectedBone.pos = newPos
-					)
-				)
-				
-				format "Frame %: t=%, newPos=%\n" f t newPos
-			)
-			
-			format "Last frame (%) left unchanged at: %\n" endFrame lastFramePos
-			
-			format "Smoothing complete!\n"
-			messageBox ("Root smoothed to " + (targetSpeedMS as string) + " m/s over " + (blendFrames as string) + " frames.\n\nCheck MAXScript Listener for details.") title:"Root Smoothing Complete"
-		)
+		format "Done! Last frame % position unchanged.\n" endFrame
+		messageBox ("Root smoothed to " + (targetSpeedMS as string) + " m/s over " + (blendFrames as string) + " frames.\nLast frame position preserved.") title:"Root Smoothing Complete"
 		
 		-- Recalculate speeds to show updated values
 		calculateSpeed()

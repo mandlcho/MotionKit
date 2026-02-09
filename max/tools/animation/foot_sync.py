@@ -723,53 +723,53 @@ struct FootSyncToolStruct
 )
 
 -- Create dialog
-rollout FootSyncDialog "{title}" width:480 height:560
+rollout FootSyncDialog "{title}" width:500 height:580
 (
     -- Description
-    label descLabel "{description}" pos:[10,10] width:460 align:#center
+    label descLabel "{description}" pos:[15,12] width:470 align:#center
     
     -- Biped filter function
     fn bipedFilter obj = (classof obj.controller == Vertical_Horizontal_Turn)
 
     -- Biped Selection
-    groupBox bipedGroup "Biped Selection" pos:[10,35] width:460 height:55
-    pickbutton bipedPicker "Pick Biped Object" pos:[20,55] width:440 height:25 filter:bipedFilter
+    groupBox bipedGroup "Biped Selection" pos:[15,40] width:470 height:60
+    pickbutton bipedPicker "Pick Biped Object" pos:[25,60] width:450 height:28 filter:bipedFilter
     
     -- Character Preset
-    groupBox presetGroup "Character Preset" pos:[10,100] width:460 height:55
-    dropdownlist presetDropdown "" pos:[20,120] width:440 \\
+    groupBox presetGroup "Character Preset" pos:[15,110] width:470 height:60
+    dropdownlist presetDropdown "" pos:[25,130] width:450 \\
         items:#{preset_names_ms}
     
     -- Parameters
-    groupBox paramsGroup "Detection Parameters" pos:[10,165] width:460 height:280
+    groupBox paramsGroup "Detection Parameters" pos:[15,180] width:470 height:290
     
-    label feetHeightLabel "Foot Height Range:" pos:[20,185] width:150
-    spinner feetMinSpin "Min:" pos:[80,205] width:160 range:[0,1000,5] type:#float fieldwidth:60
-    spinner feetNeutralSpin "Neutral:" pos:[80,230] width:160 range:[0,1000,10] type:#float fieldwidth:60
-    spinner feetMaxSpin "Max:" pos:[80,255] width:160 range:[0,1000,15] type:#float fieldwidth:60
+    label feetHeightLabel "Foot Height Range:" pos:[25,203] width:150
+    spinner feetMinSpin "Min:" pos:[90,225] width:155 range:[0,1000,5] type:#float fieldwidth:60
+    spinner feetNeutralSpin "Neutral:" pos:[90,250] width:155 range:[0,1000,10] type:#float fieldwidth:60
+    spinner feetMaxSpin "Max:" pos:[90,275] width:155 range:[0,1000,15] type:#float fieldwidth:60
     
-    label toeHeightLabel "Toe Height Range:" pos:[250,185] width:150
-    spinner toeMinSpin "Min:" pos:[310,205] width:160 range:[0,1000,0] type:#float fieldwidth:60
-    spinner toeNeutralSpin "Neutral:" pos:[310,230] width:160 range:[0,1000,5] type:#float fieldwidth:60
-    spinner toeMaxSpin "Max:" pos:[310,255] width:160 range:[0,1000,10] type:#float fieldwidth:60
+    label toeHeightLabel "Toe Height Range:" pos:[260,203] width:150
+    spinner toeMinSpin "Min:" pos:[325,225] width:155 range:[0,1000,0] type:#float fieldwidth:60
+    spinner toeNeutralSpin "Neutral:" pos:[325,250] width:155 range:[0,1000,5] type:#float fieldwidth:60
+    spinner toeMaxSpin "Max:" pos:[325,275] width:155 range:[0,1000,10] type:#float fieldwidth:60
     
-    label velocityLabel "Velocity Thresholds:" pos:[20,285] width:150
-    spinner angleSpeedSpin "Angle Speed:" pos:[100,305] width:140 range:[0,10,1.2] type:#float fieldwidth:60
-    spinner minMovementSpin "Min Movement:" pos:[100,330] width:140 range:[0,10,0.22] type:#float fieldwidth:60
+    label velocityLabel "Velocity Thresholds:" pos:[25,305] width:150
+    spinner angleSpeedSpin "Angle Speed:" pos:[105,327] width:140 range:[0,10,1.2] type:#float fieldwidth:60
+    spinner minMovementSpin "Min Movement:" pos:[105,352] width:140 range:[0,10,0.22] type:#float fieldwidth:60
     
-    label toleranceLabel "Tolerances:" pos:[250,285] width:150
-    spinner heightToleranceSpin "Height:" pos:[310,305] width:160 range:[0,10,2.0] type:#float fieldwidth:60
-    spinner speedToleranceSpin "Speed:" pos:[310,330] width:160 range:[0,10,0.4] type:#float fieldwidth:60
+    label toleranceLabel "Tolerances:" pos:[260,305] width:150
+    spinner heightToleranceSpin "Height:" pos:[325,327] width:155 range:[0,10,2.0] type:#float fieldwidth:60
+    spinner speedToleranceSpin "Speed:" pos:[325,352] width:155 range:[0,10,0.4] type:#float fieldwidth:60
     
     label infoLabel "Sync Groups: 0=Ground Contact | 1=Lifting | 2=In Air" \\
-        pos:[20,365] width:440 align:#center
+        pos:[25,392] width:450 align:#center
     
     -- Progress
-    groupBox progressGroup "Status" pos:[10,455] width:460 height:55
-    label statusLabel "" pos:[20,475] width:440 align:#center
+    groupBox progressGroup "Status" pos:[15,480] width:470 height:60
+    label statusLabel "" pos:[25,503] width:450 align:#center
     
     -- Buttons
-    button generateBtn "Generate Foot Sync" pos:[10,520] width:220 height:30
+    button generateBtn "Generate Foot Sync" pos:[15,550] width:230 height:32
     -- Update UI from tool values
     fn updateUIFromTool =
     (
@@ -800,7 +800,7 @@ rollout FootSyncDialog "{title}" width:480 height:560
         FootSyncTool.speedTolerance = speedToleranceSpin.value
     )
 
-    button closeBtn "Close" pos:[250,520] width:220 height:30
+    button closeBtn "Close" pos:[255,550] width:230 height:32
 
     -- Initialize
     on FootSyncDialog open do

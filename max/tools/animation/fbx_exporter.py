@@ -157,6 +157,727 @@ def _detect_export_path():
         return config.get('export.fbx_path', None)
 
 
+# ============================================
+# Multi-Take Export Functions
+# ============================================
+
+def _save_takes_to_scene(takes_data):
+    """
+    Save multi-take data to scene as custom attribute on root node.
+    
+    Args:
+        takes_data: List of dicts with keys: name, start_frame, end_frame, selection_set, enabled
+        
+    Example:
+        [
+            {"name": "Idle", "start_frame": 0, "end_frame": 30, "selection_set": "Fbx", "enabled": True},
+            {"name": "Walk", "start_frame": 31, "end_frame": 60, "selection_set": "Fbx", "enabled": True}
+        ]
+    """
+    try:
+        if not rt:
+            logger.error("MaxScript runtime not available")
+            return False
+            
+        # Convert takes to pipe-delimited strings
+        # Format: "name|start|end|selset|enabled"
+        take_strings = []
+        for take in takes_data:
+            enabled_str = "1" if take.get("enabled", True) else "0"
+            take_str = f"{take['name']}|{take['start_frame']}|{take['end_frame']}|{take['selection_set']}|{enabled_str}"
+            take_strings.append(take_str)
+        
+        # Create MaxScript array string
+        takes_array = "#(" + ", ".join([f'"{s}"' for s in take_strings]) + ")"
+        
+        # Store in scene root node custom attribute
+        maxscript = f'''
+(
+    -- Get or create custom attribute definition
+    local caDef = attributes MotionKitMultiTake
+    (
+        parameters main
+        (
+            takes type:#stringTab tabSize:0 tabSizeVariable:true
+        )
+    )
+    
+    -- Apply to root node
+    if rootNode.custAttributes[#MotionKitMultiTake] == undefined then
+    (
+        custAttributes.add rootNode caDef
+    )
+    
+    -- Set takes data
+    rootNode.MotionKitMultiTake.takes = {takes_array}
+    
+    true
+)
+'''
+        result = rt.execute(maxscript)
+        
+        if result:
+            logger.info(f"Saved {len(takes_data)} takes to scene")
+            return True
+        else:
+            logger.error("Failed to save takes to scene")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Failed to save takes to scene: {str(e)}")
+        return False
+
+
+def _load_takes_from_scene():
+    """
+    Load multi-take data from scene custom attribute.
+    
+    Returns:
+        list: List of take dicts, or empty list if no data found
+    """
+    try:
+        if not rt:
+            logger.error("MaxScript runtime not available")
+            return []
+            
+        # Read takes from root node custom attribute
+        maxscript = '''
+(
+    if rootNode.custAttributes[#MotionKitMultiTake] != undefined then
+    (
+        rootNode.MotionKitMultiTake.takes
+    )
+    else
+    (
+        #()
+    )
+)
+'''
+        result = rt.execute(maxscript)
+        
+        if not result or len(result) == 0:
+            logger.info("No multi-take data found in scene")
+            return []
+        
+        # Parse take strings
+        takes_data = []
+        for take_str in result:
+            parts = take_str.split('|')
+            if len(parts) >= 4:
+                take = {
+                    "name": parts[0],
+                    "start_frame": int(parts[1]),
+                    "end_frame": int(parts[2]),
+                    "selection_set": parts[3],
+                    "enabled": parts[4] == "1" if len(parts) > 4 else True
+                }
+                takes_data.append(take)
+        
+        logger.info(f"Loaded {len(takes_data)} takes from scene")
+        return takes_data
+        
+    except Exception as e:
+        logger.error(f"Failed to load takes from scene: {str(e)}")
+        return []
+
+
+def _export_multi_takes(take_indices, export_path, all_takes=False):
+    """
+    Export multiple takes from the current file.
+    
+    Args:
+        take_indices: List of take indices to export (0-based), or None if all_takes=True
+        export_path: FBX export directory path
+        all_takes: If True, export all enabled takes regardless of take_indices
+    """
+    try:
+        # Load takes from scene
+        takes_data = _load_takes_from_scene()
+        
+        if not takes_data:
+            rt.messageBox("No takes defined! Please add takes to the Multi-Take table first.", title="Multi-Take Export")
+            return
+        
+        # Filter takes to export
+        if all_takes:
+            takes_to_export = [t for t in takes_data if t.get("enabled", True)]
+            logger.info(f"Exporting all {len(takes_to_export)} enabled takes")
+        else:
+            if not take_indices:
+                rt.messageBox("No takes selected! Please select takes to export.", title="Multi-Take Export")
+                return
+            takes_to_export = [takes_data[i] for i in take_indices if i < len(takes_data) and takes_data[i].get("enabled", True)]
+            logger.info(f"Exporting {len(takes_to_export)} selected takes")
+        
+        if not takes_to_export:
+            rt.messageBox("No enabled takes to export!", title="Multi-Take Export")
+            return
+        
+        total_takes = len(takes_to_export)
+        exported_files = []
+        
+        for idx, take in enumerate(takes_to_export):
+            take_num = idx + 1
+            logger.info(f"Exporting take {take_num}/{total_takes}: {take['name']}")
+            _update_progress(int((take_num - 1) / total_takes * 100), f"Exporting {take_num}/{total_takes}: {take['name']}")
+            
+            # Find selection set
+            sel_set = None
+            for i in range(rt.selectionSets.count):
+                if rt.selectionSets[i].name == take['selection_set']:
+                    sel_set = rt.selectionSets[i]
+                    break
+            
+            if not sel_set:
+                logger.warning(f"Selection set '{take['selection_set']}' not found for take '{take['name']}', skipping...")
+                continue
+            
+            # Get objects from selection set
+            objects_to_export = [obj for obj in sel_set]
+            
+            if not objects_to_export:
+                logger.warning(f"Selection set '{take['selection_set']}' is empty for take '{take['name']}', skipping...")
+                continue
+            
+            # Select objects
+            rt.select(objects_to_export)
+            logger.info(f"Exporting {len(objects_to_export)} objects from '{take['selection_set']}' set")
+            
+            # Export FBX with take name
+            export_file = os.path.join(export_path, f"{take['name']}.fbx")
+            
+            # Check out from P4 if needed
+            if not _p4_checkout(export_file):
+                logger.warning(f"P4 checkout failed for {export_file}, continuing anyway...")
+            
+            # Remove read-only if file exists
+            if os.path.exists(export_file):
+                try:
+                    import stat
+                    os.chmod(export_file, stat.S_IWRITE | stat.S_IREAD)
+                except Exception as e:
+                    logger.warning(f"Failed to remove read-only attribute: {str(e)}")
+            
+            # Configure FBX export
+            original_start = rt.animationRange.start
+            original_end = rt.animationRange.end
+            
+            try:
+                rt.animationRange = rt.interval(take['start_frame'], take['end_frame'])
+                
+                rt.FBXExporterSetParam(rt.Name("Animation"), True)
+                rt.FBXExporterSetParam(rt.Name("BakeAnimation"), True)
+                rt.FBXExporterSetParam(rt.Name("BakeFrameStart"), take['start_frame'])
+                rt.FBXExporterSetParam(rt.Name("BakeFrameEnd"), take['end_frame'])
+                rt.FBXExporterSetParam(rt.Name("BakeFrameStep"), 1)
+                rt.FBXExporterSetParam(rt.Name("Shape"), True)
+                rt.FBXExporterSetParam(rt.Name("Skin"), True)
+                rt.FBXExporterSetParam(rt.Name("UpAxis"), rt.Name("Z"))
+                
+                # Export
+                rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
+                
+                exported_files.append(export_file)
+                logger.info(f"Exported: {export_file}")
+                
+            finally:
+                rt.animationRange = rt.interval(original_start, original_end)
+        
+        _update_progress(100, "Multi-take export complete!")
+        logger.info(f"Multi-take export complete: {len(exported_files)} files exported")
+        
+        # Show completion notification
+        if exported_files:
+            _show_export_notification(exported_files)
+        else:
+            rt.messageBox("No takes were exported!", title="Multi-Take Export")
+        
+    except Exception as e:
+        _update_progress(0, "Multi-take export failed!")
+        logger.error(f"Multi-take export failed: {str(e)}")
+        rt.messageBox(f"Multi-take export failed:\n{str(e)}", title="Multi-Take Export Error")
+
+
+# ============================================
+# Multi-Take UI Management Functions
+# ============================================
+
+def _refresh_take_list():
+    """Refresh the take list display in the UI"""
+    try:
+        takes_data = _load_takes_from_scene()
+        
+        # Format takes for display: "☑ TakeName | 0-30 | Fbx"
+        take_items = []
+        for take in takes_data:
+            enabled_icon = "☑" if take.get("enabled", True) else "☐"
+            take_str = f"{enabled_icon} {take['name']} | {take['start_frame']}-{take['end_frame']} | {take['selection_set']}"
+            take_items.append(take_str)
+        
+        # Update UI
+        if not take_items:
+            take_items = ["(No takes defined - click 'Add Take')"]
+        
+        # Create MaxScript array string
+        items_array = "#(" + ", ".join([f'"{s}"' for s in take_items]) + ")"
+        
+        maxscript = f'''
+(
+    if motionKitAnimExporterRollout != undefined then
+    (
+        motionKitAnimExporterRollout.refreshTakeList {items_array}
+    )
+)
+'''
+        rt.execute(maxscript)
+        
+    except Exception as e:
+        logger.error(f"Failed to refresh take list: {str(e)}")
+
+
+def _add_new_take():
+    """Add a new take to the list"""
+    try:
+        takes_data = _load_takes_from_scene()
+        
+        # Get timeline range for default values
+        start_frame = int(rt.animationRange.start.frame)
+        end_frame = int(rt.animationRange.end.frame)
+        
+        # Get first selection set name
+        default_sel_set = "Fbx"
+        if rt.selectionSets.count > 0:
+            default_sel_set = rt.selectionSets[0].name
+        
+        # Show edit dialog
+        result = _show_take_edit_dialog(
+            f"Take{len(takes_data) + 1}",
+            start_frame,
+            end_frame,
+            default_sel_set,
+            True
+        )
+        
+        if result:
+            takes_data.append(result)
+            _save_takes_to_scene(takes_data)
+            _refresh_take_list()
+            logger.info(f"Added new take: {result['name']}")
+        
+    except Exception as e:
+        logger.error(f"Failed to add take: {str(e)}")
+        rt.messageBox(f"Failed to add take:\n{str(e)}", title="Add Take Error")
+
+
+def _duplicate_take(index):
+    """Duplicate a take"""
+    try:
+        takes_data = _load_takes_from_scene()
+        
+        if index < 0 or index >= len(takes_data):
+            rt.messageBox("Invalid take index!", title="Duplicate Take")
+            return
+        
+        # Copy the take
+        original_take = takes_data[index]
+        new_take = {
+            "name": f"{original_take['name']}_copy",
+            "start_frame": original_take['start_frame'],
+            "end_frame": original_take['end_frame'],
+            "selection_set": original_take['selection_set'],
+            "enabled": original_take.get('enabled', True)
+        }
+        
+        takes_data.insert(index + 1, new_take)
+        _save_takes_to_scene(takes_data)
+        _refresh_take_list()
+        logger.info(f"Duplicated take: {original_take['name']} -> {new_take['name']}")
+        
+    except Exception as e:
+        logger.error(f"Failed to duplicate take: {str(e)}")
+        rt.messageBox(f"Failed to duplicate take:\n{str(e)}", title="Duplicate Take Error")
+
+
+def _remove_takes(indices_str):
+    """Remove takes by indices"""
+    try:
+        indices = [int(i) for i in indices_str.split('|') if i.strip()]
+        takes_data = _load_takes_from_scene()
+        
+        # Remove in reverse order to preserve indices
+        for index in sorted(indices, reverse=True):
+            if 0 <= index < len(takes_data):
+                removed_take = takes_data.pop(index)
+                logger.info(f"Removed take: {removed_take['name']}")
+        
+        _save_takes_to_scene(takes_data)
+        _refresh_take_list()
+        
+    except Exception as e:
+        logger.error(f"Failed to remove takes: {str(e)}")
+        rt.messageBox(f"Failed to remove takes:\n{str(e)}", title="Remove Takes Error")
+
+
+def _edit_take(index):
+    """Edit a take"""
+    try:
+        takes_data = _load_takes_from_scene()
+        
+        if index < 0 or index >= len(takes_data):
+            rt.messageBox("Invalid take index!", title="Edit Take")
+            return
+        
+        take = takes_data[index]
+        
+        # Show edit dialog
+        result = _show_take_edit_dialog(
+            take['name'],
+            take['start_frame'],
+            take['end_frame'],
+            take['selection_set'],
+            take.get('enabled', True)
+        )
+        
+        if result:
+            takes_data[index] = result
+            _save_takes_to_scene(takes_data)
+            _refresh_take_list()
+            logger.info(f"Edited take: {result['name']}")
+        
+    except Exception as e:
+        logger.error(f"Failed to edit take: {str(e)}")
+        rt.messageBox(f"Failed to edit take:\n{str(e)}", title="Edit Take Error")
+
+
+def _show_take_edit_dialog(name, start_frame, end_frame, selection_set, enabled):
+    """
+    Show dialog to edit take properties
+    
+    Returns:
+        dict: Take data if OK pressed, None if cancelled
+    """
+    try:
+        # Get selection sets
+        selection_sets = []
+        for i in range(rt.selectionSets.count):
+            selection_sets.append(rt.selectionSets[i].name)
+        
+        if not selection_sets:
+            selection_sets = ["(No selection sets)"]
+        
+        selection_sets_str = "#(" + ", ".join([f'"{s}"' for s in selection_sets]) + ")"
+        
+        # Find index of current selection set
+        sel_set_index = 1
+        if selection_set in selection_sets:
+            sel_set_index = selection_sets.index(selection_set) + 1
+        
+        enabled_str = "true" if enabled else "false"
+        
+        # Escape name for MaxScript
+        name_escaped = name.replace('\\\\', '\\\\\\\\').replace('"', '\\\\"')
+        
+        maxscript = f'''
+(
+    local dialogResult = undefined
+    
+    rollout TakeEditDialog "Edit Take" width:400 height:220
+    (
+        label nameLbl "Take Name:" pos:[20,20] width:80 align:#left
+        edittext nameEdit "" pos:[105,17] width:275 height:22 text:"{name_escaped}"
+        
+        label startLbl "Start Frame:" pos:[20,55] width:80 align:#left
+        spinner startSpn "" pos:[105,52] width:100 height:22 type:#integer range:[-100000,100000,{start_frame}]
+        
+        label endLbl "End Frame:" pos:[20,90] width:80 align:#left
+        spinner endSpn "" pos:[105,87] width:100 height:22 type:#integer range:[-100000,100000,{end_frame}]
+        
+        label selSetLbl "Selection Set:" pos:[20,125] width:80 align:#left
+        dropdownList selSetDDL "" pos:[105,122] width:275 height:22 items:{selection_sets_str} selection:{sel_set_index}
+        
+        checkbox enabledCB "Enabled" pos:[20,160] checked:{enabled_str}
+        
+        button btnOK "OK" pos:[170,185] width:100 height:28
+        button btnCancel "Cancel" pos:[280,185] width:100 height:28
+        
+        on btnOK pressed do
+        (
+            if nameEdit.text == "" then
+            (
+                messageBox "Please enter a take name!" title:"Edit Take"
+                return false
+            )
+            
+            if startSpn.value >= endSpn.value then
+            (
+                messageBox "End frame must be greater than start frame!" title:"Edit Take"
+                return false
+            )
+            
+            -- Return pipe-delimited result
+            dialogResult = nameEdit.text + "|" + (startSpn.value as string) + "|" + (endSpn.value as string) + "|" + selSetDDL.selected + "|" + (enabledCB.checked as string)
+            destroyDialog TakeEditDialog
+        )
+        
+        on btnCancel pressed do
+        (
+            dialogResult = undefined
+            destroyDialog TakeEditDialog
+        )
+    )
+    
+    createDialog TakeEditDialog modal:true
+    dialogResult
+)
+'''
+        
+        result_str = rt.execute(maxscript)
+        
+        if result_str and result_str != "undefined":
+            # Parse result
+            parts = str(result_str).split('|')
+            if len(parts) >= 4:
+                return {
+                    "name": parts[0],
+                    "start_frame": int(parts[1]),
+                    "end_frame": int(parts[2]),
+                    "selection_set": parts[3],
+                    "enabled": parts[4].lower() == "true" if len(parts) > 4 else True
+                }
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Failed to show take edit dialog: {str(e)}")
+        return None
+
+
+def _export_selected_takes(indices_str, export_path):
+    """Export selected takes"""
+    try:
+        indices = [int(i) for i in indices_str.split('|') if i.strip()]
+        _export_multi_takes(indices, export_path, all_takes=False)
+    except Exception as e:
+        logger.error(f"Failed to export selected takes: {str(e)}")
+
+
+def _export_all_takes(export_path):
+    """Export all enabled takes"""
+    try:
+        _export_multi_takes(None, export_path, all_takes=True)
+    except Exception as e:
+        logger.error(f"Failed to export all takes: {str(e)}")
+
+
+def _batch_export_with_multitake(start_frame, end_frame, export_path, selected_files_str=None):
+    """
+    Batch export files using multi-take data if available
+    
+    Args:
+        start_frame: Fallback start frame if no multi-take data
+        end_frame: Fallback end frame if no multi-take data
+        export_path: FBX export directory path
+        selected_files_str: Pipe-delimited string of selected files, or None for all files
+    """
+    try:
+        # Get current Max file directory
+        current_max_path = rt.maxFilePath
+        current_max_name = rt.maxFileName
+        
+        if not current_max_path or not current_max_name:
+            rt.messageBox("Please save the current file before batch export!", title="Batch Export")
+            return
+        
+        logger.info(f"Starting batch multi-take export from directory: {current_max_path}")
+        
+        # Get list of files to export
+        if selected_files_str:
+            # Parse selected files
+            max_files = [f.strip() for f in selected_files_str.split('|') if f.strip()]
+        else:
+            # Get all .max files in the directory
+            import glob
+            max_files = glob.glob(os.path.join(current_max_path, "*.max"))
+            max_files = [os.path.basename(f) for f in max_files]
+            max_files.sort()
+        
+        if not max_files:
+            rt.messageBox("No Max files found!", title="Batch Export")
+            return
+        
+        logger.info(f"Found {len(max_files)} Max files to process: {max_files}")
+        
+        # Move current file to front of list if doing "All"
+        if not selected_files_str and current_max_name in max_files:
+            max_files.remove(current_max_name)
+            max_files.insert(0, current_max_name)
+        
+        total_files = len(max_files)
+        all_exported_files = []
+        
+        for idx, max_file in enumerate(max_files):
+            file_num = idx + 1
+            logger.info(f"Processing file {file_num}/{total_files}: {max_file}")
+            _update_progress(int((file_num - 1) / total_files * 100), f"Processing {file_num}/{total_files}: {max_file}")
+            
+            # Load file if not current file
+            if max_file != current_max_name:
+                logger.info(f"Loading file: {max_file}")
+                full_path = os.path.join(current_max_path, max_file)
+                
+                try:
+                    rt.loadMaxFile(full_path, quiet=True)
+                    logger.info(f"Loaded: {max_file}")
+                except Exception as e:
+                    logger.error(f"Failed to load {max_file}: {str(e)}")
+                    continue
+            
+            # Check if file has multi-take data
+            takes_data = _load_takes_from_scene()
+            
+            if takes_data:
+                # Use multi-take export
+                logger.info(f"File has {len(takes_data)} multi-takes, using multi-take export")
+                takes_to_export = [t for t in takes_data if t.get("enabled", True)]
+                
+                for take in takes_to_export:
+                    try:
+                        # Export this take
+                        sel_set = None
+                        for i in range(rt.selectionSets.count):
+                            if rt.selectionSets[i].name == take['selection_set']:
+                                sel_set = rt.selectionSets[i]
+                                break
+                        
+                        if not sel_set:
+                            logger.warning(f"Selection set '{take['selection_set']}' not found for take '{take['name']}', skipping...")
+                            continue
+                        
+                        objects_to_export = [obj for obj in sel_set]
+                        if not objects_to_export:
+                            logger.warning(f"Selection set '{take['selection_set']}' is empty for take '{take['name']}', skipping...")
+                            continue
+                        
+                        rt.select(objects_to_export)
+                        
+                        export_file = os.path.join(export_path, f"{take['name']}.fbx")
+                        
+                        if not _p4_checkout(export_file):
+                            logger.warning(f"P4 checkout failed for {export_file}, continuing anyway...")
+                        
+                        if os.path.exists(export_file):
+                            try:
+                                import stat
+                                os.chmod(export_file, stat.S_IWRITE | stat.S_IREAD)
+                            except Exception as e:
+                                logger.warning(f"Failed to remove read-only attribute: {str(e)}")
+                        
+                        original_start = rt.animationRange.start
+                        original_end = rt.animationRange.end
+                        
+                        try:
+                            rt.animationRange = rt.interval(take['start_frame'], take['end_frame'])
+                            
+                            rt.FBXExporterSetParam(rt.Name("Animation"), True)
+                            rt.FBXExporterSetParam(rt.Name("BakeAnimation"), True)
+                            rt.FBXExporterSetParam(rt.Name("BakeFrameStart"), take['start_frame'])
+                            rt.FBXExporterSetParam(rt.Name("BakeFrameEnd"), take['end_frame'])
+                            rt.FBXExporterSetParam(rt.Name("BakeFrameStep"), 1)
+                            rt.FBXExporterSetParam(rt.Name("Shape"), True)
+                            rt.FBXExporterSetParam(rt.Name("Skin"), True)
+                            rt.FBXExporterSetParam(rt.Name("UpAxis"), rt.Name("Z"))
+                            
+                            rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
+                            
+                            all_exported_files.append(export_file)
+                            logger.info(f"Exported: {export_file}")
+                            
+                        finally:
+                            rt.animationRange = rt.interval(original_start, original_end)
+                    
+                    except Exception as e:
+                        logger.error(f"Failed to export take '{take['name']}': {str(e)}")
+                        continue
+            else:
+                # Fallback to single export using 'Fbx' selection set
+                logger.info(f"No multi-take data, using fallback single export")
+                
+                fbx_set = None
+                for i in range(rt.selectionSets.count):
+                    if rt.selectionSets[i].name.lower() == "fbx":
+                        fbx_set = rt.selectionSets[i]
+                        break
+                
+                if not fbx_set:
+                    logger.warning(f"No 'Fbx' selection set found in {max_file}, skipping...")
+                    continue
+                
+                objects_to_export = [obj for obj in fbx_set]
+                if not objects_to_export:
+                    logger.warning(f"'Fbx' selection set is empty in {max_file}, skipping...")
+                    continue
+                
+                rt.select(objects_to_export)
+                
+                anim_name = os.path.splitext(max_file)[0]
+                export_file = os.path.join(export_path, f"{anim_name}.fbx")
+                
+                if not _p4_checkout(export_file):
+                    logger.warning(f"P4 checkout failed for {export_file}, continuing anyway...")
+                
+                if os.path.exists(export_file):
+                    try:
+                        import stat
+                        os.chmod(export_file, stat.S_IWRITE | stat.S_IREAD)
+                    except Exception as e:
+                        logger.warning(f"Failed to remove read-only attribute: {str(e)}")
+                
+                original_start = rt.animationRange.start
+                original_end = rt.animationRange.end
+                
+                try:
+                    rt.animationRange = rt.interval(start_frame, end_frame)
+                    
+                    rt.FBXExporterSetParam(rt.Name("Animation"), True)
+                    rt.FBXExporterSetParam(rt.Name("BakeAnimation"), True)
+                    rt.FBXExporterSetParam(rt.Name("BakeFrameStart"), start_frame)
+                    rt.FBXExporterSetParam(rt.Name("BakeFrameEnd"), end_frame)
+                    rt.FBXExporterSetParam(rt.Name("BakeFrameStep"), 1)
+                    rt.FBXExporterSetParam(rt.Name("Shape"), True)
+                    rt.FBXExporterSetParam(rt.Name("Skin"), True)
+                    rt.FBXExporterSetParam(rt.Name("UpAxis"), rt.Name("Z"))
+                    
+                    rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
+                    
+                    all_exported_files.append(export_file)
+                    logger.info(f"Exported: {export_file}")
+                    
+                finally:
+                    rt.animationRange = rt.interval(original_start, original_end)
+        
+        # Restore original file
+        if current_max_name and current_max_name != max_files[-1]:
+            try:
+                logger.info(f"Restoring original file: {current_max_name}")
+                full_path = os.path.join(current_max_path, current_max_name)
+                rt.loadMaxFile(full_path, quiet=True)
+            except Exception as e:
+                logger.error(f"Failed to restore original file: {str(e)}")
+        
+        _update_progress(100, "Batch export complete!")
+        logger.info(f"Batch export complete: {len(all_exported_files)} files exported")
+        
+        if all_exported_files:
+            _show_export_notification(all_exported_files)
+        else:
+            rt.messageBox("No files were exported!", title="Batch Export")
+    
+    except Exception as e:
+        _update_progress(0, "Batch export failed!")
+        logger.error(f"Batch export failed: {str(e)}")
+        rt.messageBox(f"Batch export failed:\n{str(e)}", title="Batch Export Error")
+
+
 def execute(control=None, event=None):
     """Execute the Animation Exporter tool"""
     if not pymxs or not rt:
@@ -240,79 +961,90 @@ class AnimationExporterDialog:
 
 global motionKitAnimExporterRollout
 
-rollout MotionKitAnimExporter "{title}" width:480 height:380
+rollout MotionKitAnimExporter "{title}" width:500 height:405
 (
     -- Animation Name
     group "Animation"
     (
-        label nameLbl "{name_label}:" pos:[20,20] width:100 align:#left
-        edittext nameEdit "" pos:[130,18] width:320 height:20 labelOnTop:false text:"{default_anim_name}"
+        label nameLbl "{name_label}:" pos:[20,23] width:100 align:#left
+        edittext nameEdit "" pos:[125,20] width:350 height:22 labelOnTop:false text:"{default_anim_name}"
     )
 
     -- Frame Range
     group "Frame Range"
     (
-        label startLbl "Start:" pos:[20,70] width:40 align:#left
-        spinner startSpn "" pos:[65,68] width:80 height:20 type:#integer range:[-100000,100000,{start_frame}]
+        label startLbl "Start:" pos:[20,75] width:45 align:#left
+        spinner startSpn "" pos:[70,72] width:85 height:22 type:#integer range:[-100000,100000,{start_frame}]
 
-        label endLbl "End:" pos:[160,70] width:30 align:#left
-        spinner endSpn "" pos:[195,68] width:80 height:20 type:#integer range:[-100000,100000,{end_frame}]
+        label endLbl "End:" pos:[180,75] width:35 align:#left
+        spinner endSpn "" pos:[220,72] width:85 height:22 type:#integer range:[-100000,100000,{end_frame}]
 
-        checkbox useTimelineCB "{use_timeline}" pos:[290,70] checked:true width:160
+        checkbox useTimelineCB "{use_timeline}" pos:[330,75] checked:true width:150
     )
 
     -- Objects
     group "Objects"
     (
-        label objLbl "{objects_label}:" pos:[20,120] width:100 align:#left
-        edittext objEdit "" pos:[130,118] width:240 height:20 labelOnTop:false text:"{selection_str}"
-        button btnPickObjs "{use_selection}" pos:[380,118] width:70 height:20
+        label objLbl "{objects_label}:" pos:[20,130] width:90 align:#left
+        edittext objEdit "" pos:[115,127] width:285 height:22 labelOnTop:false text:"{selection_str}"
+        button btnPickObjs "{use_selection}" pos:[410,127] width:65 height:22
 
-        label selSetLbl "Selection Set:" pos:[20,148] width:100 align:#left
-        dropdownList selSetDDL "" pos:[130,146] width:240 height:20 items:{selection_sets_str}
-        button btnUseSelSet "Use Set" pos:[380,146] width:70 height:20
+        label selSetLbl "Selection Set:" pos:[20,160] width:90 align:#left
+        dropdownList selSetDDL "" pos:[115,157] width:285 height:22 items:{selection_sets_str}
+        button btnUseSelSet "Use Set" pos:[410,157] width:65 height:22
     )
 
     -- Export Path Preview
     group "Export Path"
     (
-        label pathPreviewLbl "Export to:" pos:[20,200] width:60 align:#left
-        edittext pathValueEdit "" pos:[90,198] width:360 height:20 labelOnTop:false text:"{export_path_escaped}" readOnly:true
-        button btnChangePath "Change..." pos:[380,222] width:70 height:20
+        label pathPreviewLbl "Export to:" pos:[20,215] width:70 align:#left
+        edittext pathValueEdit "" pos:[95,212] width:380 height:22 labelOnTop:false text:"{export_path_escaped}" readOnly:true
+        button btnChangePath "Change..." pos:[410,238] width:65 height:22
     )
-
+    
     -- Progress Bar and Status
-    progressBar exportProgress "" pos:[20,260] width:440 height:12 value:0 color:(color 100 150 255)
-    label statusLabel "" pos:[20,278] width:440 height:20 align:#center
+    progressBar exportProgress "" pos:[15,285] width:470 height:14 value:0 color:(color 100 150 255)
+    label statusLabel "" pos:[15,305] width:470 height:22 align:#center
+    
+    -- Multi-Take Export Section
+    checkbox enableMultiTakeCB "▼ Multi-Take Export" pos:[15,335] width:200 checked:false
+    
+    -- Multi-take list (initially hidden)
+    multiListBox takeListBox "" pos:[20,360] width:460 height:10 visible:false
+    
+    -- Multi-take management buttons (initially hidden)
+    button btnAddTake "Add Take" pos:[20,475] width:80 height:25 visible:false
+    button btnDuplicateTake "Duplicate" pos:[110,475] width:80 height:25 visible:false
+    button btnRemoveTake "Remove" pos:[200,475] width:80 height:25 visible:false
+    button btnEditTake "Edit..." pos:[290,475] width:80 height:25 visible:false
 
     -- Export section
     group "Export"
     (
-        button btnExportCurrent "Current" pos:[20,325] width:100 height:30
-        button btnExportSelected "Selection" pos:[130,325] width:100 height:30
-        button btnExportAll "All" pos:[240,325] width:100 height:30
+        button btnExportCurrent "Current" pos:[20,350] width:105 height:32
+        button btnExportSelected "Selection" pos:[135,350] width:105 height:32
+        button btnExportAll "All" pos:[250,350] width:105 height:32
     )
 
     -- Close button
-    button btnClose "{close}" pos:[350,325] width:110 height:30
+    button btnClose "{close}" pos:[365,350] width:115 height:32
 
-    -- Use Timeline checkbox handler
-    on useTimelineCB changed state do
+    -- ============================================
+    -- Function Definitions (must be before event handlers)
+    -- ============================================
+    
+    -- Function to load takes from scene and populate list
+    fn loadTakesFromScene =
     (
-        if state then
-        (
-            startSpn.value = animationRange.start.frame as integer
-            endSpn.value = animationRange.end.frame as integer
-            startSpn.enabled = false
-            endSpn.enabled = false
-        )
-        else
-        (
-            startSpn.enabled = true
-            endSpn.enabled = true
-        )
+        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._refresh_take_list()"
     )
-
+    
+    -- Function to update take list display
+    fn refreshTakeList takeItems =
+    (
+        takeListBox.items = takeItems
+    )
+    
     -- Function to update dialog with current scene info
     fn updateSceneInfo =
     (
@@ -334,6 +1066,131 @@ rollout MotionKitAnimExporter "{title}" width:480 height:380
             startSpn.value = animationRange.start.frame as integer
             endSpn.value = animationRange.end.frame as integer
         )
+    )
+
+    -- ============================================
+    -- Event Handlers
+    -- ============================================
+
+    -- Use Timeline checkbox handler
+    on useTimelineCB changed state do
+    (
+        if state then
+        (
+            startSpn.value = animationRange.start.frame as integer
+            endSpn.value = animationRange.end.frame as integer
+            startSpn.enabled = false
+            endSpn.enabled = false
+        )
+        else
+        (
+            startSpn.enabled = true
+            endSpn.enabled = true
+        )
+    )
+    
+    -- Multi-Take Export checkbox handler
+    on enableMultiTakeCB changed state do
+    (
+        -- Show/hide multi-take controls
+        takeListBox.visible = state
+        btnAddTake.visible = state
+        btnDuplicateTake.visible = state
+        btnRemoveTake.visible = state
+        btnEditTake.visible = state
+        
+        -- Resize dialog to fit multi-take section
+        if state then
+        (
+            -- Expand dialog to show multi-take controls
+            MotionKitAnimExporter.height = 575
+            
+            -- Move multi-take section down below Export section
+            enableMultiTakeCB.pos = [15, 395]
+            takeListBox.pos = [20, 420]
+            btnAddTake.pos = [20, 535]
+            btnDuplicateTake.pos = [110, 535]
+            btnRemoveTake.pos = [200, 535]
+            btnEditTake.pos = [290, 535]
+            
+            -- Load takes from scene
+            loadTakesFromScene()
+        )
+        else
+        (
+            -- Collapse dialog back to original size
+            MotionKitAnimExporter.height = 405
+            
+            -- Move multi-take section back to original position
+            enableMultiTakeCB.pos = [15, 335]
+            takeListBox.pos = [20, 360]
+            btnAddTake.pos = [20, 475]
+            btnDuplicateTake.pos = [110, 475]
+            btnRemoveTake.pos = [200, 475]
+            btnEditTake.pos = [290, 475]
+        )
+    )
+    
+    -- Add Take button
+    on btnAddTake pressed do
+    (
+        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._add_new_take()"
+    )
+    
+    -- Duplicate Take button
+    on btnDuplicateTake pressed do
+    (
+        local selectedIndices = takeListBox.selection as bitArray
+        if selectedIndices.numberSet == 0 then
+        (
+            messageBox "Please select a take to duplicate!" title:"{title}"
+            return false
+        )
+        
+        -- Get first selected index (1-based to 0-based)
+        local firstIndex = (selectedIndices as array)[1] - 1
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._duplicate_take(" + (firstIndex as string) + ")")
+    )
+    
+    -- Remove Take button
+    on btnRemoveTake pressed do
+    (
+        local selectedIndices = takeListBox.selection as bitArray
+        if selectedIndices.numberSet == 0 then
+        (
+            messageBox "Please select take(s) to remove!" title:"{title}"
+            return false
+        )
+        
+        -- Convert bitArray to 0-based indices
+        local indicesArray = #()
+        for i in selectedIndices do
+            append indicesArray (i - 1)
+        
+        -- Create pipe-delimited string
+        local indicesStr = ""
+        for i = 1 to indicesArray.count do
+        (
+            indicesStr += (indicesArray[i] as string)
+            if i < indicesArray.count then indicesStr += "|"
+        )
+        
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._remove_takes('" + indicesStr + "')")
+    )
+    
+    -- Edit Take button
+    on btnEditTake pressed do
+    (
+        local selectedIndices = takeListBox.selection as bitArray
+        if selectedIndices.numberSet == 0 then
+        (
+            messageBox "Please select a take to edit!" title:"{title}"
+            return false
+        )
+        
+        -- Get first selected index (1-based to 0-based)
+        local firstIndex = (selectedIndices as array)[1] - 1
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._edit_take(" + (firstIndex as string) + ")")
     )
 
     -- Set initial state on dialog open
@@ -430,72 +1287,109 @@ rollout MotionKitAnimExporter "{title}" width:480 height:380
     -- Export Current button
     on btnExportCurrent pressed do
     (
-        -- Validation
-        if startSpn.value >= endSpn.value then
+        -- Check if multi-take export is enabled
+        if enableMultiTakeCB.checked then
         (
-            messageBox "End frame must be greater than start frame!" title:"{title}"
-            return false
+            -- Export all enabled takes from current file
+            local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
+            python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_all_takes(r'" + escapedPath + "')")
         )
+        else
+        (
+            -- Original single-export logic
+            -- Validation
+            if startSpn.value >= endSpn.value then
+            (
+                messageBox "End frame must be greater than start frame!" title:"{title}"
+                return false
+            )
 
-        -- Reset progress and status
-        exportProgress.value = 0
-        statusLabel.text = "Exporting current file..."
+            -- Reset progress and status
+            exportProgress.value = 0
+            statusLabel.text = "Exporting current file..."
 
-        -- Escape backslashes for Python raw string
-        local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
+            -- Escape backslashes for Python raw string
+            local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
 
-        -- Call Python export current function
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_current_file(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
+            -- Call Python export current function
+            python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_current_file(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
 
-        -- Reset UI after export
-        exportProgress.value = 0
-        statusLabel.text = ""
+            -- Reset UI after export
+            exportProgress.value = 0
+            statusLabel.text = ""
+        )
     )
 
     -- Export Selected button
     on btnExportSelected pressed do
     (
-        -- Validation
-        if startSpn.value >= endSpn.value then
+        -- Check if multi-take export is enabled
+        if enableMultiTakeCB.checked then
         (
-            messageBox "End frame must be greater than start frame!" title:"{title}"
-            return false
+            -- Show file selection dialog for multi-take batch export
+            local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
+            python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._show_file_selection_dialog_multitake(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
         )
+        else
+        (
+            -- Original file selection dialog
+            -- Validation
+            if startSpn.value >= endSpn.value then
+            (
+                messageBox "End frame must be greater than start frame!" title:"{title}"
+                return false
+            )
 
-        -- Escape backslashes for Python raw string
-        local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
+            -- Escape backslashes for Python raw string
+            local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
 
-        -- Call Python function to show file selection dialog
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._show_file_selection_dialog(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
+            -- Call Python function to show file selection dialog
+            python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._show_file_selection_dialog(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
+        )
     )
 
     -- Export All button
     on btnExportAll pressed do
     (
-        -- Validation
-        if startSpn.value >= endSpn.value then
+        -- Check if multi-take export is enabled
+        if enableMultiTakeCB.checked then
         (
-            messageBox "End frame must be greater than start frame!" title:"{title}"
-            return false
+            -- Batch export all files using multi-take data
+            local confirmMsg = "Export all Max files in current directory?\\n\\nThis will:\\n1. Open each .max file\\n2. Export all enabled takes (if multi-take data exists)\\n3. Or export 'Fbx' selection set (if no multi-take data)\\n\\nContinue?"
+            if not (queryBox confirmMsg title:"Batch Multi-Take Export") then
+                return false
+            
+            local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
+            python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._batch_export_with_multitake(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "', None)")
         )
+        else
+        (
+            -- Original batch export
+            -- Validation
+            if startSpn.value >= endSpn.value then
+            (
+                messageBox "End frame must be greater than start frame!" title:"{title}"
+                return false
+            )
 
-        -- Confirm batch export
-        if not (queryBox "Export all Max files in current directory?\\n\\nThis will:\\n1. Export current file\\n2. Open next file in directory\\n3. Select 'Fbx' selection set\\n4. Export and repeat\\n\\nContinue?" title:"Export All") then
-            return false
+            -- Confirm batch export
+            if not (queryBox "Export all Max files in current directory?\\n\\nThis will:\\n1. Export current file\\n2. Open next file in directory\\n3. Select 'Fbx' selection set\\n4. Export and repeat\\n\\nContinue?" title:"Export All") then
+                return false
 
-        -- Reset progress and status
-        exportProgress.value = 0
-        statusLabel.text = "Starting batch export..."
+            -- Reset progress and status
+            exportProgress.value = 0
+            statusLabel.text = "Starting batch export..."
 
-        -- Escape backslashes for Python raw string
-        local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
+            -- Escape backslashes for Python raw string
+            local escapedPath = substituteString pathValueEdit.text "\\\\" "\\\\\\\\"
 
-        -- Call Python batch export function
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._batch_export_directory(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
+            -- Call Python batch export function
+            python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._batch_export_directory(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", r'" + escapedPath + "')")
 
-        -- Reset UI after export
-        exportProgress.value = 0
-        statusLabel.text = ""
+            -- Reset UI after export
+            exportProgress.value = 0
+            statusLabel.text = ""
+        )
     )
 
     -- Close button
@@ -878,6 +1772,147 @@ createDialog FileSelectionDialog
 
     except Exception as e:
         logger.error(f"Failed to show file selection dialog: {str(e)}")
+        rt.messageBox(f"Failed to show file selection:\n{str(e)}", title="Export Selected Error")
+
+
+def _show_file_selection_dialog_multitake(start_frame, end_frame, export_path):
+    """
+    Show a dialog to select Max files to export using multi-take mode
+    
+    Args:
+        start_frame: Fallback start frame for files without multi-take data
+        end_frame: Fallback end frame for files without multi-take data
+        export_path: FBX export directory path
+    """
+    try:
+        # Get current Max file directory
+        current_max_path = rt.maxFilePath
+        
+        if not current_max_path or current_max_path == "":
+            current_max_path = _get_p4_workspace_root()
+            if not current_max_path:
+                rt.messageBox("No Max file open and P4 workspace not configured!", title="Export Selected")
+                return
+        
+        logger.info(f"Scanning directory for Max files: {current_max_path}")
+        
+        # Get all .max files in the directory
+        import glob
+        max_files = glob.glob(os.path.join(current_max_path, "*.max"))
+        max_files = [os.path.basename(f) for f in max_files]
+        max_files.sort()
+        
+        if not max_files:
+            rt.messageBox(f"No Max files found in:\n{current_max_path}", title="Export Selected")
+            return
+        
+        logger.info(f"Found {len(max_files)} Max files")
+        
+        # Escape paths for Python string parsing
+        export_path_escaped = export_path.replace('\\', '\\\\')
+        
+        # Show file selection dialog via MaxScript
+        maxscript = f'''
+rollout FileSelectionDialog "Select Files to Export (Multi-Take Mode)" width:420 height:600
+(
+    multiListBox fileList "" items:#({",".join([f'"{f}"' for f in max_files])}) selection:#{{}} pos:[10,10] width:400 height:29
+
+    -- Selection helper buttons
+    button btnSelectAll "Select All" pos:[20,505] width:90 height:25
+    button btnDeselectAll "Deselect All" pos:[120,505] width:90 height:25
+    button btnInvertSel "Invert Selection" pos:[220,505] width:110 height:25
+
+    -- Selection count
+    label selectionLabel "0 file(s) selected" pos:[10,535] width:400 align:#center
+
+    -- Export/Cancel buttons
+    button btnExport "Export Selection" pos:[80,565] width:125 height:28
+    button btnCancel "Cancel" pos:[215,565] width:125 height:28
+
+    -- Update selection count
+    fn updateSelectionCount =
+    (
+        local count = (fileList.selection as bitArray).numberSet
+        selectionLabel.text = (count as string) + " file(s) selected"
+    )
+
+    on fileList selectionEnd do
+    (
+        updateSelectionCount()
+    )
+
+    on btnSelectAll pressed do
+    (
+        local allBits = #{{}}
+        for i = 1 to fileList.items.count do
+            append allBits i
+        fileList.selection = allBits as bitArray
+        updateSelectionCount()
+    )
+
+    on btnDeselectAll pressed do
+    (
+        fileList.selection = #{{}}
+        updateSelectionCount()
+    )
+
+    on btnInvertSel pressed do
+    (
+        local currentSel = fileList.selection as bitArray
+        local invertedSel = #{{}}
+        for i = 1 to fileList.items.count do
+        (
+            if not (currentSel[i]) then
+                append invertedSel i
+        )
+        fileList.selection = invertedSel as bitArray
+        updateSelectionCount()
+    )
+
+    on btnExport pressed do
+    (
+        local selectedFiles = #()
+        local selBits = fileList.selection as bitArray
+
+        for i in selBits do
+        (
+            append selectedFiles (fileList.items[i])
+        )
+
+        if selectedFiles.count == 0 then
+        (
+            messageBox "Please select at least one file!" title:"Export Selected"
+            return false
+        )
+
+        -- Create pipe-delimited string
+        local filesStr = ""
+        for i = 1 to selectedFiles.count do
+        (
+            filesStr += selectedFiles[i]
+            if i < selectedFiles.count then filesStr += "|"
+        )
+
+        -- Call Python function for multi-take batch export
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._batch_export_with_multitake({start_frame}, {end_frame}, r'{export_path_escaped}', '" + filesStr + "')")
+
+        destroyDialog FileSelectionDialog
+    )
+
+    on btnCancel pressed do
+    (
+        destroyDialog FileSelectionDialog
+    )
+)
+
+try (destroyDialog FileSelectionDialog) catch()
+createDialog FileSelectionDialog
+'''
+        
+        rt.execute(maxscript)
+    
+    except Exception as e:
+        logger.error(f"Failed to show file selection dialog (multi-take): {str(e)}")
         rt.messageBox(f"Failed to show file selection:\n{str(e)}", title="Export Selected Error")
 
 

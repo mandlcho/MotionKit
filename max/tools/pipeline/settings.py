@@ -84,42 +84,42 @@ class SettingsDialog:
 
         # Generate MaxScript for the dialog
         maxscript = f'''
-rollout MotionKitSettingsRollout "{title}" width:480 height:280
+rollout MotionKitSettingsRollout "{title}" width:520 height:300
 (
     -- Language Settings Group
     group "{language}"
     (
-        label lblLanguageInfo "{language_label}" align:#left across:2
+        label lblLanguageInfo "{language_label}" pos:[20,23] width:150 align:#left
         dropdownList ddlLanguage items:#("English", "中文 (Chinese)", "한국어 (Korean)") \\
             selection:{1 if current_language == 'en' else (2 if current_language == 'zh' else 3)} \\
-            width:250 align:#right
+            pos:[175,20] width:320
     )
 
     -- Perforce Settings Group
     group "{perforce_group}"
     (
-        label lblP4Info "{perforce_info}" align:#left
+        label lblP4Info "{perforce_info}" pos:[20,90] width:480 align:#left
 
-        label lblServer "{server}" align:#left across:2
-        editText edtServer "" text:"{self._escape_maxscript(p4_server)}" fieldWidth:350 align:#right labelOnTop:false
+        label lblServer "{server}" pos:[20,115] width:80 align:#left
+        editText edtServer "" text:"{self._escape_maxscript(p4_server)}" pos:[105,112] width:390 height:22 labelOnTop:false
 
-        label lblUser "{user}" align:#left across:2
-        editText edtUser "" text:"{self._escape_maxscript(p4_user)}" fieldWidth:350 align:#right labelOnTop:false
+        label lblUser "{user}" pos:[20,145] width:80 align:#left
+        editText edtUser "" text:"{self._escape_maxscript(p4_user)}" pos:[105,142] width:390 height:22 labelOnTop:false
 
-        label lblWorkspace "{workspace}" align:#left across:2
-        dropdownList ddlWorkspace items:#("{p4_workspace if p4_workspace else '(Not loaded)'}") selection:1 width:350 align:#right
+        label lblWorkspace "{workspace}" pos:[20,175] width:80 align:#left
+        dropdownList ddlWorkspace items:#("{p4_workspace if p4_workspace else '(Not loaded)'}") selection:1 pos:[105,172] width:390
 
-        button btnLoadWorkspaces "{load_workspaces}" width:150 height:24 align:#left
-        button btnTestConnection "{test_connection}" width:150 height:24 align:#left offset:[160, -28]
+        button btnLoadWorkspaces "{load_workspaces}" pos:[20,210] width:155 height:26
+        button btnTestConnection "{test_connection}" pos:[185,210] width:155 height:26
 
-        label lblStatusDot "●" align:#left across:2 offset:[0,2]
-        label lblStatus "{status} {status_not_connected}" align:#left offset:[5,0]
+        label lblStatusDot "●" pos:[20,246] width:15 align:#left
+        label lblStatus "{status} {status_not_connected}" pos:[40,246] width:455 align:#left
     )
 
     -- Buttons
-    button btnSave "{save}" width:80 height:28 pos:[180, 240]
-    button btnApplyClose "{save_close}" width:110 height:28 pos:[270, 240]
-    button btnCancel "{cancel}" width:80 height:28 pos:[390, 240]
+    button btnSave "{save}" width:85 height:30 pos:[200, 262]
+    button btnApplyClose "{save_close}" width:115 height:30 pos:[295, 262]
+    button btnCancel "{cancel}" width:85 height:30 pos:[420, 262]
 
     -- Initialize status dot color (red = not connected)
     on MotionKitSettingsRollout open do

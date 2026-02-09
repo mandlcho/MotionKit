@@ -121,38 +121,43 @@ struct ExtractTrajectoryToolStruct
         helper.extractStartFrame = startFrame
         helper.extractEndFrame = endFrame
         
+        -- Save current time
+        local originalTime = sliderTime
+        
         -- Bake animation
         with animate on
         (
             for f = startFrame to endFrame do
             (
-                at time f
+                sliderTime = f
+                
+                if useRelative then
                 (
-                    if useRelative then
-                    (
-                        -- Calculate position/rotation relative to reference object
-                        local refTM = referenceObj.transform
-                        local srcTM = sourceObj.transform
-                        
-                        -- Calculate relative transform
-                        local relativeTM = srcTM * (inverse refTM)
-                        
-                        if extractPos then
-                            helper.pos = relativeTM.translation
-                        if extractRot then
-                            helper.rotation = relativeTM.rotation
-                    )
-                    else
-                    (
-                        -- World space extraction
-                        if extractPos then
-                            helper.pos = sourceObj.pos
-                        if extractRot then
-                            helper.rotation = sourceObj.rotation
-                    )
+                    -- Calculate position/rotation relative to reference object
+                    local refTM = referenceObj.transform
+                    local srcTM = sourceObj.transform
+                    
+                    -- Calculate relative transform
+                    local relativeTM = srcTM * (inverse refTM)
+                    
+                    if extractPos then
+                        helper.pos = relativeTM.translation
+                    if extractRot then
+                        helper.rotation = relativeTM.rotation
+                )
+                else
+                (
+                    -- World space extraction
+                    if extractPos then
+                        helper.pos = sourceObj.pos
+                    if extractRot then
+                        helper.rotation = sourceObj.rotation
                 )
             )
         )
+        
+        -- Restore original time
+        sliderTime = originalTime
         
         -- Create preview spline if requested
         if showPreview and extractPos then
@@ -169,14 +174,18 @@ struct ExtractTrajectoryToolStruct
     (
         local positions = #()
         
+        -- Save current time
+        local originalTime = sliderTime
+        
         -- Sample positions
         for f = startFrame to endFrame do
         (
-            at time f
-            (
-                append positions helper.pos
-            )
+            sliderTime = f
+            append positions helper.pos
         )
+        
+        -- Restore original time
+        sliderTime = originalTime
         
         if positions.count > 1 then
         (
@@ -215,18 +224,10 @@ struct ExtractTrajectoryToolStruct
         (
             if classOf obj == Dummy then
             (
-                -- Check if it has TrajectoryData custom attributes
-                if custAttributes.count obj > 0 then
+                -- Check for properties added by TrajectoryData on the node
+                if (hasProperty obj #sourceName) and (hasProperty obj #extractStartFrame) then
                 (
-                    for i = 1 to custAttributes.count obj do
-                    (
-                        local ca = custAttributes.get obj i
-                        if ca.name == "TrajectoryData" then
-                        (
-                            append trajectories obj
-                            exit
-                        )
-                    )
+                    append trajectories obj
                 )
             )
         )
@@ -269,70 +270,72 @@ struct ExtractTrajectoryToolStruct
 ExtractTrajectoryTool = ExtractTrajectoryToolStruct()
 
 -- Dialog rollout
-rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:600 height:520
+rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:640 height:582
 (
     -- Left side: Trajectory Manager
     group "Trajectory Manager"
     (
-        label trajLbl "Trajectories in Scene:" pos:[15,20] width:200 align:#left
-        multiListBox trajList "" pos:[15,40] width:210 height:19
+        label trajLbl "Trajectories in Scene:" pos:[20,22] width:200 align:#left
+        multiListBox trajList "" pos:[20,45] width:230 height:22
         
-        button btnSelect "Select in Scene" pos:[15,355] width:100 height:26
-        button btnRefresh "Refresh List" pos:[125,355] width:100 height:26
+        button btnSelect "Select in Scene" pos:[20,395] width:110 height:28
+        button btnRefresh "Refresh List" pos:[140,395] width:110 height:28
         
-        button btnRebake "Re-Bake" pos:[15,387] width:100 height:26
-        button btnDelete "Delete" pos:[125,387] width:100 height:26
+        button btnRebake "Re-Bake" pos:[20,430] width:110 height:28
+        button btnDelete "Delete" pos:[140,430] width:110 height:28
     )
     
     -- Right side: Extract New Trajectory
     group "Extract New Trajectory"
     (
         -- Source Object
-        label sourceLbl "Source Object:" pos:[250,20] width:100 align:#left
-        pickbutton sourcePickBtn "Pick Object" pos:[250,42] width:100 height:26
-        button sourceSelBtn "Use Selected" pos:[360,42] width:100 height:26
-        edittext sourceEdit "" pos:[250,72] width:210 height:20 readOnly:true
+        label sourceLbl "Source Object:" pos:[280,22] width:100 align:#left
+        pickbutton sourcePickBtn "Pick Object" pos:[280,45] width:110 height:28
+        button sourceSelBtn "Use Selected" pos:[400,45] width:110 height:28
+        edittext sourceEdit "" pos:[280,80] width:330 height:22 readOnly:true
         
         -- Extraction Mode
-        label modeLbl "Mode:" pos:[250,100] width:50 align:#left
-        radiobuttons modeRadio labels:#("World Space", "Relative to Object") pos:[300,98] default:1
+        label modeLbl "Extraction Mode:" pos:[280,115] width:100 align:#left
+        radiobuttons modeRadio labels:#("World Space", "Relative to Object") pos:[280,138] default:1
         
         -- Reference Object (indented, initially disabled)
-        label refLbl "Reference Object:" pos:[270,145] width:120 align:#left enabled:false
-        pickbutton refPickBtn "Pick Reference" pos:[270,167] width:100 height:26 enabled:false
-        button refSelBtn "Use Selected" pos:[380,167] width:100 height:26 enabled:false
-        edittext refEdit "" pos:[270,197] width:190 height:20 readOnly:true enabled:false
+        label refLbl "Reference Object:" pos:[300,185] width:120 align:#left enabled:false
+        pickbutton refPickBtn "Pick Reference" pos:[300,208] width:110 height:28 enabled:false
+        button refSelBtn "Use Selected" pos:[420,208] width:110 height:28 enabled:false
+        edittext refEdit "" pos:[300,243] width:310 height:22 readOnly:true enabled:false
         
         -- Components
-        label compLbl "Extract Components:" pos:[250,225] width:120 align:#left
-        checkbox posCheck "Position" pos:[250,247] checked:true
-        checkbox rotCheck "Rotation" pos:[340,247] checked:true
+        label compLbl "Extract Components:" pos:[280,280] width:150 align:#left
+        checkbox posCheck "Position" pos:[280,303] width:80 checked:true
+        checkbox rotCheck "Rotation" pos:[370,303] width:80 checked:true
         
         -- Frame Range
-        label rangeLbl "Frame Range:" pos:[250,272] width:80 align:#left
-        label startLbl "Start:" pos:[250,294] width:40 align:#left
-        spinner startSpn "" pos:[295,292] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}]
+        label rangeLbl "Frame Range:" pos:[280,335] width:100 align:#left
+        checkbox useTimelineCB "Use Timeline Range" pos:[390,335] checked:true width:160
         
-        label endLbl "End:" pos:[380,294] width:30 align:#left
-        spinner endSpn "" pos:[415,292] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}]
+        label startLbl "Start:" pos:[280,365] width:45 align:#left
+        spinner startSpn "" pos:[330,363] width:90 height:20 type:#integer range:[-100000,100000,{start_frame}]
         
-        checkbox useTimelineCB "Use Timeline Range" pos:[250,317] checked:true width:150
+        label endLbl "End:" pos:[440,365] width:35 align:#left
+        spinner endSpn "" pos:[480,363] width:90 height:20 type:#integer range:[-100000,100000,{end_frame}]
         
         -- Output
-        label nameLbl "Helper Name:" pos:[250,342] width:80 align:#left
-        edittext nameEdit "" pos:[340,340] width:240 height:20
+        label nameLbl "Helper Name:" pos:[280,395] width:100 align:#left
+        edittext nameEdit "" pos:[280,418] width:330 height:22
         
-        checkbox previewCheck "Show Trajectory Preview" pos:[250,367] checked:true
+        checkbox previewCheck "Show Trajectory Preview" pos:[280,453] checked:true width:200
     )
     
-    -- Progress Bar
-    progressBar extractProgress "" pos:[20,420] width:560 height:14 value:0 color:(color 100 150 255)
-    label statusLabel "" pos:[20,440] width:560 height:20 align:#center
+    -- Status Label (above progress bar to prevent overlap)
+    label statusLabel "" pos:[20,485] width:600 height:18 align:#center
+    
+    -- Progress Bar (below status text)
+    progressBar extractProgress "" pos:[20,506] width:600 height:12 value:0 color:(color 100 150 255)
     
     -- Main Action Buttons (centered at bottom)
-    button previewBtn "Preview Trajectory" pos:[70,470] width:140 height:32
-    button extractBtn "Extract & Bake" pos:[230,470] width:140 height:32
-    button closeBtn "Close" pos:[390,470] width:140 height:32
+    button previewBtn "Preview Trajectory" pos:[85,535] width:150 height:36
+    button extractBtn "Extract & Bake" pos:[245,535] width:150 height:36
+    button closeBtn "Close" pos:[405,535] width:150 height:36
     
     -- Initialize dialog
     on ExtractTrajectoryDialog open do
@@ -361,6 +364,8 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:600 height:
             append trajNames (ExtractTrajectoryTool.getTrajectoryInfo traj)
         )
         trajList.items = trajNames
+        trajList.selection = 0  -- Clear selection
+        windows.processPostedMessages()  -- Force UI refresh
         statusLabel.text = "Found " + (trajectories.count as string) + " trajectories"
     )
     
@@ -424,37 +429,51 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:600 height:
             -- Delete old animation keys
             deleteKeys traj
             
+            -- Save current time
+            local originalTime = sliderTime
+            
             -- Re-bake animation
             statusLabel.text = "Re-baking trajectory..."
             with animate on
             (
                 for f = startF to endF do
                 (
-                    at time f
+                    sliderTime = f
+                    
+                    if isRel then
                     (
-                        if isRel then
-                        (
-                            local refTM = refObj.transform
-                            local srcTM = srcObj.transform
-                            local relativeTM = srcTM * (inverse refTM)
-                            
-                            if hasPos then
-                                traj.pos = relativeTM.translation
-                            if hasRot then
-                                traj.rotation = relativeTM.rotation
-                        )
-                        else
-                        (
-                            if hasPos then
-                                traj.pos = srcObj.pos
-                            if hasRot then
-                                traj.rotation = srcObj.rotation
-                        )
+                        local refTM = refObj.transform
+                        local srcTM = srcObj.transform
+                        local relativeTM = srcTM * (inverse refTM)
+                        
+                        if hasPos then
+                            traj.pos = relativeTM.translation
+                        if hasRot then
+                            traj.rotation = relativeTM.rotation
+                    )
+                    else
+                    (
+                        if hasPos then
+                            traj.pos = srcObj.pos
+                        if hasRot then
+                            traj.rotation = srcObj.rotation
                     )
                 )
             )
             
+            -- Restore original time
+            sliderTime = originalTime
+            
             statusLabel.text = "Re-baked: " + traj.name
+            
+            -- Refresh trajectory list to update display
+            local trajectories = ExtractTrajectoryTool.findAllTrajectories()
+            local trajNames = #()
+            for traj in trajectories do
+            (
+                append trajNames (ExtractTrajectoryTool.getTrajectoryInfo traj)
+            )
+            trajList.items = trajNames
         )
     )
     
@@ -525,9 +544,8 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:600 height:
         ExtractTrajectoryTool.sourceObj = obj
         sourceEdit.text = obj.name
         
-        -- Auto-generate output name
-        if nameEdit.text == "" then
-            nameEdit.text = obj.name + "_Trajectory"
+        -- Always update output name with new object
+        nameEdit.text = obj.name + "_Trajectory"
     )
     
     -- Use selected source object
@@ -549,9 +567,8 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:600 height:
         ExtractTrajectoryTool.sourceObj = obj
         sourceEdit.text = obj.name
         
-        -- Auto-generate output name
-        if nameEdit.text == "" then
-            nameEdit.text = obj.name + "_Trajectory"
+        -- Always update output name with new object
+        nameEdit.text = obj.name + "_Trajectory"
     )
     
     -- Pick reference object
@@ -609,6 +626,9 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:600 height:
         statusLabel.text = "Generating preview..."
         extractProgress.value = 50
         
+        -- Save current time
+        local originalTime = sliderTime
+        
         -- Create temporary helper for preview
         local tempHelper = Dummy name:"TempPreview" boxsize:[5,5,5]
         
@@ -616,19 +636,18 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:600 height:
         (
             for f = startSpn.value to endSpn.value do
             (
-                at time f
+                sliderTime = f
+                
+                if useRelative then
                 (
-                    if useRelative then
-                    (
-                        local refTM = ExtractTrajectoryTool.referenceObj.transform
-                        local srcTM = ExtractTrajectoryTool.sourceObj.transform
-                        local relativeTM = srcTM * (inverse refTM)
-                        tempHelper.pos = relativeTM.translation
-                    )
-                    else
-                    (
-                        tempHelper.pos = ExtractTrajectoryTool.sourceObj.pos
-                    )
+                    local refTM = ExtractTrajectoryTool.referenceObj.transform
+                    local srcTM = ExtractTrajectoryTool.sourceObj.transform
+                    local relativeTM = srcTM * (inverse refTM)
+                    tempHelper.pos = relativeTM.translation
+                )
+                else
+                (
+                    tempHelper.pos = ExtractTrajectoryTool.sourceObj.pos
                 )
             )
         )
@@ -636,6 +655,9 @@ rollout ExtractTrajectoryDialog "Extract Animation Trajectory" width:600 height:
         -- Create preview spline
         ExtractTrajectoryTool.createPreviewSpline tempHelper startSpn.value endSpn.value
         delete tempHelper
+        
+        -- Restore original time
+        sliderTime = originalTime
         
         extractProgress.value = 100
         statusLabel.text = "Preview ready - orange spline shows trajectory"

@@ -88,45 +88,45 @@ class RootAnimCopyDialog:
 -- MotionKit Root Animation Copy Tool
 -- ============================================
 
-rollout MotionKitRootAnimCopy "{title}" width:520 height:285
+rollout MotionKitRootAnimCopy "{title}" width:540 height:305
 (
     -- Title with margins
     label titleLabel "{description}" \\
-        pos:[10,6] width:500 align:#center
+        pos:[15,10] width:510 align:#center
 
     -- Position Group
-    groupBox positionGroup "{position_group}" pos:[10,26] width:245 height:48
-    checkbox xAxisPos "{x_axis}" pos:[20,44] checked:true across:3
-    checkbox yAxisPos "{y_axis}" pos:[95,44] checked:true
-    checkbox zAxisPos "{z_axis}" pos:[170,44] checked:true
+    groupBox positionGroup "{position_group}" pos:[15,35] width:250 height:52
+    checkbox xAxisPos "{x_axis}" pos:[25,53] checked:true across:3
+    checkbox yAxisPos "{y_axis}" pos:[103,53] checked:true
+    checkbox zAxisPos "{z_axis}" pos:[181,53] checked:true
 
     -- Rotation Group
-    groupBox rotationGroup "{rotation_group}" pos:[265,26] width:245 height:48
-    checkbox zAxisRot "{z_rotation}" pos:[275,44] checked:false
+    groupBox rotationGroup "{rotation_group}" pos:[275,35] width:250 height:52
+    checkbox zAxisRot "{z_rotation}" pos:[285,53] checked:false
 
     -- Frame Range Group
-    groupBox frameRangeGroup "{frame_range_group}" pos:[10,82] width:500 height:73
-    checkbox useTimelineRange "{use_timeline}" pos:[20,98] checked:true
+    groupBox frameRangeGroup "{frame_range_group}" pos:[15,97] width:510 height:78
+    checkbox useTimelineRange "{use_timeline}" pos:[25,115] checked:true
 
-    label startLabel "{start}" pos:[20,120] width:40
-    edittext frameStartEdit "" pos:[65,118] width:90 height:18 enabled:false labelOnTop:false
-    button pickStartFrame "{pick}" pos:[160,118] width:50 height:18 enabled:false
+    label startLabel "{start}" pos:[25,140] width:45
+    edittext frameStartEdit "" pos:[75,137] width:95 height:20 enabled:false labelOnTop:false
+    button pickStartFrame "{pick}" pos:[175,137] width:55 height:20 enabled:false
 
-    label endLabel "{end}" pos:[270,120] width:40
-    edittext frameEndEdit "" pos:[310,118] width:90 height:18 enabled:false labelOnTop:false
-    button pickEndFrame "{pick}" pos:[405,118] width:50 height:18 enabled:false
+    label endLabel "{end}" pos:[280,140] width:40
+    edittext frameEndEdit "" pos:[325,137] width:95 height:20 enabled:false labelOnTop:false
+    button pickEndFrame "{pick}" pos:[425,137] width:55 height:20 enabled:false
 
     -- Height Offset Group
-    groupBox heightOffsetGroup "{height_offset_group}" pos:[10,163] width:500 height:73
-    checkbox useHeightOffset "{apply_offset}" pos:[20,179] checked:false
+    groupBox heightOffsetGroup "{height_offset_group}" pos:[15,185] width:510 height:78
+    checkbox useHeightOffset "{apply_offset}" pos:[25,203] checked:false
 
-    label offsetLabel "{offset}" pos:[20,201] width:45
-    spinner heightOffsetSpn "" pos:[70,199] width:120 height:18 \\
+    label offsetLabel "{offset}" pos:[25,228] width:50
+    spinner heightOffsetSpn "" pos:[80,225] width:125 height:20 \\
         range:[-1000,1000,0] type:#float scale:0.1 enabled:false
-    button calcHeightOffset "{calc_from_selection}" pos:[200,199] width:300 height:18 enabled:false
+    button calcHeightOffset "{calc_from_selection}" pos:[215,225] width:305 height:20 enabled:false
 
     -- Main copy button
-    button copyRootAnim "{copy_button}" pos:[10,245] width:500 height:35
+    button copyRootAnim "{copy_button}" pos:[15,273] width:510 height:35
 
     -- Initialize with current timeline
     on MotionKitRootAnimCopy open do

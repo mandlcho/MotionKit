@@ -737,47 +737,43 @@ rollout MultiTakeManager "Multi-Take Manager" width:750 height:500
         tableControl.RowHeadersVisible = false
         tableControl.BackgroundColor = (dotNetClass "System.Drawing.Color").FromArgb 240 240 240
         
-        -- Add columns with proper dotNet column type
-        local DataGridViewCheckBoxColumn = dotNetClass "System.Windows.Forms.DataGridViewCheckBoxColumn"
-        local DataGridViewTextBoxColumn = dotNetClass "System.Windows.Forms.DataGridViewTextBoxColumn"
-        
         -- Enabled column (checkbox)
-        local colEnabled = DataGridViewCheckBoxColumn()
+        local colEnabled = dotNetObject "System.Windows.Forms.DataGridViewCheckBoxColumn"
         colEnabled.Name = "Enabled"
         colEnabled.HeaderText = "✓"
         colEnabled.Width = 40
         tableControl.Columns.Add colEnabled
         
         -- Name column
-        local colName = DataGridViewTextBoxColumn()
+        local colName = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
         colName.Name = "Name"
         colName.HeaderText = "Take Name"
         colName.Width = 180
         tableControl.Columns.Add colName
         
         -- Start column
-        local colStart = DataGridViewTextBoxColumn()
+        local colStart = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
         colStart.Name = "Start"
         colStart.HeaderText = "Start"
         colStart.Width = 70
         tableControl.Columns.Add colStart
         
         -- End column
-        local colEnd = DataGridViewTextBoxColumn()
+        local colEnd = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
         colEnd.Name = "End"
         colEnd.HeaderText = "End"
         colEnd.Width = 70
         tableControl.Columns.Add colEnd
         
         -- Selection Set column
-        local colSelSet = DataGridViewTextBoxColumn()
+        local colSelSet = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
         colSelSet.Name = "SelectionSet"
         colSelSet.HeaderText = "Selection Set"
         colSelSet.Width = 180
         tableControl.Columns.Add colSelSet
         
         -- Actions column
-        local colActions = DataGridViewTextBoxColumn()
+        local colActions = dotNetObject "System.Windows.Forms.DataGridViewTextBoxColumn"
         colActions.Name = "Actions"
         colActions.HeaderText = "Actions"
         colActions.Width = 100
@@ -916,39 +912,37 @@ def _populate_multitake_grid():
     try:
         takes_data = _load_takes_from_scene()
         
-        # Get selection sets for dropdown
-        selection_sets = []
-        for i in range(rt.selectionSets.count):
-            selection_sets.append(rt.selectionSets[i].name)
+        # Build MaxScript to populate grid directly
+        rows_data = []
+        for take in takes_data:
+            enabled = "true" if take.get('enabled', True) else "false"
+            name = take['name'].replace('"', '\\"')
+            start = take['start_frame']
+            end = take['end_frame']
+            sel_set = take['selection_set'].replace('"', '\\"')
+            rows_data.append(f'#({enabled}, "{name}", {start}, {end}, "{sel_set}")')
         
-        maxscript = '''
+        rows_array = "#(" + ", ".join(rows_data) + ")"
+        
+        maxscript = f'''
 (
     if motionKitMultiTakeManager != undefined then
     (
         local grid = motionKitMultiTakeManager.tableControl
         grid.Rows.Clear()
         
-        -- Get takes data from Python
-        python.execute "import max.tools.animation.fbx_exporter; takes_data = max.tools.animation.fbx_exporter._load_takes_from_scene()"
-        local takesCount = python.execute "len(takes_data)"
+        local takesData = {rows_array}
         
-        for i = 0 to (takesCount - 1) do
+        for takeRow in takesData do
         (
-            local takeData = python.execute ("takes_data[" + (i as string) + "]")
-            local enabled = python.execute ("takes_data[" + (i as string) + "].get('enabled', True)")
-            local name = python.execute ("takes_data[" + (i as string) + "]['name']")
-            local startFrame = python.execute ("takes_data[" + (i as string) + "]['start_frame']")
-            local endFrame = python.execute ("takes_data[" + (i as string) + "]['end_frame']")
-            local selSet = python.execute ("takes_data[" + (i as string) + "]['selection_set']")
-            
             local rowIndex = grid.Rows.Add()
             local row = grid.Rows.item[rowIndex]
             
-            row.Cells.item[0].Value = enabled
-            row.Cells.item[1].Value = name
-            row.Cells.item[2].Value = startFrame
-            row.Cells.item[3].Value = endFrame
-            row.Cells.item[4].Value = selSet
+            row.Cells.item[0].Value = takeRow[1]
+            row.Cells.item[1].Value = takeRow[2]
+            row.Cells.item[2].Value = takeRow[3]
+            row.Cells.item[3].Value = takeRow[4]
+            row.Cells.item[4].Value = takeRow[5]
             row.Cells.item[5].Value = "[Delete]"
         )
     )

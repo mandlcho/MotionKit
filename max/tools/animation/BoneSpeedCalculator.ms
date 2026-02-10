@@ -45,7 +45,9 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 	(
 		label lblRootHelp "Smooth root animation to target speed:" align:#left offset:[5,5]
 		spinner spnTargetSpeed "Target Speed (m/s):" range:[-100,100,10] type:#float fieldwidth:60 offset:[0,5]
-		spinner spnBlendFrames "Blend Frames:" range:[1,100,30] type:#integer fieldwidth:60 offset:[0,5]
+		spinner spnBlendFrames "Blend Frames:" range:[1,200,30] type:#integer fieldwidth:60 offset:[0,5]
+		button btnCalcBlend "Auto" width:40 height:16 offset:[0,-3] across:2 align:#right tooltip:"Calculate optimal blend frames"
+		label lblBlendInfo "" align:#left offset:[0,-3]
 		button btnSmoothRoot "Smooth Root to Target" width:160 height:30 offset:[0,5]
 	)
 	
@@ -54,6 +56,17 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 	local lastFrame = -1
 	local isCallbackActive = false
 	local transformCallback = undefined
+	
+	-- Format speed value: round near-zero, limit decimal places
+	function formatSpeed val =
+	(
+		if abs val < 0.001 then
+			return "0.0 m/s"
+		
+		-- Round to 4 decimal places
+		local rounded = (floor (val * 10000 + 0.5)) / 10000.0
+		return (rounded as string) + " m/s"
+	)
 	
 	-- Calculate Speed Function
 	function calculateSpeed =
@@ -81,7 +94,7 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 				(
 					local speedX = (pos2.x - pos1.x) / timeDelta
 					local speedXMS = speedX / conversionFactor
-					txtSpeedX.text = (speedXMS as string) + " m/s"
+					txtSpeedX.text = formatSpeed speedXMS
 				)
 				else
 				(
@@ -93,7 +106,7 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 				(
 					local speedY = (pos2.y - pos1.y) / timeDelta
 					local speedYMS = speedY / conversionFactor
-					txtSpeedY.text = (speedYMS as string) + " m/s"
+					txtSpeedY.text = formatSpeed speedYMS
 				)
 				else
 				(
@@ -105,7 +118,7 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 				(
 					local speedZ = (pos2.z - pos1.z) / timeDelta
 					local speedZMS = speedZ / conversionFactor
-					txtSpeedZ.text = (speedZMS as string) + " m/s"
+					txtSpeedZ.text = formatSpeed speedZMS
 				)
 				else
 				(
@@ -131,7 +144,7 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 					(
 						local speedX = (pos2.x - pos1.x) / timeDelta
 						local speedXMS = speedX / conversionFactor
-						txtSpeedX.text = (speedXMS as string) + " m/s (into last frame)"
+						txtSpeedX.text = (formatSpeed speedXMS) + " (into last)"
 					)
 					else
 					(
@@ -143,7 +156,7 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 					(
 						local speedY = (pos2.y - pos1.y) / timeDelta
 						local speedYMS = speedY / conversionFactor
-						txtSpeedY.text = (speedYMS as string) + " m/s (into last frame)"
+						txtSpeedY.text = (formatSpeed speedYMS) + " (into last)"
 					)
 					else
 					(
@@ -155,7 +168,7 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 					(
 						local speedZ = (pos2.z - pos1.z) / timeDelta
 						local speedZMS = speedZ / conversionFactor
-						txtSpeedZ.text = (speedZMS as string) + " m/s (into last frame)"
+						txtSpeedZ.text = (formatSpeed speedZMS) + " (into last)"
 					)
 					else
 					(
@@ -238,6 +251,55 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 	on chkZ changed state do
 	(
 		if selectedBone != undefined then calculateSpeed()
+	)
+	
+	-- Calculate optimal blend frames based on speed difference
+	function calcOptimalBlendFrames =
+	(
+		if selectedBone == undefined or not isValidNode selectedBone then return 30
+		
+		local targetSpeedMS = spnTargetSpeed.value
+		local fps = frameRate as float
+		local targetCmPerFrame = (targetSpeedMS * 100.0) / fps
+		local endFrame = animationRange.end.frame as integer
+		
+		-- Get current speed at end of animation (last few frames)
+		local posEnd = at time endFrame (in coordsys world selectedBone.pos)
+		local posPrev = at time (endFrame - 1) (in coordsys world selectedBone.pos)
+		
+		-- Find max speed difference across selected axes
+		local maxDiff = 0.0
+		if chkX.checked then
+		(
+			local diff = abs (targetCmPerFrame - (posEnd.x - posPrev.x))
+			if diff > maxDiff then maxDiff = diff
+		)
+		if chkY.checked then
+		(
+			local diff = abs (targetCmPerFrame - (posEnd.y - posPrev.y))
+			if diff > maxDiff then maxDiff = diff
+		)
+		if chkZ.checked then
+		(
+			local diff = abs (targetCmPerFrame - (posEnd.z - posPrev.z))
+			if diff > maxDiff then maxDiff = diff
+		)
+		
+		-- Maximum acceleration = 5% of target speed per frame
+		-- This keeps the curve gentle
+		local maxAccel = abs (targetCmPerFrame * 0.05)
+		if maxAccel < 0.01 then maxAccel = 0.01  -- safety floor
+		
+		-- Minimum frames needed = speedDifference / maxAcceleration
+		local minFrames = (ceil (maxDiff / maxAccel)) as integer
+		
+		-- Clamp to available range
+		local maxAvailable = endFrame - animationRange.start.frame - 1
+		if minFrames < 5 then minFrames = 5
+		if minFrames > maxAvailable then minFrames = maxAvailable
+		if minFrames > 200 then minFrames = 200
+		
+		return minFrames
 	)
 	
 	-- Smooth Root Function
@@ -379,9 +441,34 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		return true
 	)
 	
+	-- Auto-calculate blend frames button
+	on btnCalcBlend pressed do
+	(
+		local optimal = calcOptimalBlendFrames()
+		spnBlendFrames.value = optimal
+		lblBlendInfo.text = "(recommended: " + (optimal as string) + ")"
+	)
+	
+	-- Update recommendation when target speed changes
+	on spnTargetSpeed changed val do
+	(
+		if selectedBone != undefined then
+		(
+			local optimal = calcOptimalBlendFrames()
+			lblBlendInfo.text = "(recommended: " + (optimal as string) + ")"
+		)
+	)
+	
 	-- Smooth Root Button
 	on btnSmoothRoot pressed do
 	(
+		-- Warn if blend frames is too low
+		local optimal = calcOptimalBlendFrames()
+		if spnBlendFrames.value < optimal then
+		(
+			local msg = "Blend frames (" + (spnBlendFrames.value as string) + ") is below recommended (" + (optimal as string) + ").\nThis may cause erratic positions.\n\nContinue anyway?"
+			if not (queryBox msg title:"Root Smoothing Warning") then return()
+		)
 		smoothRootToTarget()
 	)
 	

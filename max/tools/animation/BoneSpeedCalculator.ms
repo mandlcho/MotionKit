@@ -15,9 +15,9 @@ catch()
 rollout boneSpeedRollout "Bone Axis Speed Calculator"
 (
 	-- UI Elements
-	group "Bone Selection"
+	group "Object Selection"
 	(
-		pickbutton btnPickBone "Pick Bone" width:160 height:30
+		pickbutton btnPickBone "Pick Object" width:160 height:30
 		label lblSelectedBone "Selected: None" align:#left offset:[5,5]
 	)
 	
@@ -48,7 +48,9 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		spinner spnBlendFrames "Blend Frames:" range:[1,200,30] type:#integer fieldwidth:60 offset:[0,5]
 		button btnCalcBlend "Auto" width:40 height:16 offset:[0,-3] across:2 align:#right tooltip:"Calculate optimal blend frames"
 		label lblBlendInfo "" align:#left offset:[0,-3]
-		button btnSmoothRoot "Smooth Root to Target" width:160 height:30 offset:[0,5]
+		button btnPreview "Preview" width:160 height:30 offset:[0,5]
+		button btnApply "Apply" width:75 height:30 offset:[0,5] across:2 enabled:false
+		button btnCancel "Cancel" width:75 height:30 offset:[0,5] enabled:false
 	)
 	
 	-- Variables
@@ -56,6 +58,38 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 	local lastFrame = -1
 	local isCallbackActive = false
 	local transformCallback = undefined
+	local previewHelper = undefined  -- Point helper for preview
+	local previewData = #()  -- Stored calculated positions for apply
+	local previewStartFrame = 0
+	local previewEndFrame = 0
+	
+	-- Check if an object is a Biped node
+	function isBipedObject obj =
+	(
+		try
+		(
+			return (classof obj.controller == BipSlave_Control or \
+					classof obj.controller == Vertical_Horizontal_Turn or \
+					classof obj.controller == Bip_Float or \
+					(classof obj.controller == subAnim and classof obj == Biped_Object))
+		)
+		catch
+		(
+			return false
+		)
+	)
+	
+	-- Set world position on a standard (non-Biped) object
+	function setWorldPos obj f pos =
+	(
+		at time f
+		(
+			animate on
+			(
+				in coordsys world obj.pos = pos
+			)
+		)
+	)
 	
 	-- Format speed value: round near-zero, limit decimal places
 	function formatSpeed val =
@@ -264,8 +298,8 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		local endFrame = animationRange.end.frame as integer
 		
 		-- Get current speed at end of animation (last few frames)
-		local posEnd = at time endFrame (in coordsys world selectedBone.pos)
-		local posPrev = at time (endFrame - 1) (in coordsys world selectedBone.pos)
+		local posEnd = at time endFrame (in coordsys world selectedBone.transform.pos)
+		local posPrev = at time (endFrame - 1) (in coordsys world selectedBone.transform.pos)
 		
 		-- Find max speed difference across selected axes
 		local maxDiff = 0.0
@@ -302,23 +336,151 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		return minFrames
 	)
 	
-	-- Smooth Root Function
-	function smoothRootToTarget =
+	-- Clean up preview helper
+	function cleanupPreview =
+	(
+		if previewHelper != undefined then
+		(
+			try
+			(
+				-- Disable motion trail before deleting
+				previewHelper.showTrajectory = false
+				delete previewHelper
+			)
+			catch()
+			previewHelper = undefined
+		)
+		previewData = #()
+		btnApply.enabled = false
+		btnCancel.enabled = false
+		btnPreview.text = "Preview"
+	)
+	
+	-- Calculate smoothed positions (shared between preview and apply)
+	function calculateSmoothedPositions =
 	(
 		if selectedBone == undefined or not isValidNode selectedBone then
 		(
-			messageBox "Please select a bone first!" title:"Root Smoothing"
+			format "ERROR: No valid object selected\n"
+			return #()
+		)
+		if not chkX.checked and not chkY.checked and not chkZ.checked then
+		(
+			format "ERROR: No axes selected\n"
+			return #()
+		)
+		
+		local targetSpeedMS = spnTargetSpeed.value
+		local blendFrames = spnBlendFrames.value as integer
+		local endFrame = animationRange.end.frame as integer
+		local startFrame = endFrame - blendFrames
+		
+		format "Calculating: startFrame=% endFrame=% blendFrames=% animStart=%\n" startFrame endFrame blendFrames animationRange.start.frame
+		
+		if startFrame < (animationRange.start.frame + 1) then
+		(
+			format "ERROR: Not enough frames (startFrame % < animStart+1 %)\n" startFrame (animationRange.start.frame + 1)
+			return #()
+		)
+		
+		local fps = frameRate as float
+		local targetCmPerFrame = (targetSpeedMS * 100.0) / fps
+		
+		-- Get current speed at start of blend range (speed INTO startFrame)
+		local posBeforeStart = at time (startFrame - 1) (in coordsys world selectedBone.transform.pos)
+		local posAtStart = at time startFrame (in coordsys world selectedBone.transform.pos)
+		local origSpeedX = posAtStart.x - posBeforeStart.x
+		local origSpeedY = posAtStart.y - posBeforeStart.y
+		local origSpeedZ = posAtStart.z - posBeforeStart.z
+		
+		-- FIXED last frame position
+		local lastFramePos = at time endFrame (in coordsys world selectedBone.transform.pos)
+		
+		-- Debug
+		local origMsX = origSpeedX / 100.0 * fps
+		local origMsY = origSpeedY / 100.0 * fps
+		local origMsZ = origSpeedZ / 100.0 * fps
+		format "\n=== Root Smoothing Calculation ===\n"
+		format "End frame: % [FIXED pos: %]\n" endFrame lastFramePos
+		format "Blend: frame % to frame % (% frames)\n" startFrame (endFrame - 1) blendFrames
+		format "Current speed at blend start: X=% Y=% Z=% m/s\n" origMsX origMsY origMsZ
+		format "Target speed: % m/s = % cm/frame\n" targetSpeedMS targetCmPerFrame
+		
+		-- Pure backward extrapolation from fixed endFrame
+		-- Speed ramps linearly from origSpeed (step 1) to targetSpeed (step N)
+		local numSteps = blendFrames
+		local results = #()
+		
+		local curX = lastFramePos.x
+		local curY = lastFramePos.y
+		local curZ = lastFramePos.z
+		
+		-- Walk backward from endFrame
+		local backwardPositions = #()
+		for step = numSteps to 1 by -1 do
+		(
+			local t = step as float / numSteps as float
+			
+			-- Lerp speed: at step 1 (earliest) use origSpeed, at step N (latest) use targetSpeed
+			local speedX = origSpeedX + (targetCmPerFrame - origSpeedX) * t
+			local speedY = origSpeedY + (targetCmPerFrame - origSpeedY) * t
+			local speedZ = origSpeedZ + (targetCmPerFrame - origSpeedZ) * t
+			
+			-- Step backward
+			curX = curX - speedX
+			curY = curY - speedY
+			curZ = curZ - speedZ
+			
+			local f = startFrame + step - 1
+			
+			-- For unselected axes, keep original position
+			local origPos = at time f (in coordsys world selectedBone.transform.pos)
+			local finalX = origPos.x
+			local finalY = origPos.y
+			local finalZ = origPos.z
+			
+			if chkX.checked then finalX = curX
+			if chkY.checked then finalY = curY
+			if chkZ.checked then finalZ = curZ
+			
+			append backwardPositions #(f, finalX, finalY, finalZ)
+		)
+		
+		-- Reverse to ascending frame order
+		for i = backwardPositions.count to 1 by -1 do
+			append results backwardPositions[i]
+		
+		-- Add the fixed last frame
+		append results #(endFrame, lastFramePos.x, lastFramePos.y, lastFramePos.z)
+		
+		-- Store frame range for apply
+		previewStartFrame = startFrame
+		previewEndFrame = endFrame
+		
+		return results
+	)
+	
+	-- Create or update preview helper with motion trail
+	function createPreview =
+	(
+		if selectedBone == undefined or not isValidNode selectedBone then
+		(
+			messageBox "Please select an object first!" title:"Root Smoothing"
 			return false
 		)
 		
-		-- Check which axes are selected
+		if (isBipedObject selectedBone) then
+		(
+			messageBox "Smoothing is not supported for Biped objects.\nYou can still use the speed display to check Biped speeds." title:"Root Smoothing"
+			return false
+		)
+		
 		if not chkX.checked and not chkY.checked and not chkZ.checked then
 		(
 			messageBox "Please select at least one axis (X, Y, or Z) to smooth!" title:"Root Smoothing"
 			return false
 		)
 		
-		local targetSpeedMS = spnTargetSpeed.value
 		local blendFrames = spnBlendFrames.value as integer
 		local endFrame = animationRange.end.frame as integer
 		local startFrame = endFrame - blendFrames
@@ -329,114 +491,130 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 			return false
 		)
 		
-		local fps = frameRate as float
-		-- Target speed in cm/frame (the unit Max works in)
-		local targetCmPerFrame = (targetSpeedMS * 100.0) / fps
-		
-		-- Get original speed at the start of blend range (speed INTO startFrame)
-		local posBeforeStart = at time (startFrame - 1) (in coordsys world selectedBone.pos)
-		local posAtStart = at time startFrame (in coordsys world selectedBone.pos)
-		local origSpeedX = posAtStart.x - posBeforeStart.x
-		local origSpeedY = posAtStart.y - posBeforeStart.y
-		local origSpeedZ = posAtStart.z - posBeforeStart.z
-		
-		-- FIXED last frame position - never changes
-		local lastFramePos = at time endFrame (in coordsys world selectedBone.pos)
-		
-		-- Convert original speeds to m/s for debug display
-		local origMsX = origSpeedX / 100.0 * fps
-		local origMsY = origSpeedY / 100.0 * fps
-		local origMsZ = origSpeedZ / 100.0 * fps
-		
-		format "\n=== Root Smoothing (Backward Extrapolation) ===\n"
-		format "End frame: % [FIXED pos: %]\n" endFrame lastFramePos
-		format "Blend: frame % to frame % (% frames)\n" startFrame (endFrame - 1) blendFrames
-		format "Original speed at start: X=% Y=% Z=% cm/frame\n" origSpeedX origSpeedY origSpeedZ
-		format "Original speed at start: X=% Y=% Z=% m/s\n" origMsX origMsY origMsZ
-		format "Target speed: % m/s = % cm/frame\n" targetSpeedMS targetCmPerFrame
-		
-		-- ============================================================
-		-- Algorithm:
-		-- We have N = blendFrames steps from startFrame to endFrame.
-		-- Step i (1-based) goes from frame (startFrame + i - 1) to (startFrame + i).
-		-- Step N is the LAST step, going into endFrame.
-		--
-		-- Speed at step i = lerp(origSpeed, targetSpeed, i / N)
-		--   step 1: mostly original speed
-		--   step N: exactly target speed
-		--
-		-- We build positions BACKWARDS from the fixed endFrame:
-		--   pos[endFrame] = lastFramePos  (fixed)
-		--   pos[endFrame - 1] = pos[endFrame] - speed_at_step_N
-		--   pos[endFrame - 2] = pos[endFrame - 1] - speed_at_step_(N-1)
-		--   ...
-		--   pos[startFrame] = pos[startFrame + 1] - speed_at_step_1
-		-- ============================================================
-		
-		-- Build positions array backward (index 1 = endFrame, last = startFrame)
-		local numSteps = blendFrames  -- N steps
-		local framePositions = #()  -- array of #(frameNum, x, y, z)
-		
-		-- Start from fixed end
-		local curX = lastFramePos.x
-		local curY = lastFramePos.y
-		local curZ = lastFramePos.z
-		
-		-- endFrame itself (fixed, we store it but won't key it)
-		append framePositions #(endFrame, curX, curY, curZ)
-		
-		-- Walk backward: step N, N-1, ..., 1
-		for step = numSteps to 1 by -1 do
+		-- Calculate positions
+		format "Creating preview for: % (class: %)\n" selectedBone.name (classof selectedBone)
+		format "isBiped: %\n" (isBipedObject selectedBone)
+		previewData = calculateSmoothedPositions()
+		format "Preview data count: %\n" previewData.count
+		if previewData.count == 0 then
 		(
-			local t = step as float / numSteps as float
-			
-			-- Speed for this step (lerp between original and target)
-			local speedX = origSpeedX + (targetCmPerFrame - origSpeedX) * t
-			local speedY = origSpeedY + (targetCmPerFrame - origSpeedY) * t
-			local speedZ = origSpeedZ + (targetCmPerFrame - origSpeedZ) * t
-			
-			-- Subtract to go backward
-			curX = curX - speedX
-			curY = curY - speedY
-			curZ = curZ - speedZ
-			
-			local f = startFrame + step - 1
-			append framePositions #(f, curX, curY, curZ)
-			
-			local speedMS = speedX / 100.0 * fps
-			local speedMSY = speedY / 100.0 * fps
-			local speedMSZ = speedZ / 100.0 * fps
-			format "  Step %: frame % -> speed X=% Y=% Z=% m/s\n" step f speedMS speedMSY speedMSZ
+			messageBox "Failed to calculate positions. Check MAXScript Listener for details." title:"Root Smoothing"
+			return false
 		)
 		
-		with undo on
+		-- Clean up old preview if exists
+		if previewHelper != undefined then
 		(
-			-- Apply positions (skip endFrame - it's fixed)
-			for i = 2 to framePositions.count do
+			try (delete previewHelper) catch()
+			previewHelper = undefined
+		)
+		
+		-- Create Point helper
+		previewHelper = Point()
+		previewHelper.name = "_RootSmooth_Preview"
+		previewHelper.wirecolor = color 0 255 0  -- green
+		previewHelper.size = 5
+		previewHelper.centermarker = true
+		previewHelper.axistripod = false
+		previewHelper.cross = true
+		previewHelper.box = false
+		
+		-- Key the preview helper at every frame
+		-- First, key frames BEFORE the blend range to match bone position
+		for f = animationRange.start.frame to (startFrame - 1) do
+		(
+			local bonePos = at time f (in coordsys world selectedBone.transform.pos)
+			at time f
 			(
-				local f = framePositions[i][1]
-				local currentPos = at time f (in coordsys world selectedBone.pos)
-				local newPos = copy currentPos
-				
-				if chkX.checked then newPos.x = framePositions[i][2]
-				if chkY.checked then newPos.y = framePositions[i][3]
-				if chkZ.checked then newPos.z = framePositions[i][4]
-				
-				at time f
+				animate on
 				(
-					animate on
-					(
-						in coordsys world selectedBone.pos = newPos
-					)
+					in coordsys world previewHelper.pos = bonePos
 				)
 			)
 		)
 		
-		format "Done! Last frame % position unchanged.\n" endFrame
-		messageBox ("Root smoothed to " + (targetSpeedMS as string) + " m/s over " + (blendFrames as string) + " frames.\nLast frame position preserved.") title:"Root Smoothing Complete"
+		-- Key the blended frames
+		for i = 1 to previewData.count do
+		(
+			local f = previewData[i][1]
+			local px = previewData[i][2]
+			local py = previewData[i][3]
+			local pz = previewData[i][4]
+			
+			at time f
+			(
+				animate on
+				(
+					in coordsys world previewHelper.pos = [px, py, pz]
+				)
+			)
+		)
 		
-		-- Recalculate speeds to show updated values
+		-- Enable motion trail on the preview helper
+		previewHelper.showTrajectory = true
+		
+		-- Also enable trajectory on bone for comparison
+		selectedBone.showTrajectory = true
+		
+		-- Select the preview helper so user can see it
+		select previewHelper
+		
+		-- Enable Apply/Cancel buttons
+		btnApply.enabled = true
+		btnCancel.enabled = true
+		btnPreview.text = "Update Preview"
+		
+		format "Preview created: %\n" previewHelper.name
+		format "Green = preview path, adjust settings and click Update Preview.\n"
+		format "Click Apply to transfer to bone, or Cancel to discard.\n"
+		
+		return true
+	)
+	
+	-- Apply preview positions to the actual object
+	function applyPreview =
+	(
+		if selectedBone == undefined or not isValidNode selectedBone then return false
+		if previewData.count == 0 then return false
+		if (isBipedObject selectedBone) then
+		(
+			messageBox "Smoothing is not supported for Biped objects." title:"Root Smoothing"
+			return false
+		)
+		
+		format "Applying % frames to: % (class: %)\n" (previewData.count - 1) selectedBone.name (classof selectedBone)
+		
+		with undo on
+		(
+			-- Apply all calculated positions (skip last frame - it's fixed)
+			for i = 1 to (previewData.count - 1) do
+			(
+				local f = previewData[i][1]
+				local px = previewData[i][2]
+				local py = previewData[i][3]
+				local pz = previewData[i][4]
+				
+				setWorldPos selectedBone f [px, py, pz]
+				
+				if i == 1 or i == (previewData.count - 1) then
+					format "  Applied frame %: [%, %, %]\n" f px py pz
+			)
+		)
+		
+		-- Clean up preview
+		selectedBone.showTrajectory = false
+		cleanupPreview()
+		
+		-- Re-select the bone
+		select selectedBone
+		
+		-- Recalculate speed display
 		calculateSpeed()
+		
+		local targetSpeedMS = spnTargetSpeed.value
+		local blendFrames = spnBlendFrames.value as integer
+		format "Applied! Root smoothed to % m/s over % frames.\n" targetSpeedMS blendFrames
+		messageBox ("Root smoothed to " + (targetSpeedMS as string) + " m/s over " + (blendFrames as string) + " frames.\nLast frame position preserved.") title:"Root Smoothing Applied"
 		
 		return true
 	)
@@ -459,8 +637,8 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		)
 	)
 	
-	-- Smooth Root Button
-	on btnSmoothRoot pressed do
+	-- Preview Button
+	on btnPreview pressed do
 	(
 		-- Warn if blend frames is too low
 		local optimal = calcOptimalBlendFrames()
@@ -469,7 +647,22 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 			local msg = "Blend frames (" + (spnBlendFrames.value as string) + ") is below recommended (" + (optimal as string) + ").\nThis may cause erratic positions.\n\nContinue anyway?"
 			if not (queryBox msg title:"Root Smoothing Warning") then return()
 		)
-		smoothRootToTarget()
+		createPreview()
+	)
+	
+	-- Apply Button
+	on btnApply pressed do
+	(
+		applyPreview()
+	)
+	
+	-- Cancel Button
+	on btnCancel pressed do
+	(
+		selectedBone.showTrajectory = false
+		cleanupPreview()
+		if selectedBone != undefined then select selectedBone
+		format "Preview cancelled.\n"
 	)
 	
 	-- Auto-Update Toggle
@@ -560,6 +753,14 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 	-- Cleanup on close
 	on boneSpeedRollout close do
 	(
+		-- Clean up preview if active
+		cleanupPreview()
+		
+		if selectedBone != undefined then
+		(
+			try (selectedBone.showTrajectory = false) catch()
+		)
+		
 		if isCallbackActive then
 		(
 			try
@@ -583,4 +784,4 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 )
 
 -- Create Dialog and store reference
-global boneSpeedDialog = createDialog boneSpeedRollout 200 480
+global boneSpeedDialog = createDialog boneSpeedRollout 200 530

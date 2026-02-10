@@ -396,6 +396,11 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		-- FIXED last frame position
 		local lastFramePos = at time endFrame (in coordsys world selectedBone.transform.pos)
 		
+		-- Target speed is applied to the single selected axis
+		local targetX = targetCmPerFrame
+		local targetY = targetCmPerFrame
+		local targetZ = targetCmPerFrame
+		
 		-- Debug
 		local origMsX = origSpeedX / 100.0 * fps
 		local origMsY = origSpeedY / 100.0 * fps
@@ -404,7 +409,7 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		format "End frame: % [FIXED pos: %]\n" endFrame lastFramePos
 		format "Blend: frame % to frame % (% frames)\n" startFrame (endFrame - 1) blendFrames
 		format "Current speed at blend start: X=% Y=% Z=% m/s\n" origMsX origMsY origMsZ
-		format "Target speed: % m/s = % cm/frame\n" targetSpeedMS targetCmPerFrame
+		format "Target speed per axis: X=% Y=% Z=% cm/frame\n" targetX targetY targetZ
 		
 		-- Pure backward extrapolation from fixed endFrame
 		-- Speed ramps linearly from origSpeed (step 1) to targetSpeed (step N)
@@ -421,30 +426,33 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		(
 			local t = step as float / numSteps as float
 			
-			-- Lerp speed: at step 1 (earliest) use origSpeed, at step N (latest) use targetSpeed
-			local speedX = origSpeedX + (targetCmPerFrame - origSpeedX) * t
-			local speedY = origSpeedY + (targetCmPerFrame - origSpeedY) * t
-			local speedZ = origSpeedZ + (targetCmPerFrame - origSpeedZ) * t
+			-- Lerp speed per axis: at step 1 (earliest) use origSpeed, at step N (latest) use target
+			local speedX = origSpeedX + (targetX - origSpeedX) * t
+			local speedY = origSpeedY + (targetY - origSpeedY) * t
+			local speedZ = origSpeedZ + (targetZ - origSpeedZ) * t
 			
 			-- Clamp: never let speed cross zero on selected axes
-			-- Maintain minimum speed in the target direction
-			local minSpeed = abs targetCmPerFrame * 0.05  -- 5% of target as floor
-			if minSpeed < 0.001 then minSpeed = 0.001
-			
-			if chkX.checked and targetCmPerFrame != 0 then
+			-- Maintain minimum speed in that axis's target direction
+			if chkX.checked and targetX != 0 then
 			(
-				if targetCmPerFrame > 0 and speedX < minSpeed then speedX = minSpeed
-				if targetCmPerFrame < 0 and speedX > -minSpeed then speedX = -minSpeed
+				local minX = abs targetX * 0.05
+				if minX < 0.001 then minX = 0.001
+				if targetX > 0 and speedX < minX then speedX = minX
+				if targetX < 0 and speedX > -minX then speedX = -minX
 			)
-			if chkY.checked and targetCmPerFrame != 0 then
+			if chkY.checked and targetY != 0 then
 			(
-				if targetCmPerFrame > 0 and speedY < minSpeed then speedY = minSpeed
-				if targetCmPerFrame < 0 and speedY > -minSpeed then speedY = -minSpeed
+				local minY = abs targetY * 0.05
+				if minY < 0.001 then minY = 0.001
+				if targetY > 0 and speedY < minY then speedY = minY
+				if targetY < 0 and speedY > -minY then speedY = -minY
 			)
-			if chkZ.checked and targetCmPerFrame != 0 then
+			if chkZ.checked and targetZ != 0 then
 			(
-				if targetCmPerFrame > 0 and speedZ < minSpeed then speedZ = minSpeed
-				if targetCmPerFrame < 0 and speedZ > -minSpeed then speedZ = -minSpeed
+				local minZ = abs targetZ * 0.05
+				if minZ < 0.001 then minZ = 0.001
+				if targetZ > 0 and speedZ < minZ then speedZ = minZ
+				if targetZ < 0 and speedZ > -minZ then speedZ = -minZ
 			)
 			
 			-- Step backward
@@ -496,7 +504,19 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 			return false
 		)
 		
-		if not chkX.checked and not chkY.checked and not chkZ.checked then
+		-- Only allow one axis for smoothing
+		local axisCount = 0
+		if chkX.checked then axisCount = axisCount + 1
+		if chkY.checked then axisCount = axisCount + 1
+		if chkZ.checked then axisCount = axisCount + 1
+		
+		if axisCount > 1 then
+		(
+			messageBox "Please select only ONE axis for smoothing.\nSmooth each axis individually for best results.\n\nMultiple axes can still be selected for speed display." title:"Root Smoothing"
+			return false
+		)
+		
+		if axisCount == 0 then
 		(
 			messageBox "Please select at least one axis (X, Y, or Z) to smooth!" title:"Root Smoothing"
 			return false

@@ -426,6 +426,27 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 			local speedY = origSpeedY + (targetCmPerFrame - origSpeedY) * t
 			local speedZ = origSpeedZ + (targetCmPerFrame - origSpeedZ) * t
 			
+			-- Clamp: never let speed cross zero on selected axes
+			-- Maintain minimum speed in the target direction
+			local minSpeed = abs targetCmPerFrame * 0.05  -- 5% of target as floor
+			if minSpeed < 0.001 then minSpeed = 0.001
+			
+			if chkX.checked and targetCmPerFrame != 0 then
+			(
+				if targetCmPerFrame > 0 and speedX < minSpeed then speedX = minSpeed
+				if targetCmPerFrame < 0 and speedX > -minSpeed then speedX = -minSpeed
+			)
+			if chkY.checked and targetCmPerFrame != 0 then
+			(
+				if targetCmPerFrame > 0 and speedY < minSpeed then speedY = minSpeed
+				if targetCmPerFrame < 0 and speedY > -minSpeed then speedY = -minSpeed
+			)
+			if chkZ.checked and targetCmPerFrame != 0 then
+			(
+				if targetCmPerFrame > 0 and speedZ < minSpeed then speedZ = minSpeed
+				if targetCmPerFrame < 0 and speedZ > -minSpeed then speedZ = -minSpeed
+			)
+			
 			-- Step backward
 			curX = curX - speedX
 			curY = curY - speedY

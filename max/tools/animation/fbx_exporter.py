@@ -157,6 +157,115 @@ def _detect_export_path():
         return config.get('export.fbx_path', None)
 
 
+def _load_file_settings():
+    """
+    Load per-file frame range settings from scene custom attributes.
+    
+    Returns:
+        dict: Settings dict with keys: start_frame, end_frame, use_timeline
+              Returns None if no settings found in this scene
+    """
+    try:
+        if not rt:
+            logger.error("MaxScript runtime not available")
+            return None
+            
+        # Read settings from root node custom attribute
+        maxscript = '''
+(
+    if rootNode.custAttributes[#MotionKitFBXExporterSettings] != undefined then
+    (
+        local ca = rootNode.MotionKitFBXExporterSettings
+        local result = #()
+        append result ca.startFrame
+        append result ca.endFrame
+        append result ca.useTimeline
+        result
+    )
+    else
+    (
+        undefined
+    )
+)
+'''
+        result = rt.execute(maxscript)
+        
+        if result and result != "undefined" and len(result) == 3:
+            settings = {
+                "start_frame": int(result[0]),
+                "end_frame": int(result[1]),
+                "use_timeline": bool(result[2])
+            }
+            logger.info(f"Loaded per-file settings from scene: {settings}")
+            return settings
+        else:
+            logger.debug("No per-file settings found in scene")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Failed to load per-file settings: {str(e)}")
+        return None
+
+
+def _save_file_settings(start_frame, end_frame, use_timeline):
+    """
+    Save per-file frame range settings to scene custom attributes.
+    
+    Args:
+        start_frame: Start frame value
+        end_frame: End frame value
+        use_timeline: Whether "Use Timeline Range" is enabled
+    """
+    try:
+        if not rt:
+            logger.error("MaxScript runtime not available")
+            return False
+            
+        # Convert Python bool to MaxScript bool
+        use_timeline_str = "true" if use_timeline else "false"
+        
+        # Store in scene root node custom attribute
+        maxscript = f'''
+(
+    -- Get or create custom attribute definition
+    local caDef = attributes MotionKitFBXExporterSettings
+    (
+        parameters main
+        (
+            startFrame type:#integer default:{start_frame}
+            endFrame type:#integer default:{end_frame}
+            useTimeline type:#boolean default:{use_timeline_str}
+        )
+    )
+    
+    -- Apply to root node if not already present
+    if rootNode.custAttributes[#MotionKitFBXExporterSettings] == undefined then
+    (
+        custAttributes.add rootNode caDef
+    )
+    
+    -- Update values
+    rootNode.MotionKitFBXExporterSettings.startFrame = {start_frame}
+    rootNode.MotionKitFBXExporterSettings.endFrame = {end_frame}
+    rootNode.MotionKitFBXExporterSettings.useTimeline = {use_timeline_str}
+    
+    true
+)
+'''
+        result = rt.execute(maxscript)
+        
+        if result:
+            logger.info(f"Saved per-file settings to scene: start={start_frame}, end={end_frame}, use_timeline={use_timeline}")
+            return True
+        else:
+            logger.error("Failed to save per-file settings to scene")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Failed to save per-file settings: {str(e)}")
+        return False
+
+
 # ============================================
 # Multi-Take Export Functions
 # ============================================
@@ -1316,9 +1425,21 @@ class AnimationExporterDialog:
         export_btn = t('tools.fbx_exporter.export_selected')
         close = t('common.close')
 
-        # Get current timeline range
-        start_frame = int(rt.animationRange.start.frame)
-        end_frame = int(rt.animationRange.end.frame)
+        # Get current timeline range (default)
+        timeline_start = int(rt.animationRange.start.frame)
+        timeline_end = int(rt.animationRange.end.frame)
+        
+        # Try to load per-file settings from scene
+        start_frame = timeline_start
+        end_frame = timeline_end
+        use_timeline_checked = True
+        
+        file_settings = _load_file_settings()
+        if file_settings:
+            start_frame = file_settings.get('start_frame', timeline_start)
+            end_frame = file_settings.get('end_frame', timeline_end)
+            use_timeline_checked = file_settings.get('use_timeline', True)
+            logger.info(f"Loaded saved settings: start={start_frame}, end={end_frame}, use_timeline={use_timeline_checked}")
 
         # Get selection sets
         selection_sets = []
@@ -1334,7 +1455,6 @@ class AnimationExporterDialog:
 
         # Get default animation name from scene file name
         default_anim_name = ""
-        max_file_path = rt.maxFilePath + rt.maxFileName
         if rt.maxFileName and rt.maxFileName != "":
             # Remove file extension
             default_anim_name = rt.getFilenameFile(rt.maxFileName)
@@ -1343,6 +1463,9 @@ class AnimationExporterDialog:
         export_path = _detect_export_path()
         export_path_display = export_path if export_path else "(Not configured - set in Settings)"
         export_path_escaped = self._escape_maxscript(export_path_display)
+        
+        # Convert use_timeline_checked to MaxScript boolean
+        use_timeline_checked_str = "true" if use_timeline_checked else "false"
 
         maxscript = f'''
 -- ============================================
@@ -1369,7 +1492,7 @@ rollout MotionKitAnimExporter "{title}" width:500 height:430
         label endLbl "End:" pos:[180,75] width:35 align:#left
         spinner endSpn "" pos:[220,72] width:85 height:22 type:#integer range:[-100000,100000,{end_frame}]
 
-        checkbox useTimelineCB "{use_timeline}" pos:[330,75] checked:true width:150
+        checkbox useTimelineCB "{use_timeline}" pos:[330,75] checked:{use_timeline_checked_str} width:150
     )
 
     -- Objects
@@ -1430,12 +1553,8 @@ rollout MotionKitAnimExporter "{title}" width:500 height:430
             append setNames selectionSets[i].name
         selSetDDL.items = setNames
 
-        -- Update frame range if using timeline
-        if useTimelineCB.checked then
-        (
-            startSpn.value = animationRange.start.frame as integer
-            endSpn.value = animationRange.end.frame as integer
-        )
+        -- Load saved per-file settings from scene
+        python.execute "import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._load_and_apply_settings_to_dialog()"
     )
 
     -- ============================================
@@ -1457,6 +1576,23 @@ rollout MotionKitAnimExporter "{title}" width:500 height:430
             startSpn.enabled = true
             endSpn.enabled = true
         )
+        
+        -- Save settings to scene
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_file_settings(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", " + (state as string) + ")")
+    )
+    
+    -- Start frame spinner changed handler
+    on startSpn changed val do
+    (
+        -- Save settings to scene
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_file_settings(" + (val as string) + ", " + (endSpn.value as string) + ", " + (useTimelineCB.checked as string) + ")")
+    )
+    
+    -- End frame spinner changed handler
+    on endSpn changed val do
+    (
+        -- Save settings to scene
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_file_settings(" + (startSpn.value as string) + ", " + (val as string) + ", " + (useTimelineCB.checked as string) + ")")
     )
     
     -- Manage Multi-Take button
@@ -1697,6 +1833,52 @@ def _update_progress(value, status=""):
             rt.execute(f'MotionKitAnimExporter.statusLabel.text = "{status_escaped}"')
     except Exception as e:
         logger.warning(f"Failed to update UI progress: {str(e)}")
+
+
+def _load_and_apply_settings_to_dialog():
+    """
+    Load per-file settings from scene and apply them to the dialog.
+    Called when opening a new file or changing scenes.
+    """
+    try:
+        # Get timeline range as fallback
+        timeline_start = int(rt.animationRange.start.frame)
+        timeline_end = int(rt.animationRange.end.frame)
+        
+        # Load settings from scene
+        file_settings = _load_file_settings()
+        
+        if file_settings:
+            start_frame = file_settings.get('start_frame', timeline_start)
+            end_frame = file_settings.get('end_frame', timeline_end)
+            use_timeline = file_settings.get('use_timeline', True)
+            
+            # Apply to dialog
+            use_timeline_str = "true" if use_timeline else "false"
+            rt.execute(f"MotionKitAnimExporter.startSpn.value = {start_frame}")
+            rt.execute(f"MotionKitAnimExporter.endSpn.value = {end_frame}")
+            rt.execute(f"MotionKitAnimExporter.useTimelineCB.checked = {use_timeline_str}")
+            
+            # Update spinner enabled state based on use_timeline
+            if use_timeline:
+                rt.execute("MotionKitAnimExporter.startSpn.enabled = false")
+                rt.execute("MotionKitAnimExporter.endSpn.enabled = false")
+            else:
+                rt.execute("MotionKitAnimExporter.startSpn.enabled = true")
+                rt.execute("MotionKitAnimExporter.endSpn.enabled = true")
+            
+            logger.info(f"Applied saved settings to dialog: start={start_frame}, end={end_frame}, use_timeline={use_timeline}")
+        else:
+            # No saved settings, use timeline defaults
+            rt.execute(f"MotionKitAnimExporter.startSpn.value = {timeline_start}")
+            rt.execute(f"MotionKitAnimExporter.endSpn.value = {timeline_end}")
+            rt.execute("MotionKitAnimExporter.useTimelineCB.checked = true")
+            rt.execute("MotionKitAnimExporter.startSpn.enabled = false")
+            rt.execute("MotionKitAnimExporter.endSpn.enabled = false")
+            logger.debug("No saved settings found, using timeline defaults")
+            
+    except Exception as e:
+        logger.error(f"Failed to load and apply settings to dialog: {str(e)}")
 
 
 def _save_export_path(path):

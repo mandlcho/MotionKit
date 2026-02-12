@@ -1413,6 +1413,16 @@ class AnimationExporterDialog:
 
     def show(self):
         """Show the Animation Exporter dialog using MaxScript"""
+        
+        # Check if dialog already exists and bring to front
+        try:
+            check_existing = rt.execute("motionKitAnimExporterDialog != undefined")
+            if check_existing:
+                logger.info("Animation Exporter dialog already open, bringing to front")
+                rt.execute("try (setDialogPos motionKitAnimExporterDialog (getDialogPos motionKitAnimExporterDialog)) catch()")
+                return
+        except Exception as e:
+            logger.debug(f"Could not check for existing dialog: {str(e)}")
 
         # Get all translations
         title = t('tools.fbx_exporter.title')

@@ -1473,6 +1473,7 @@ class AnimationExporterDialog:
 -- ============================================
 
 global motionKitAnimExporterRollout
+global motionKitAnimExporterDialog
 
 rollout MotionKitAnimExporter "{title}" width:500 height:430
 (
@@ -1627,6 +1628,7 @@ rollout MotionKitAnimExporter "{title}" width:500 height:430
         callbacks.removeScripts #systemPostNew id:#motionKitAnimExporter
         callbacks.removeScripts #filePostMerge id:#motionKitAnimExporter
         motionKitAnimExporterRollout = undefined
+        motionKitAnimExporterDialog = undefined
     )
 
     -- Pick Objects button
@@ -1814,9 +1816,27 @@ rollout MotionKitAnimExporter "{title}" width:500 height:430
     )
 )
 
--- Create and show dialog
-try (destroyDialog MotionKitAnimExporter) catch()
-createDialog MotionKitAnimExporter
+-- Create and show dialog (singleton pattern)
+if motionKitAnimExporterDialog != undefined then
+(
+    -- Dialog already exists, just bring it to front
+    try
+    (
+        setDialogPos motionKitAnimExporterDialog (getDialogPos motionKitAnimExporterDialog)
+    )
+    catch
+    (
+        -- Dialog reference is stale, destroy it and create new one
+        try (destroyDialog MotionKitAnimExporter) catch()
+        motionKitAnimExporterDialog = createDialog MotionKitAnimExporter
+    )
+)
+else
+(
+    -- Create new dialog
+    try (destroyDialog MotionKitAnimExporter) catch()
+    motionKitAnimExporterDialog = createDialog MotionKitAnimExporter
+)
 '''
 
         # Execute the MaxScript to show the dialog

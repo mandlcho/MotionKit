@@ -1588,22 +1588,25 @@ rollout MotionKitAnimExporter "{title}" width:500 height:430
             endSpn.enabled = true
         )
         
-        -- Save settings to scene
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_file_settings(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", " + (state as string) + ")")
+        -- Save settings to scene (convert MaxScript bool to Python bool)
+        local useTimelineStr = if state then "True" else "False"
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_file_settings(" + (startSpn.value as string) + ", " + (endSpn.value as string) + ", " + useTimelineStr + ")")
     )
     
     -- Start frame spinner changed handler
     on startSpn changed val do
     (
-        -- Save settings to scene
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_file_settings(" + (val as string) + ", " + (endSpn.value as string) + ", " + (useTimelineCB.checked as string) + ")")
+        -- Save settings to scene (convert MaxScript bool to Python bool)
+        local useTimelineStr = if useTimelineCB.checked then "True" else "False"
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_file_settings(" + (val as string) + ", " + (endSpn.value as string) + ", " + useTimelineStr + ")")
     )
     
     -- End frame spinner changed handler
     on endSpn changed val do
     (
-        -- Save settings to scene
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_file_settings(" + (startSpn.value as string) + ", " + (val as string) + ", " + (useTimelineCB.checked as string) + ")")
+        -- Save settings to scene (convert MaxScript bool to Python bool)
+        local useTimelineStr = if useTimelineCB.checked then "True" else "False"
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._save_file_settings(" + (startSpn.value as string) + ", " + (val as string) + ", " + useTimelineStr + ")")
     )
     
     -- Manage Multi-Take button

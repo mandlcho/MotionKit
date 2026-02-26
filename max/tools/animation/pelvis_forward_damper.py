@@ -204,14 +204,16 @@ struct PelvisForwardDamperStruct
                              reductionPct smoothPasses startFrame endFrame
 
         -- Animated dummy showing the new path
-        local dummy = Dummy name:"PelvisDamper_Preview" boxsize:[10,10,10]
-        dummy.wirecolor = (color 80 255 120)
+        -- Note: avoid naming the local 'dummy' — MaxScript is case-insensitive
+        -- and it would shadow the Dummy class before the right-hand side is evaluated
+        local previewHelper = Dummy name:"PelvisDamper_Preview" boxsize:[10,10,10]
+        previewHelper.wirecolor = (color 80 255 120)
         with animate on
         (
             for i = 1 to totalFrames do
             (
                 sliderTime = startFrame + i - 1
-                dummy.pos = newPositions[i]
+                previewHelper.pos = newPositions[i]
             )
         )
         sliderTime = originalTime
@@ -232,7 +234,7 @@ struct PelvisForwardDamperStruct
         newSpline.wirecolor = (color 70 255 70)
         newSpline.render_displayRenderMesh = false
 
-        return dummy
+        return previewHelper
     ),
 
     -- Apply damped positions back to the pelvis bone

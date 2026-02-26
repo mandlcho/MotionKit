@@ -1,6 +1,6 @@
 """
 Pelvis Forward Damper Tool for MotionKit
-Reduces pelvis forward-backward oscillation after the root curve is linearized
+Removes pelvis forward-backward oscillation by linearizing between the first and last frame
 
 The problem this solves:
   When you linearize a root bone's forward movement (constant speed for game export),
@@ -8,15 +8,17 @@ The problem this solves:
   no longer partially masked by the root's uneven speed.
 
 The fix:
-  Compute the relative forward offset between pelvis and root, then reduce how much
-  it deviates from its mean. All other axes (side-to-side, vertical) are untouched.
+  Linearly interpolate the pelvis's forward offset (relative to root) between its value
+  on the first frame and its value on the last frame. All intermediate oscillation is
+  removed. The amount slider blends between the original and the linearized result.
+  All other axes (side-to-side, vertical) are untouched.
 
   On first Apply the original pelvis positions are locked into a hidden backup dummy.
   Every subsequent Apply and Preview always computes from those locked originals so
-  the slider is non-destructive — you can dial it up or down freely. Use
-  "Start Fresh" to commit the current state as the new baseline.
+  the slider is non-destructive. Use "Start Fresh" to commit the current state as
+  the new baseline.
 
-Usage: Pick pelvis and root bones, set reduction amount, preview, then apply.
+Usage: Pick pelvis and root bones, set amount, preview, then apply.
 """
 
 try:
@@ -110,7 +112,7 @@ struct PelvisForwardDamperStruct
     ),
 
     -- -------------------------------------------------------
-    -- Position sampling — works for any node type
+    -- Position sampling
     -- -------------------------------------------------------
     fn samplePositions node startFrame endFrame =
     (
@@ -127,9 +129,6 @@ struct PelvisForwardDamperStruct
 
     -- -------------------------------------------------------
     -- Backup management
-    -- The backup is a hidden Dummy whose baked animation holds
-    -- the pelvis world positions from before any damping was applied.
-    -- It persists in the scene so the slider stays non-destructive.
     -- -------------------------------------------------------
     fn backupNodeName = "PelvisDamper_OrigBackup",
 
@@ -137,8 +136,6 @@ struct PelvisForwardDamperStruct
     (
         local node = getNodeByName (this.backupNodeName())
         if node == undefined then return undefined
-
-        -- Verify it matches the current pelvis and frame range
         try
         (
             if node.mk_pelvisName != pelvisName  then return undefined
@@ -146,24 +143,19 @@ struct PelvisForwardDamperStruct
             if node.mk_endFrame   != endFrame    then return undefined
         )
         catch ( return undefined )
-
         return node
     ),
 
     fn createBackup pelvisNode startFrame endFrame =
     (
-        -- Remove any stale backup
         local old = getNodeByName (this.backupNodeName())
         if old != undefined then delete old
 
-        -- Sample the current (original) pelvis positions
         local origPos = this.samplePositions pelvisNode startFrame endFrame
 
-        -- Hidden dummy to hold the baked positions
         local backupNode = Dummy name:(this.backupNodeName()) boxsize:[1,1,1]
         backupNode.isHidden = true
 
-        -- Tag it with metadata so we can validate it later
         local ca = attributes "PelvisDamperMeta"
         (
             parameters main
@@ -178,7 +170,6 @@ struct PelvisForwardDamperStruct
         backupNode.mk_startFrame = startFrame
         backupNode.mk_endFrame   = endFrame
 
-        -- Bake original positions into the dummy
         local savedTime = sliderTime
         with animate on
         (
@@ -189,18 +180,15 @@ struct PelvisForwardDamperStruct
             )
         )
         sliderTime = savedTime
-
         return backupNode
     ),
 
-    -- Delete the backup (user wants a fresh baseline from current state)
     fn clearBackupData =
     (
         local node = getNodeByName (this.backupNodeName())
         if node != undefined then delete node
     ),
 
-    -- Restore the pelvis to the stored originals
     fn restoreFromBackup pelvisNode startFrame endFrame =
     (
         local backup = this.findBackup pelvisNode.name startFrame endFrame
@@ -211,11 +199,11 @@ struct PelvisForwardDamperStruct
             return false
         )
 
-        local origPos    = this.samplePositions backup   startFrame endFrame
+        local origPos    = this.samplePositions backup    startFrame endFrame
         local currentPos = this.samplePositions pelvisNode startFrame endFrame
         local totalFrames = endFrame - startFrame + 1
-
         local savedTime = sliderTime
+
         with animate on
         (
             for i = 1 to totalFrames do
@@ -229,7 +217,6 @@ struct PelvisForwardDamperStruct
         return true
     ),
 
-    -- Return a human-readable backup status string for the UI
     fn backupStatus pelvisName startFrame endFrame =
     (
         local node = getNodeByName (this.backupNodeName())
@@ -247,69 +234,54 @@ struct PelvisForwardDamperStruct
     ),
 
     -- -------------------------------------------------------
-    -- Math
+    -- Core: linearize relative forward between first and last frame
+    --
+    -- The relative forward offset (pelvis - root) is interpolated
+    -- linearly between its value at the first frame and its value at
+    -- the last frame. 'amount' (0-100) blends between the original
+    -- curve and the fully linearized result.
+    --
+    -- First and last frames are always preserved exactly (t=0 / t=1).
     -- -------------------------------------------------------
-    fn smoothCurve values passes =
-    (
-        -- MaxScript copy() returns OK on arrays; use collect instead
-        local result = for v in values collect v
-        for p = 1 to passes do
-        (
-            local smoothed = for v in result collect v
-            for i = 2 to (result.count - 1) do
-                smoothed[i] = (result[i-1] + result[i] + result[i+1]) / 3.0
-            result = smoothed
-        )
-        return result
-    ),
-
-    -- Takes explicit position arrays (not scene nodes) so it always
-    -- works from whichever baseline the caller chose.
-    -- blendFrames: number of frames at each end over which the damping
-    -- fades in/out smoothly, preventing speed-up artifacts at boundaries.
-    fn computeDampedPositions origPelvisPos rootPos axisIndex reductionPct smoothPasses blendFrames =
+    fn computeLinearizedPositions origPelvisPos rootPos axisIndex amount =
     (
         local totalFrames = origPelvisPos.count
 
-        local relFwd = #()
-        for i = 1 to totalFrames do
-        (
-            local pF = if axisIndex == 1 then origPelvisPos[i].x else origPelvisPos[i].y
-            local rF = if axisIndex == 1 then rootPos[i].x       else rootPos[i].y
-            append relFwd (pF - rF)
-        )
+        -- Relative forward at the two endpoints
+        local startRelFwd = if axisIndex == 1 then
+            origPelvisPos[1].x - rootPos[1].x
+        else
+            origPelvisPos[1].y - rootPos[1].y
 
-        if smoothPasses > 0 then
-            relFwd = this.smoothCurve relFwd smoothPasses
+        local endRelFwd = if axisIndex == 1 then
+            origPelvisPos[totalFrames].x - rootPos[totalFrames].x
+        else
+            origPelvisPos[totalFrames].y - rootPos[totalFrames].y
 
-        local sum = 0.0
-        for v in relFwd do sum += v
-        local meanFwd = sum / totalFrames
-
-        local dampFactor = 1.0 - (reductionPct / 100.0)
+        local blendWeight = amount / 100.0
 
         local newPositions = #()
         for i = 1 to totalFrames do
         (
-            -- Blend weight: 0 at the boundaries, 1 in the middle.
-            -- This prevents the snap/speed-up that occurs when a fully-damped
-            -- frame sits next to a hard-locked boundary frame.
-            local blendWeight = 1.0
-            if blendFrames > 0 then
-            (
-                local fromStart = i - 1           -- 0 at first frame
-                local fromEnd   = totalFrames - i -- 0 at last frame
-                local nearBound = if fromStart < fromEnd then fromStart else fromEnd
-                if nearBound < blendFrames then
-                    blendWeight = nearBound as float / blendFrames as float
-            )
+            -- t goes 0 at first frame, 1 at last frame
+            local t = if totalFrames > 1 then
+                (i - 1) as float / (totalFrames - 1) as float
+            else 0.0
 
-            local rF        = if axisIndex == 1 then rootPos[i].x else rootPos[i].y
-            -- Damped relative forward (full reduction applied)
-            local dampedRel = meanFwd + (relFwd[i] - meanFwd) * dampFactor
-            -- Blend between original and damped
-            local finalRel  = relFwd[i] + (dampedRel - relFwd[i]) * blendWeight
-            local newFwd    = rF + finalRel
+            -- Target: straight line between first and last relative offset
+            local linearRelFwd = startRelFwd + (endRelFwd - startRelFwd) * t
+
+            -- Original relative offset at this frame
+            local origRelFwd = if axisIndex == 1 then
+                origPelvisPos[i].x - rootPos[i].x
+            else
+                origPelvisPos[i].y - rootPos[i].y
+
+            -- Blend
+            local finalRelFwd = origRelFwd + (linearRelFwd - origRelFwd) * blendWeight
+
+            local rF = if axisIndex == 1 then rootPos[i].x else rootPos[i].y
+            local newFwd = rF + finalRelFwd
 
             local origPos = origPelvisPos[i]
             local newPos  = if axisIndex == 1 then
@@ -326,7 +298,7 @@ struct PelvisForwardDamperStruct
     -- -------------------------------------------------------
     -- Preview
     -- -------------------------------------------------------
-    fn previewDamping pelvisNode rootNode axisIndex reductionPct smoothPasses blendFrames startFrame endFrame =
+    fn previewDamping pelvisNode rootNode axisIndex amount startFrame endFrame =
     (
         if pelvisNode == undefined or rootNode == undefined then
         (
@@ -339,19 +311,16 @@ struct PelvisForwardDamperStruct
         local totalFrames = endFrame - startFrame + 1
         local savedTime   = sliderTime
 
-        -- Use locked originals if available, otherwise sample current pelvis
         local backup = this.findBackup pelvisNode.name startFrame endFrame
         local origPelvisPos = if backup != undefined then
-            this.samplePositions backup   startFrame endFrame
+            this.samplePositions backup    startFrame endFrame
         else
             this.samplePositions pelvisNode startFrame endFrame
 
         local rootPos     = this.samplePositions rootNode startFrame endFrame
-        local newPositions = this.computeDampedPositions origPelvisPos rootPos \\
-                             axisIndex reductionPct smoothPasses blendFrames
+        local newPositions = this.computeLinearizedPositions origPelvisPos rootPos \\
+                             axisIndex amount
 
-        -- Animated dummy showing the adjusted path
-        -- (name local 'previewHelper' to avoid shadowing the Dummy class)
         local previewHelper = Dummy name:"PelvisDamper_Preview" boxsize:[10,10,10]
         previewHelper.wirecolor = (color 80 255 120)
         with animate on
@@ -364,7 +333,7 @@ struct PelvisForwardDamperStruct
         )
         sliderTime = savedTime
 
-        -- Red = original path, Green = adjusted path
+        -- Red = original, Green = adjusted
         local origSpline = SplineShape name:"PelvisDamper_Original"
         addNewSpline origSpline
         for p in origPelvisPos do addKnot origSpline 1 #smooth #curve p
@@ -385,7 +354,7 @@ struct PelvisForwardDamperStruct
     -- -------------------------------------------------------
     -- Apply
     -- -------------------------------------------------------
-    fn applyDamping pelvisNode rootNode axisIndex reductionPct smoothPasses blendFrames startFrame endFrame =
+    fn applyDamping pelvisNode rootNode axisIndex amount startFrame endFrame =
     (
         if pelvisNode == undefined or rootNode == undefined then
         (
@@ -396,24 +365,18 @@ struct PelvisForwardDamperStruct
         local totalFrames = endFrame - startFrame + 1
         local savedTime   = sliderTime
 
-        -- Ensure we have locked originals. Create backup on first apply.
         local backup = this.findBackup pelvisNode.name startFrame endFrame
         if backup == undefined then
             backup = this.createBackup pelvisNode startFrame endFrame
 
-        -- Always compute the target from the locked originals
-        local origPelvisPos = this.samplePositions backup    startFrame endFrame
-        local rootPos       = this.samplePositions rootNode  startFrame endFrame
-        local newPositions  = this.computeDampedPositions origPelvisPos rootPos \\
-                              axisIndex reductionPct smoothPasses blendFrames
+        local origPelvisPos = this.samplePositions backup   startFrame endFrame
+        local rootPos       = this.samplePositions rootNode startFrame endFrame
+        local newPositions  = this.computeLinearizedPositions origPelvisPos rootPos \\
+                              axisIndex amount
 
-        -- Sample where the pelvis currently sits (may already be damped from a
-        -- previous apply). The delta moves it from current to the new target.
         local currentPos = this.samplePositions pelvisNode startFrame endFrame
         sliderTime = savedTime
 
-        -- Blend weight is already baked into newPositions, so every frame
-        -- gets the right amount — no need to skip boundaries explicitly.
         with animate on
         (
             for i = 1 to totalFrames do
@@ -447,7 +410,7 @@ PelvisForwardDamperTool = PelvisForwardDamperStruct()
 -- ============================================================
 -- Dialog
 -- ============================================================
-rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
+rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:435
 (
     -- Source Bones
     group "Source Bones"
@@ -472,52 +435,44 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
         radiobuttons forwardAxisRadio labels:#("X Axis", "Y Axis") pos:[20,153] default:2 columns:2
     )
 
-    -- Damping
-    group "Damping"
+    -- Amount
+    group "Linearize Forward"
     (
-        label reductionLbl "Reduction:" pos:[20,200] width:75 align:#left
-        slider reductionSlider ""       pos:[100,198] width:285 height:22 range:[0,100,50] type:#integer ticks:10
-        label reductionValLbl "50%"     pos:[393,200] width:45 align:#left
+        label amountLbl "Amount:" pos:[20,200] width:65 align:#left
+        slider amountSlider ""    pos:[90,198] width:295 height:22 range:[0,100,100] type:#integer ticks:10
+        label amountValLbl "100%" pos:[393,200] width:45 align:#left
 
-        label helpTxt "0% = no change       100% = flatten to average offset" \\
+        label helpTxt "0% = no change    100% = straight line between first and last frame" \\
             pos:[20,226] width:440 align:#left
-
-        label smoothLbl "Smoothing passes:" pos:[20,250] width:130 align:#left
-        spinner smoothSpn "" pos:[155,248] width:55 height:20 type:#integer range:[0,10,2]
-        label smoothHelp "(0 = none)" pos:[218,250] width:90 align:#left
-
-        label blendLbl "Boundary blend:" pos:[20,274] width:120 align:#left
-        spinner blendSpn "" pos:[155,272] width:55 height:20 type:#integer range:[0,50,5]
-        label blendHelp "frames to fade in/out at each end" pos:[218,274] width:220 align:#left
     )
 
     -- Frame Range
     group "Frame Range"
     (
-        checkbox useTimelineCB "Use Timeline Range" pos:[20,285] width:160 checked:true
-        label startLbl "Start:" pos:[200,285] width:40 align:#left
-        spinner startSpn "" pos:[243,283] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}] enabled:false
-        label endLbl "End:"   pos:[325,285] width:35 align:#left
-        spinner endSpn ""   pos:[360,283] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
+        checkbox useTimelineCB "Use Timeline Range" pos:[20,255] width:160 checked:true
+        label startLbl "Start:" pos:[200,255] width:40 align:#left
+        spinner startSpn "" pos:[243,253] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}] enabled:false
+        label endLbl "End:"   pos:[325,255] width:35 align:#left
+        spinner endSpn ""   pos:[360,253] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
     )
 
     -- Backup status
     group "Original Baseline"
     (
-        label backupStatusLbl "No original locked" pos:[20,325] width:340 height:16 align:#left
-        button startFreshBtn  "Start Fresh"        pos:[320,320] width:120 height:22
-        button restoreOrigBtn "Restore Original"   pos:[20,348]  width:200 height:22
-        label restoreHelp "Reverts pelvis to the locked original" pos:[230,352] width:210 align:#left
+        label backupStatusLbl "No original locked" pos:[20,295] width:340 height:16 align:#left
+        button startFreshBtn  "Start Fresh"        pos:[320,290] width:120 height:22
+        button restoreOrigBtn "Restore Original"   pos:[20,318]  width:200 height:22
+        label restoreHelp "Reverts pelvis to the locked original" pos:[230,322] width:210 align:#left
     )
 
     -- Status / progress
-    label statusLabel "" pos:[20,382] width:440 height:16 align:#center
-    progressBar damperProgress "" pos:[20,401] width:440 height:10 value:0 color:(color 80 200 120)
+    label statusLabel "" pos:[20,352] width:440 height:16 align:#center
+    progressBar damperProgress "" pos:[20,371] width:440 height:10 value:0 color:(color 80 200 120)
 
     -- Action buttons
-    button previewBtn  "Preview"         pos:[20,422]  width:130 height:36
-    button applyBtn    "Apply to Pelvis" pos:[160,422] width:165 height:36
-    button cleanupBtn  "Clear Preview"   pos:[335,422] width:125 height:36
+    button previewBtn  "Preview"         pos:[20,392]  width:130 height:36
+    button applyBtn    "Apply to Pelvis" pos:[160,392] width:165 height:36
+    button cleanupBtn  "Clear Preview"   pos:[335,392] width:125 height:36
 
     -- --------------------------------------------------------
     fn refreshBackupStatus =
@@ -532,7 +487,6 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
         backupStatusLbl.text = s
     )
 
-    -- Init
     on PelvisForwardDamperDialog open do
     (
         startSpn.value = animationRange.start.frame as integer
@@ -551,9 +505,9 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
         refreshBackupStatus()
     )
 
-    on reductionSlider changed val do
+    on amountSlider changed val do
     (
-        reductionValLbl.text = val as string + "%"
+        amountValLbl.text = val as string + "%"
     )
 
     on autoDetectBtn pressed do
@@ -679,9 +633,7 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
             PelvisForwardDamperTool.pelvisNode \\
             PelvisForwardDamperTool.rootNode \\
             forwardAxisRadio.state \\
-            reductionSlider.value \\
-            smoothSpn.value \\
-            blendSpn.value \\
+            amountSlider.value \\
             startSpn.value \\
             endSpn.value
 
@@ -706,7 +658,7 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
             return false
         )
 
-        local msg = "Apply " + reductionSlider.value as string + "% forward damping to " + \\
+        local msg = "Apply " + amountSlider.value as string + "% linearization to " + \\
                     PelvisForwardDamperTool.pelvisNode.name + "?\\n\\n" + \\
                     "This writes keys directly to the pelvis bone.\\nUndo with Ctrl+Z."
         if not (queryBox msg title:"Confirm Apply") then return false
@@ -721,9 +673,7 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
             PelvisForwardDamperTool.pelvisNode \\
             PelvisForwardDamperTool.rootNode \\
             forwardAxisRadio.state \\
-            reductionSlider.value \\
-            smoothSpn.value \\
-            blendSpn.value \\
+            amountSlider.value \\
             startSpn.value \\
             endSpn.value
 
@@ -731,7 +681,7 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
         windows.processPostedMessages()
 
         if ok then
-            statusLabel.text = "Done - forward oscillation reduced by " + reductionSlider.value as string + "%"
+            statusLabel.text = "Done - forward linearized " + amountSlider.value as string + "%"
         else
             statusLabel.text = "Failed"
 

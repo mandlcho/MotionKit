@@ -226,24 +226,25 @@ struct PelvisForwardDamperStruct
 
         -- Now linearize the forward axis:
         -- Delete all intermediate keys and replace with two linear keys
-        local posCtrl    = newHelper.pos.controller   -- Position_XYZ
-        local fwdSubCtrl = posCtrl[axisIndex]         -- Bezier_Float for X, Y, or Z
+        local posCtrl    = newHelper.pos.controller            -- Position_XYZ
+        -- posCtrl[n] returns a SubAnim wrapper; .controller gives the Bezier_Float
+        local fwdSubCtrl = posCtrl[axisIndex].controller       -- Bezier_Float
 
         deleteKeys fwdSubCtrl #allKeys
 
-        -- Add start key
-        addNewKey fwdSubCtrl (startFrame as time)
-        local k1 = getKey fwdSubCtrl 1
-        k1.value = startFwd
+        -- Add start key and set value
+        local idx1 = addNewKey fwdSubCtrl (startFrame as time)
+        local k1   = getKey fwdSubCtrl idx1
+        k1.value   = startFwd
 
-        -- Add end key
-        addNewKey fwdSubCtrl (endFrame as time)
-        local k2 = getKey fwdSubCtrl 2
-        k2.value = endFwd
+        -- Add end key and set value
+        local idx2 = addNewKey fwdSubCtrl (endFrame as time)
+        local k2   = getKey fwdSubCtrl idx2
+        k2.value   = endFwd
 
         -- Both keys get linear tangents so the curve is a perfect straight line
-        setTangents fwdSubCtrl 1 #linear #linear
-        setTangents fwdSubCtrl 2 #linear #linear
+        setTangents fwdSubCtrl idx1 #linear #linear
+        setTangents fwdSubCtrl idx2 #linear #linear
 
         return newHelper
     ),

@@ -151,8 +151,9 @@ struct FootSlideFixerStruct
     ),
 
     -- -------------------------------------------------------
-    -- XY velocity array (Z is vertical swing — ignore it)
-    -- Index 1 is always 0.0 (no predecessor)
+    -- 3D velocity array — index 1 is always 0.0 (no predecessor)
+    -- Using full 3D distance: a planted foot has no XY *or* Z movement.
+    -- Correction is still XY-only; Z is only used here for detection.
     -- -------------------------------------------------------
     fn buildVelocityArray posArr =
     (
@@ -161,7 +162,8 @@ struct FootSlideFixerStruct
         (
             local dx = posArr[i].x - posArr[i-1].x
             local dy = posArr[i].y - posArr[i-1].y
-            append vel (sqrt (dx*dx + dy*dy))
+            local dz = posArr[i].z - posArr[i-1].z
+            append vel (sqrt (dx*dx + dy*dy + dz*dz))
         )
         return vel
     ),
@@ -331,6 +333,19 @@ rollout FootSlideFixerDialog "{title}" width:460 height:275
     (
         startSpn.value = animationRange.start.frame as integer
         endSpn.value   = animationRange.end.frame as integer
+
+        -- Pre-populate from Biped Axis Cleaner if the user already picked a pelvis
+        try
+        (
+            if BipedAxisCleanerTool != undefined and \
+               BipedAxisCleanerTool.pelvisNode != undefined then
+            (
+                FootSlideFixerTool.bipedNode = BipedAxisCleanerTool.pelvisNode
+                bipedEdit.text = BipedAxisCleanerTool.pelvisNode.name
+                statusLabel.text = "{msg_detected}" + BipedAxisCleanerTool.pelvisNode.name
+            )
+        )
+        catch()
     )
 
     on useTimelineCB changed state do

@@ -1,44 +1,44 @@
 """
-Pelvis Forward Damper Tool for MotionKit
+Biped Axis Cleaner Tool for MotionKit
 
 Workflow:
   1. "Create Helper" — bakes the pelvis world position to a Dummy helper,
      then replaces the forward axis with two linear keys (first and last frame).
-     X and Z retain all original keys; only the chosen forward axis is flattened.
-  2. Inspect the helper in the viewport (green = adjusted path, red = original).
+     The other two axes retain all original keys; only the chosen forward axis is flattened.
+  2. Inspect the helper in the viewport.
   3. "Apply to Pelvis" — bakes the helper's modified position back to the pelvis
      using the Amount slider to blend between original and fully linearized.
 
   On first Apply the original pelvis positions are locked in a hidden backup dummy
-  so the Amount slider is non-destructive across multiple applies. Use "Start Fresh"
-  to commit the current state as the new baseline.
+  so the Amount slider is non-destructive across multiple applies.
 """
 
 try:
     import pymxs
     rt = pymxs.runtime
 except ImportError:
-    print("[Pelvis Forward Damper] ERROR: pymxs not available")
+    print("[Biped Axis Cleaner] ERROR: pymxs not available")
     pymxs = None
     rt = None
 
 from core.logger import logger
+from core.localization import t
 
-TOOL_NAME = "Pelvis Forward Damper"
+TOOL_NAME = "Biped Axis Cleaner"
 
 
 def execute(control=None, event=None):
     if not pymxs or not rt:
-        print("[Pelvis Forward Damper] ERROR: Not running in 3ds Max")
+        print("[Biped Axis Cleaner] ERROR: Not running in 3ds Max")
         return
     try:
-        PelvisForwardDamperDialog().show()
+        BipedAxisCleanerDialog().show()
     except Exception as e:
-        logger.error(f"Failed to open Pelvis Forward Damper: {str(e)}")
-        rt.messageBox(f"Failed to open Pelvis Forward Damper:\n{str(e)}", title="MotionKit Error")
+        logger.error(f"Failed to open Biped Axis Cleaner: {str(e)}")
+        rt.messageBox(f"Failed to open Biped Axis Cleaner:\n{str(e)}", title="MotionKit Error")
 
 
-class PelvisForwardDamperDialog:
+class BipedAxisCleanerDialog:
 
     def __init__(self):
         self.version = "1.0.0"
@@ -47,14 +47,49 @@ class PelvisForwardDamperDialog:
         start_frame = int(rt.animationRange.start.frame)
         end_frame   = int(rt.animationRange.end.frame)
 
+        # UI strings
+        title               = t('tools.biped_axis_cleaner.title')
+        group_source        = t('tools.biped_axis_cleaner.group_source')
+        btn_auto_detect     = t('tools.biped_axis_cleaner.btn_auto_detect')
+        lbl_pelvis          = t('tools.biped_axis_cleaner.lbl_pelvis')
+        btn_pick            = t('common.pick')
+        btn_sel             = t('tools.biped_axis_cleaner.btn_sel')
+        group_axis          = t('tools.biped_axis_cleaner.group_axis')
+        lbl_axis_question   = t('tools.biped_axis_cleaner.lbl_axis_question')
+        group_amount        = t('tools.biped_axis_cleaner.group_amount')
+        lbl_amount          = t('tools.biped_axis_cleaner.lbl_amount')
+        lbl_amount_help     = t('tools.biped_axis_cleaner.lbl_amount_help')
+        group_frame_range   = t('tools.biped_axis_cleaner.group_frame_range')
+        cb_use_timeline     = t('tools.biped_axis_cleaner.cb_use_timeline')
+        lbl_start           = t('tools.biped_axis_cleaner.lbl_start')
+        lbl_end             = t('tools.biped_axis_cleaner.lbl_end')
+        btn_create_helper   = t('tools.biped_axis_cleaner.btn_create_helper')
+        btn_apply           = t('tools.biped_axis_cleaner.btn_apply')
+        btn_delete_helper   = t('tools.biped_axis_cleaner.btn_delete_helper')
+
+        # Error / status strings
+        err_assign_pelvis       = t('tools.biped_axis_cleaner.err_assign_pelvis')
+        err_no_helper           = t('tools.biped_axis_cleaner.err_no_helper')
+        err_select_one          = t('tools.biped_axis_cleaner.err_select_one')
+        confirm_apply_tpl       = t('tools.biped_axis_cleaner.confirm_apply')
+        msg_detected_prefix     = t('tools.biped_axis_cleaner.msg_detected_prefix')
+        msg_no_biped            = t('tools.biped_axis_cleaner.msg_no_biped')
+        msg_creating            = t('tools.biped_axis_cleaner.msg_creating')
+        msg_helper_created_sfx  = t('tools.biped_axis_cleaner.msg_helper_created_sfx')
+        msg_failed_helper       = t('tools.biped_axis_cleaner.msg_failed_helper')
+        msg_applying            = t('tools.biped_axis_cleaner.msg_applying')
+        msg_done_tpl            = t('tools.biped_axis_cleaner.msg_done')
+        msg_failed              = t('tools.biped_axis_cleaner.msg_failed')
+        msg_helper_deleted      = t('tools.biped_axis_cleaner.msg_helper_deleted')
+
         maxscript = f'''
 -- ============================================
--- MotionKit Pelvis Forward Damper
+-- MotionKit Biped Axis Cleaner
 -- ============================================
 
-global PelvisForwardDamperTool
+global BipedAxisCleanerTool
 
-struct PelvisForwardDamperStruct
+struct BipedAxisCleanerStruct
 (
     pelvisNode = undefined,
 
@@ -97,7 +132,7 @@ struct PelvisForwardDamperStruct
     -- -------------------------------------------------------
     -- Backup — stores original pelvis positions as a hidden dummy
     -- -------------------------------------------------------
-    fn backupNodeName = "PelvisDamper_OrigBackup",
+    fn backupNodeName = "BipedAxisCleaner_OrigBackup",
 
     fn findBackup pelvisName startFrame endFrame =
     (
@@ -123,7 +158,7 @@ struct PelvisForwardDamperStruct
         local backupNode = Dummy name:(this.backupNodeName()) boxsize:[1,1,1]
         backupNode.isHidden = true
 
-        local ca = attributes "PelvisDamperMeta"
+        local ca = attributes "BipedAxisCleanerMeta"
         (
             parameters main
             (
@@ -156,32 +191,16 @@ struct PelvisForwardDamperStruct
         if node != undefined then delete node
     ),
 
-    fn backupStatus pelvisName startFrame endFrame =
-    (
-        local node = getNodeByName (this.backupNodeName())
-        if node == undefined then return "No original locked"
-        try
-        (
-            if node.mk_pelvisName == pelvisName and \\
-               node.mk_startFrame == startFrame  and \\
-               node.mk_endFrame   == endFrame    then
-                return ("Original locked  [" + startFrame as string + " - " + endFrame as string + "]")
-            else
-                return "Backup exists but doesn't match current settings"
-        )
-        catch ( return "No original locked" )
-    ),
-
     -- -------------------------------------------------------
     -- Helper — visible dummy with linearized forward axis
     -- -------------------------------------------------------
-    fn helperNodeName = "PelvisLinear_Helper",
+    fn helperNodeName = "BipedAxisCleaner_Helper",
 
     fn createHelper pelvisNode axisIndex startFrame endFrame =
     (
         if pelvisNode == undefined then
         (
-            messageBox "Please assign the Pelvis bone first." title:"Pelvis Forward Damper"
+            messageBox "{err_assign_pelvis}" title:"{title}"
             return undefined
         )
 
@@ -193,13 +212,13 @@ struct PelvisForwardDamperStruct
         local savedTime   = sliderTime
 
         -- Use backup positions if available so Create Helper is idempotent
-        local backup   = this.findBackup pelvisNode.name startFrame endFrame
-        local origPos  = if backup != undefined then
-            this.samplePositions backup    startFrame endFrame
+        local backup  = this.findBackup pelvisNode.name startFrame endFrame
+        local origPos = if backup != undefined then
+            this.samplePositions backup     startFrame endFrame
         else
             this.samplePositions pelvisNode startFrame endFrame
 
-        -- Get forward value at first and last frame before we modify anything
+        -- Get forward value at first and last frame
         local startFwd = if axisIndex == 1 then origPos[1].x
                          else if axisIndex == 2 then origPos[1].y
                          else origPos[1].z
@@ -213,9 +232,9 @@ struct PelvisForwardDamperStruct
         newHelper.wirecolor = (color 80 200 255)
 
         -- Bake in a single pass:
-        -- X and Z come straight from the original pelvis positions.
+        -- The two non-forward axes come straight from the original positions.
         -- The forward axis is replaced with a linear interpolation between
-        -- the first and last frame values — no sub-controller manipulation needed.
+        -- the first and last frame values.
         with animate on
         (
             for i = 1 to totalFrames do
@@ -254,14 +273,14 @@ struct PelvisForwardDamperStruct
     (
         if pelvisNode == undefined then
         (
-            messageBox "Please assign the Pelvis bone first." title:"Pelvis Forward Damper"
+            messageBox "{err_assign_pelvis}" title:"{title}"
             return false
         )
 
         local helperNode = getNodeByName (this.helperNodeName())
         if helperNode == undefined then
         (
-            messageBox "No helper found. Run 'Create Helper' first." title:"Pelvis Forward Damper"
+            messageBox "{err_no_helper}" title:"{title}"
             return false
         )
 
@@ -305,54 +324,54 @@ struct PelvisForwardDamperStruct
     )
 )
 
-PelvisForwardDamperTool = PelvisForwardDamperStruct()
+BipedAxisCleanerTool = BipedAxisCleanerStruct()
 
 -- ============================================================
 -- Dialog
 -- ============================================================
-rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:380
+rollout BipedAxisCleanerDialog "{title}" width:460 height:355
 (
-    group "Source Bone"
+    group "{group_source}"
     (
-        button autoDetectBtn "Auto-Detect Biped Pelvis" pos:[20,22] width:410 height:24
-        label pelvisLbl "Pelvis:" pos:[20,57]  width:55 align:#left
-        edittext pelvisEdit ""   pos:[78,54]  width:200 height:20 readOnly:true
-        pickbutton pelvisPickBtn "Pick" pos:[285,54] width:60 height:20
-        button pelvisSelBtn "Sel"       pos:[352,54] width:68 height:20
+        button autoDetectBtn "{btn_auto_detect}" pos:[20,22] width:410 height:24
+        label pelvisLbl "{lbl_pelvis}" pos:[20,57]  width:55 align:#left
+        edittext pelvisEdit ""         pos:[78,54]  width:200 height:20 readOnly:true
+        pickbutton pelvisPickBtn "{btn_pick}" pos:[285,54] width:60 height:20
+        button pelvisSelBtn "{btn_sel}"       pos:[352,54] width:68 height:20
     )
 
-    group "World Forward Axis"
+    group "{group_axis}"
     (
-        label axisLbl "Which world axis is your character's forward direction?" pos:[20,133] width:400 align:#left
-        radiobuttons forwardAxisRadio labels:#("X", "Y", "Z") pos:[20,153] default:2 columns:3
+        label axisLbl "{lbl_axis_question}" pos:[20,100] width:400 align:#left
+        radiobuttons forwardAxisRadio labels:#("X", "Y", "Z") pos:[20,120] default:2 columns:3
     )
 
-    group "Amount"
+    group "{group_amount}"
     (
-        label amountLbl "Amount:" pos:[20,198] width:60 align:#left
-        slider amountSlider ""    pos:[85,196] width:285 height:22 range:[0,100,100] type:#integer ticks:10
-        label amountValLbl "100%" pos:[378,198] width:45 align:#left
-        label helpTxt "0% = no change    100% = straight line between first and last frame" \\
-            pos:[20,222] width:420 align:#left
+        label amountLbl "{lbl_amount}" pos:[20,165] width:60 align:#left
+        slider amountSlider ""         pos:[85,163] width:285 height:22 range:[0,100,100] type:#integer ticks:10
+        label amountValLbl "100%"      pos:[378,165] width:45 align:#left
+        label helpTxt "{lbl_amount_help}" \\
+            pos:[20,189] width:420 align:#left
     )
 
-    group "Frame Range"
+    group "{group_frame_range}"
     (
-        checkbox useTimelineCB "Use Timeline Range" pos:[20,252] width:160 checked:true
-        label startLbl "Start:" pos:[195,252] width:40 align:#left
-        spinner startSpn "" pos:[238,250] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}] enabled:false
-        label endLbl "End:"   pos:[320,252] width:35 align:#left
-        spinner endSpn ""   pos:[355,250] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
+        checkbox useTimelineCB "{cb_use_timeline}" pos:[20,227] width:160 checked:true
+        label startLbl "{lbl_start}" pos:[195,227] width:40 align:#left
+        spinner startSpn "" pos:[238,225] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}] enabled:false
+        label endLbl "{lbl_end}"     pos:[320,227] width:35 align:#left
+        spinner endSpn ""   pos:[355,225] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
     )
 
-    label statusLabel "" pos:[20,293] width:420 height:16 align:#center
-    progressBar damperProgress "" pos:[20,313] width:420 height:10 value:0 color:(color 80 200 120)
+    label statusLabel "" pos:[20,268] width:420 height:16 align:#center
+    progressBar damperProgress "" pos:[20,288] width:420 height:10 value:0 color:(color 80 200 120)
 
-    button createHelperBtn "Create Helper"    pos:[20,333]  width:130 height:36
-    button applyBtn        "Apply to Pelvis"  pos:[160,333] width:145 height:36
-    button deleteHelperBtn "Delete Helper"    pos:[315,333] width:125 height:36
+    button createHelperBtn "{btn_create_helper}" pos:[20,308]  width:130 height:36
+    button applyBtn        "{btn_apply}"         pos:[160,308] width:145 height:36
+    button deleteHelperBtn "{btn_delete_helper}" pos:[315,308] width:125 height:36
 
-    on PelvisForwardDamperDialog open do
+    on BipedAxisCleanerDialog open do
     (
         startSpn.value = animationRange.start.frame as integer
         endSpn.value   = animationRange.end.frame as integer
@@ -374,20 +393,20 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:380
 
     on autoDetectBtn pressed do
     (
-        local pelvis = PelvisForwardDamperTool.autoDetect()
+        local pelvis = BipedAxisCleanerTool.autoDetect()
         if pelvis != undefined then
         (
-            PelvisForwardDamperTool.pelvisNode = pelvis
+            BipedAxisCleanerTool.pelvisNode = pelvis
             pelvisEdit.text = pelvis.name
-            statusLabel.text = "Detected: " + pelvis.name
+            statusLabel.text = "{msg_detected_prefix}" + pelvis.name
         )
         else
-            statusLabel.text = "No biped pelvis found - pick manually"
+            statusLabel.text = "{msg_no_biped}"
     )
 
     on pelvisPickBtn picked obj do
     (
-        PelvisForwardDamperTool.pelvisNode = obj
+        BipedAxisCleanerTool.pelvisNode = obj
         pelvisEdit.text = obj.name
     )
 
@@ -395,27 +414,27 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:380
     (
         if selection.count != 1 then
         (
-            messageBox "Select exactly one object first." title:"Pelvis Forward Damper"
+            messageBox "{err_select_one}" title:"{title}"
             return false
         )
-        PelvisForwardDamperTool.pelvisNode = selection[1]
+        BipedAxisCleanerTool.pelvisNode = selection[1]
         pelvisEdit.text = selection[1].name
     )
 
     on createHelperBtn pressed do
     (
-        if PelvisForwardDamperTool.pelvisNode == undefined then
+        if BipedAxisCleanerTool.pelvisNode == undefined then
         (
-            messageBox "Please assign the Pelvis bone first." title:"Pelvis Forward Damper"
+            messageBox "{err_assign_pelvis}" title:"{title}"
             return false
         )
 
-        statusLabel.text = "Creating helper..."
+        statusLabel.text = "{msg_creating}"
         damperProgress.value = 30
         windows.processPostedMessages()
 
-        local result = PelvisForwardDamperTool.createHelper \\
-            PelvisForwardDamperTool.pelvisNode \\
+        local result = BipedAxisCleanerTool.createHelper \\
+            BipedAxisCleanerTool.pelvisNode \\
             forwardAxisRadio.state \\
             startSpn.value \\
             endSpn.value
@@ -426,10 +445,10 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:380
         if result != undefined then
         (
             select result
-            statusLabel.text = "Helper created: " + result.name + "  (forward axis linearized)"
+            statusLabel.text = result.name + "  {msg_helper_created_sfx}"
         )
         else
-            statusLabel.text = "Failed to create helper"
+            statusLabel.text = "{msg_failed_helper}"
 
         sleep 0.5
         damperProgress.value = 0
@@ -437,29 +456,29 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:380
 
     on applyBtn pressed do
     (
-        if PelvisForwardDamperTool.pelvisNode == undefined then
+        if BipedAxisCleanerTool.pelvisNode == undefined then
         (
-            messageBox "Please assign the Pelvis bone first." title:"Pelvis Forward Damper"
+            messageBox "{err_assign_pelvis}" title:"{title}"
             return false
         )
 
-        local helperCheck = getNodeByName (PelvisForwardDamperTool.helperNodeName())
+        local helperCheck = getNodeByName (BipedAxisCleanerTool.helperNodeName())
         if helperCheck == undefined then
         (
-            messageBox "No helper found. Click 'Create Helper' first." title:"Pelvis Forward Damper"
+            messageBox "{err_no_helper}" title:"{title}"
             return false
         )
 
-        local msg = "Apply " + amountSlider.value as string + "% linearization to " + \\
-                    PelvisForwardDamperTool.pelvisNode.name + "?\\n\\nUndo with Ctrl+Z."
-        if not (queryBox msg title:"Confirm Apply") then return false
+        local msg = substituteString "{confirm_apply_tpl}" "{{0}}" (amountSlider.value as string)
+        msg = substituteString msg "{{1}}" BipedAxisCleanerTool.pelvisNode.name
+        if not (queryBox msg title:"{title}") then return false
 
-        statusLabel.text = "Applying..."
+        statusLabel.text = "{msg_applying}"
         damperProgress.value = 20
         windows.processPostedMessages()
 
-        local ok = PelvisForwardDamperTool.applyHelperToPelvis \\
-            PelvisForwardDamperTool.pelvisNode \\
+        local ok = BipedAxisCleanerTool.applyHelperToPelvis \\
+            BipedAxisCleanerTool.pelvisNode \\
             forwardAxisRadio.state \\
             amountSlider.value \\
             startSpn.value \\
@@ -469,9 +488,12 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:380
         windows.processPostedMessages()
 
         if ok then
-            statusLabel.text = "Done - forward axis linearized " + amountSlider.value as string + "%"
+        (
+            local doneMsg = substituteString "{msg_done_tpl}" "{{0}}" (amountSlider.value as string)
+            statusLabel.text = doneMsg
+        )
         else
-            statusLabel.text = "Failed"
+            statusLabel.text = "{msg_failed}"
 
         sleep 0.5
         damperProgress.value = 0
@@ -479,18 +501,18 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:380
 
     on deleteHelperBtn pressed do
     (
-        PelvisForwardDamperTool.deleteHelper()
-        statusLabel.text = "Helper deleted"
+        BipedAxisCleanerTool.deleteHelper()
+        statusLabel.text = "{msg_helper_deleted}"
     )
 
-    on PelvisForwardDamperDialog close do
+    on BipedAxisCleanerDialog close do
     (
         -- leave helper in scene so user can inspect it after closing
     )
 )
 
-try (destroyDialog PelvisForwardDamperDialog) catch()
-createDialog PelvisForwardDamperDialog
+try (destroyDialog BipedAxisCleanerDialog) catch()
+createDialog BipedAxisCleanerDialog
 '''
 
         rt.execute(maxscript)

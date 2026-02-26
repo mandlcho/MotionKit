@@ -106,10 +106,11 @@ struct PelvisForwardDamperStruct
     -- Moving average smoothing on a flat array of floats
     fn smoothCurve values passes =
     (
-        local result = copy values
+        -- MaxScript's copy() returns OK on arrays; use collect instead
+        local result = for v in values collect v
         for p = 1 to passes do
         (
-            local smoothed = copy result
+            local smoothed = for v in result collect v
             for i = 2 to (result.count - 1) do
                 smoothed[i] = (result[i-1] + result[i] + result[i+1]) / 3.0
             result = smoothed

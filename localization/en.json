@@ -189,6 +189,30 @@
     "bone_speed_calculator": {
       "name": "Bone Speed Calculator"
     },
+    "foot_slide_fixer": {
+      "name": "Foot Slide Fixer",
+      "title": "Foot Slide Fixer",
+      "group_source": "Source Biped",
+      "btn_auto_detect": "Auto-Detect Biped",
+      "lbl_biped": "Biped:",
+      "btn_sel": "Sel",
+      "group_detection": "Detection",
+      "lbl_threshold": "Velocity Threshold:",
+      "group_frame_range": "Frame Range",
+      "cb_use_timeline": "Use Timeline Range",
+      "lbl_start": "Start:",
+      "lbl_end": "End:",
+      "btn_apply": "Fix Foot Sliding",
+      "err_no_biped": "Please assign a Biped node first.",
+      "err_figure_mode": "Biped is in Figure Mode. Exit Figure Mode before applying.",
+      "err_no_feet": "Could not find foot nodes. Pick a Biped node manually.",
+      "msg_detected": "Detected: ",
+      "msg_no_detect": "No Biped found — pick manually",
+      "msg_fixing": "Fixing...",
+      "msg_done": "Done — L: {0} segment(s)  R: {1} segment(s)",
+      "msg_no_segments": "No plant phases detected — try raising the threshold",
+      "msg_failed": "Failed"
+    },
     "biped_axis_cleaner": {
       "name": "Biped Axis Cleaner",
       "title": "Biped Axis Cleaner",

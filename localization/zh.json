@@ -136,6 +136,7 @@
       "btn_sel": "选取",
       "group_detection": "检测参数",
       "lbl_threshold": "速度阈值:",
+      "lbl_height": "高度容差:",
       "group_frame_range": "帧范围",
       "cb_use_timeline": "使用时间轴范围",
       "lbl_start": "开始:",

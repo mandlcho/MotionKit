@@ -57,6 +57,7 @@ class FootSlideFixerDialog:
         btn_sel           = t('tools.foot_slide_fixer.btn_sel')
         group_detection   = t('tools.foot_slide_fixer.group_detection')
         lbl_threshold     = t('tools.foot_slide_fixer.lbl_threshold')
+        lbl_height        = t('tools.foot_slide_fixer.lbl_height')
         group_frame_range = t('tools.foot_slide_fixer.group_frame_range')
         cb_use_timeline   = t('tools.foot_slide_fixer.cb_use_timeline')
         lbl_start         = t('tools.foot_slide_fixer.lbl_start')
@@ -186,7 +187,7 @@ struct FootSlideFixerStruct
     -- -------------------------------------------------------
     -- Detect contiguous plant segments
     -- -------------------------------------------------------
-    fn findPlantSegments velArr threshold minPlantFrames =
+    fn findPlantSegments velArr posArr minZ heightTolerance threshold minPlantFrames =
     (
         local segments  = #()
         local i         = 1
@@ -194,10 +195,10 @@ struct FootSlideFixerStruct
 
         while i <= n do
         (
-            if velArr[i] < threshold then
+            if velArr[i] < threshold and (posArr[i].z - minZ) < heightTolerance then
             (
                 local segStart = i
-                while i <= n and velArr[i] < threshold do i += 1
+                while i <= n and velArr[i] < threshold and (posArr[i].z - minZ) < heightTolerance do i += 1
                 local segEnd = i - 1
                 if (segEnd - segStart + 1) >= minPlantFrames then
                     append segments #(segStart, segEnd)
@@ -277,13 +278,16 @@ struct FootSlideFixerStruct
     -- -------------------------------------------------------
     -- Fix a single foot — returns number of plant segments found
     -- -------------------------------------------------------
-    fn fixFoot footNode threshold startFrame endFrame =
+    fn fixFoot footNode threshold heightTolerance startFrame endFrame =
     (
         local posArr      = this.samplePositions footNode startFrame endFrame
         local totalFrames = endFrame - startFrame + 1
         local velArr      = this.buildVelocityArray posArr
         velArr            = this.medianFilter3 velArr
-        local segments    = this.findPlantSegments velArr threshold 3
+        local minZ        = posArr[1].z
+        for i = 2 to posArr.count do
+            if posArr[i].z < minZ then minZ = posArr[i].z
+        local segments    = this.findPlantSegments velArr posArr minZ heightTolerance threshold 3
         if segments.count == 0 then return 0
 
         local corrections = this.buildCorrectionArray posArr segments 4 totalFrames
@@ -297,7 +301,7 @@ FootSlideFixerTool = FootSlideFixerStruct()
 -- ============================================================
 -- Dialog
 -- ============================================================
-rollout FootSlideFixerDialog "{title}" width:460 height:275
+rollout FootSlideFixerDialog "{title}" width:460 height:301
 (
     group "{group_source}"
     (
@@ -313,21 +317,23 @@ rollout FootSlideFixerDialog "{title}" width:460 height:275
         label thresholdLbl "{lbl_threshold}" pos:[20,108] width:130 align:#left
         slider velocitySlider "" pos:[155,106] width:215 height:22 range:[0,20,1.5] type:#float ticks:10
         label velValLbl "1.5" pos:[378,108] width:45 align:#left
+        label heightLbl "{lbl_height}" pos:[20,132] width:130 align:#left
+        spinner heightSpn "" pos:[155,130] width:70 height:20 type:#float range:[0,100,5.0]
     )
 
     group "{group_frame_range}"
     (
-        checkbox useTimelineCB "{cb_use_timeline}" pos:[20,156] width:160 checked:true
-        label startLbl "{lbl_start}" pos:[195,156] width:40 align:#left
-        spinner startSpn "" pos:[238,154] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}] enabled:false
-        label endLbl "{lbl_end}"     pos:[320,156] width:35 align:#left
-        spinner endSpn ""   pos:[355,154] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
+        checkbox useTimelineCB "{cb_use_timeline}" pos:[20,182] width:160 checked:true
+        label startLbl "{lbl_start}" pos:[195,182] width:40 align:#left
+        spinner startSpn "" pos:[238,180] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}] enabled:false
+        label endLbl "{lbl_end}"     pos:[320,182] width:35 align:#left
+        spinner endSpn ""   pos:[355,180] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
     )
 
-    label statusLabel "" pos:[20,188] width:420 height:16 align:#center
-    progressBar fixProgress "" pos:[20,208] width:420 height:10 value:0 color:(color 80 200 120)
+    label statusLabel "" pos:[20,214] width:420 height:16 align:#center
+    progressBar fixProgress "" pos:[20,234] width:420 height:10 value:0 color:(color 80 200 120)
 
-    button applyBtn "{btn_apply}" pos:[20,228] width:420 height:36
+    button applyBtn "{btn_apply}" pos:[20,254] width:420 height:36
 
     on FootSlideFixerDialog open do
     (
@@ -428,22 +434,23 @@ rollout FootSlideFixerDialog "{title}" width:460 height:275
         fixProgress.value = 10
         windows.processPostedMessages()
 
-        local startF = startSpn.value
-        local endF   = endSpn.value
-        local thresh = velocitySlider.value
-        local lCount = 0
-        local rCount = 0
+        local startF          = startSpn.value
+        local endF            = endSpn.value
+        local thresh          = velocitySlider.value
+        local heightTolerance = heightSpn.value
+        local lCount          = 0
+        local rCount          = 0
 
         if lFoot != undefined then
         (
-            lCount = FootSlideFixerTool.fixFoot lFoot thresh startF endF
+            lCount = FootSlideFixerTool.fixFoot lFoot thresh heightTolerance startF endF
             fixProgress.value = 55
             windows.processPostedMessages()
         )
 
         if rFoot != undefined then
         (
-            rCount = FootSlideFixerTool.fixFoot rFoot thresh startF endF
+            rCount = FootSlideFixerTool.fixFoot rFoot thresh heightTolerance startF endF
             fixProgress.value = 100
             windows.processPostedMessages()
         )

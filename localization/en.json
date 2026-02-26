@@ -198,6 +198,7 @@
       "btn_sel": "Sel",
       "group_detection": "Detection",
       "lbl_threshold": "Velocity Threshold:",
+      "lbl_height": "Height Tolerance:",
       "group_frame_range": "Frame Range",
       "cb_use_timeline": "Use Timeline Range",
       "lbl_start": "Start:",

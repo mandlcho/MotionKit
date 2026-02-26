@@ -208,43 +208,34 @@ struct PelvisForwardDamperStruct
                          else if axisIndex == 2 then origPos[totalFrames].y
                          else origPos[totalFrames].z
 
-        -- Create the helper with a Position_XYZ controller for clean axis access
+        -- Create the helper
         local newHelper = Dummy name:(this.helperNodeName()) boxsize:[8,8,8]
         newHelper.wirecolor = (color 80 200 255)
-        newHelper.pos.controller = Position_XYZ()
 
-        -- Bake all three axes from the original pelvis positions
+        -- Bake in a single pass:
+        -- X and Z come straight from the original pelvis positions.
+        -- The forward axis is replaced with a linear interpolation between
+        -- the first and last frame values — no sub-controller manipulation needed.
         with animate on
         (
             for i = 1 to totalFrames do
             (
+                local t = if totalFrames > 1 then
+                    (i - 1) as float / (totalFrames - 1) as float
+                else 0.0
+
+                local linearFwd = startFwd + (endFwd - startFwd) * t
+                local origP     = origPos[i]
+
+                local newPos = if axisIndex == 1 then point3 linearFwd origP.y origP.z
+                               else if axisIndex == 2 then point3 origP.x linearFwd origP.z
+                               else point3 origP.x origP.y linearFwd
+
                 sliderTime = startFrame + i - 1
-                newHelper.pos = origPos[i]
+                newHelper.pos = newPos
             )
         )
         sliderTime = savedTime
-
-        -- Now linearize the forward axis:
-        -- Delete all intermediate keys and replace with two linear keys
-        local posCtrl    = newHelper.pos.controller            -- Position_XYZ
-        -- posCtrl[n] returns a SubAnim wrapper; .controller gives the Bezier_Float
-        local fwdSubCtrl = posCtrl[axisIndex].controller       -- Bezier_Float
-
-        deleteKeys fwdSubCtrl #allKeys
-
-        -- Add start key and set value
-        local idx1 = addNewKey fwdSubCtrl (startFrame as time)
-        local k1   = getKey fwdSubCtrl idx1
-        k1.value   = startFwd
-
-        -- Add end key and set value
-        local idx2 = addNewKey fwdSubCtrl (endFrame as time)
-        local k2   = getKey fwdSubCtrl idx2
-        k2.value   = endFwd
-
-        -- Both keys get linear tangents so the curve is a perfect straight line
-        setTangents fwdSubCtrl idx1 #linear #linear
-        setTangents fwdSubCtrl idx2 #linear #linear
 
         return newHelper
     ),

@@ -125,13 +125,14 @@ struct PelvisForwardDamperStruct
         local originalTime = sliderTime
 
         -- Sample world positions
+        -- Biped_Object exposes world pos via .transform.pos, not .pos
         local pelvisPos = #()
         local rootPos = #()
         for f = startFrame to endFrame do
         (
             sliderTime = f
-            append pelvisPos pelvisNode.pos
-            append rootPos rootNode.pos
+            append pelvisPos pelvisNode.transform.pos
+            append rootPos rootNode.transform.pos
         )
         sliderTime = originalTime
 
@@ -194,7 +195,7 @@ struct PelvisForwardDamperStruct
         for f = startFrame to endFrame do
         (
             sliderTime = f
-            append origPositions pelvisNode.pos
+            append origPositions pelvisNode.transform.pos
         )
         sliderTime = originalTime
 
@@ -245,15 +246,29 @@ struct PelvisForwardDamperStruct
         local totalFrames = endFrame - startFrame + 1
         local originalTime = sliderTime
 
+        -- Sample original positions BEFORE writing anything.
+        -- Biped_Object requires .transform.pos for reading world position.
+        local origPositions = #()
+        for f = startFrame to endFrame do
+        (
+            sliderTime = f
+            append origPositions pelvisNode.transform.pos
+        )
+        sliderTime = originalTime
+
         local newPositions = this.computeDampedPositions pelvisNode rootNode axisIndex \\
                              reductionPct smoothPasses startFrame endFrame
 
+        -- Biped_Object does not accept .pos assignment.
+        -- Use move() with a pre-computed delta instead — biped respects this
+        -- and creates the appropriate internal position key.
         with animate on
         (
             for i = 1 to totalFrames do
             (
                 sliderTime = startFrame + i - 1
-                pelvisNode.pos = newPositions[i]
+                local delta = newPositions[i] - origPositions[i]
+                move pelvisNode delta
             )
         )
 

@@ -265,7 +265,9 @@ struct PelvisForwardDamperStruct
 
     -- Takes explicit position arrays (not scene nodes) so it always
     -- works from whichever baseline the caller chose.
-    fn computeDampedPositions origPelvisPos rootPos axisIndex reductionPct smoothPasses =
+    -- blendFrames: number of frames at each end over which the damping
+    -- fades in/out smoothly, preventing speed-up artifacts at boundaries.
+    fn computeDampedPositions origPelvisPos rootPos axisIndex reductionPct smoothPasses blendFrames =
     (
         local totalFrames = origPelvisPos.count
 
@@ -289,9 +291,25 @@ struct PelvisForwardDamperStruct
         local newPositions = #()
         for i = 1 to totalFrames do
         (
-            local rF       = if axisIndex == 1 then rootPos[i].x else rootPos[i].y
-            local newRelFwd = meanFwd + (relFwd[i] - meanFwd) * dampFactor
-            local newFwd    = rF + newRelFwd
+            -- Blend weight: 0 at the boundaries, 1 in the middle.
+            -- This prevents the snap/speed-up that occurs when a fully-damped
+            -- frame sits next to a hard-locked boundary frame.
+            local blendWeight = 1.0
+            if blendFrames > 0 then
+            (
+                local fromStart = i - 1           -- 0 at first frame
+                local fromEnd   = totalFrames - i -- 0 at last frame
+                local nearBound = if fromStart < fromEnd then fromStart else fromEnd
+                if nearBound < blendFrames then
+                    blendWeight = nearBound as float / blendFrames as float
+            )
+
+            local rF        = if axisIndex == 1 then rootPos[i].x else rootPos[i].y
+            -- Damped relative forward (full reduction applied)
+            local dampedRel = meanFwd + (relFwd[i] - meanFwd) * dampFactor
+            -- Blend between original and damped
+            local finalRel  = relFwd[i] + (dampedRel - relFwd[i]) * blendWeight
+            local newFwd    = rF + finalRel
 
             local origPos = origPelvisPos[i]
             local newPos  = if axisIndex == 1 then
@@ -302,17 +320,13 @@ struct PelvisForwardDamperStruct
             append newPositions newPos
         )
 
-        -- First and last frame must stay exactly at the original position
-        newPositions[1]           = origPelvisPos[1]
-        newPositions[totalFrames] = origPelvisPos[totalFrames]
-
         return newPositions
     ),
 
     -- -------------------------------------------------------
     -- Preview
     -- -------------------------------------------------------
-    fn previewDamping pelvisNode rootNode axisIndex reductionPct smoothPasses startFrame endFrame =
+    fn previewDamping pelvisNode rootNode axisIndex reductionPct smoothPasses blendFrames startFrame endFrame =
     (
         if pelvisNode == undefined or rootNode == undefined then
         (
@@ -334,7 +348,7 @@ struct PelvisForwardDamperStruct
 
         local rootPos     = this.samplePositions rootNode startFrame endFrame
         local newPositions = this.computeDampedPositions origPelvisPos rootPos \\
-                             axisIndex reductionPct smoothPasses
+                             axisIndex reductionPct smoothPasses blendFrames
 
         -- Animated dummy showing the adjusted path
         -- (name local 'previewHelper' to avoid shadowing the Dummy class)
@@ -371,7 +385,7 @@ struct PelvisForwardDamperStruct
     -- -------------------------------------------------------
     -- Apply
     -- -------------------------------------------------------
-    fn applyDamping pelvisNode rootNode axisIndex reductionPct smoothPasses startFrame endFrame =
+    fn applyDamping pelvisNode rootNode axisIndex reductionPct smoothPasses blendFrames startFrame endFrame =
     (
         if pelvisNode == undefined or rootNode == undefined then
         (
@@ -391,24 +405,22 @@ struct PelvisForwardDamperStruct
         local origPelvisPos = this.samplePositions backup    startFrame endFrame
         local rootPos       = this.samplePositions rootNode  startFrame endFrame
         local newPositions  = this.computeDampedPositions origPelvisPos rootPos \\
-                              axisIndex reductionPct smoothPasses
+                              axisIndex reductionPct smoothPasses blendFrames
 
         -- Sample where the pelvis currently sits (may already be damped from a
         -- previous apply). The delta moves it from current to the new target.
         local currentPos = this.samplePositions pelvisNode startFrame endFrame
         sliderTime = savedTime
 
+        -- Blend weight is already baked into newPositions, so every frame
+        -- gets the right amount — no need to skip boundaries explicitly.
         with animate on
         (
             for i = 1 to totalFrames do
             (
-                -- Leave first and last frame completely untouched
-                if i != 1 and i != totalFrames then
-                (
-                    sliderTime = startFrame + i - 1
-                    local delta = newPositions[i] - currentPos[i]
-                    move pelvisNode delta
-                )
+                sliderTime = startFrame + i - 1
+                local delta = newPositions[i] - currentPos[i]
+                move pelvisNode delta
             )
         )
 
@@ -473,6 +485,10 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
         label smoothLbl "Smoothing passes:" pos:[20,250] width:130 align:#left
         spinner smoothSpn "" pos:[155,248] width:55 height:20 type:#integer range:[0,10,2]
         label smoothHelp "(0 = none)" pos:[218,250] width:90 align:#left
+
+        label blendLbl "Boundary blend:" pos:[20,274] width:120 align:#left
+        spinner blendSpn "" pos:[155,272] width:55 height:20 type:#integer range:[0,50,5]
+        label blendHelp "frames to fade in/out at each end" pos:[218,274] width:220 align:#left
     )
 
     -- Frame Range
@@ -665,6 +681,7 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
             forwardAxisRadio.state \\
             reductionSlider.value \\
             smoothSpn.value \\
+            blendSpn.value \\
             startSpn.value \\
             endSpn.value
 
@@ -706,6 +723,7 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:480 height:465
             forwardAxisRadio.state \\
             reductionSlider.value \\
             smoothSpn.value \\
+            blendSpn.value \\
             startSpn.value \\
             endSpn.value
 

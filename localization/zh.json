@@ -142,6 +142,7 @@
       "lbl_start": "开始:",
       "lbl_end": "结束:",
       "btn_apply": "修复滑步",
+      "cb_compensate": "补偿质心高度",
       "err_no_biped": "请先指定一个 Biped 节点。",
       "err_figure_mode": "Biped 处于形态模式，请退出后再应用。",
       "err_no_feet": "无法找到脚骨骼节点，请手动拾取 Biped 节点。",

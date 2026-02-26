@@ -204,6 +204,7 @@
       "lbl_start": "Start:",
       "lbl_end": "End:",
       "btn_apply": "Fix Foot Sliding",
+      "cb_compensate": "Compensate Pelvis Height",
       "err_no_biped": "Please assign a Biped node first.",
       "err_figure_mode": "Biped is in Figure Mode. Exit Figure Mode before applying.",
       "err_no_feet": "Could not find foot nodes. Pick a Biped node manually.",

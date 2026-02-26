@@ -63,6 +63,7 @@ class FootSlideFixerDialog:
         lbl_start         = t('tools.foot_slide_fixer.lbl_start')
         lbl_end           = t('tools.foot_slide_fixer.lbl_end')
         btn_apply         = t('tools.foot_slide_fixer.btn_apply')
+        cb_compensate     = t('tools.foot_slide_fixer.cb_compensate')
 
         # Status / error strings
         err_no_biped      = t('tools.foot_slide_fixer.err_no_biped')
@@ -310,6 +311,96 @@ struct FootSlideFixerStruct
         local corrections = this.buildCorrectionArray posArr segments 4 totalFrames
         this.applyCorrections footNode posArr corrections startFrame
         return segments.count
+    ),
+
+    -- -------------------------------------------------------
+    -- Compensate pelvis Z so corrected feet don't over-extend legs
+    -- Strategy: for each frame, maintain the original 3D distance
+    -- from pelvis to each foot by lowering the pelvis when a foot
+    -- correction has increased the horizontal (XY) separation.
+    -- Takes the most conservative (lowest) adjustment needed across
+    -- both feet so neither leg is overstretched.
+    -- -------------------------------------------------------
+    fn compensatePelvis pelvisNode lFoot rFoot \
+                        origPelvisPos origLPos origRPos \
+                        startFrame endFrame =
+    (
+        local totalFrames = endFrame - startFrame + 1
+        local savedTime   = sliderTime
+
+        local newLPos = if lFoot != undefined then \
+            this.samplePositions lFoot startFrame endFrame else #()
+        local newRPos = if rFoot != undefined then \
+            this.samplePositions rFoot startFrame endFrame else #()
+
+        local pelvisCorr = for i = 1 to totalFrames collect 0.0
+
+        for i = 1 to totalFrames do
+        (
+            local bestAdj = 0.0
+
+            -- Left foot contribution
+            if origLPos.count >= i and newLPos.count >= i then
+            (
+                local cx = newLPos[i].x - origLPos[i].x
+                local cy = newLPos[i].y - origLPos[i].y
+                if (abs cx) > 0.001 or (abs cy) > 0.001 then
+                (
+                    local pPos   = origPelvisPos[i]
+                    local h_orig = sqrt ((pPos.x - origLPos[i].x)^2 + \
+                                        (pPos.y - origLPos[i].y)^2)
+                    local v_orig = pPos.z - origLPos[i].z
+                    local d_orig = sqrt (h_orig^2 + v_orig^2)
+                    local h_new  = sqrt ((pPos.x - newLPos[i].x)^2 + \
+                                        (pPos.y - newLPos[i].y)^2)
+                    if h_new < d_orig then
+                    (
+                        local v_new = sqrt (d_orig^2 - h_new^2)
+                        local adj   = v_new - v_orig
+                        if adj < bestAdj then bestAdj = adj
+                    )
+                )
+            )
+
+            -- Right foot contribution
+            if origRPos.count >= i and newRPos.count >= i then
+            (
+                local cx = newRPos[i].x - origRPos[i].x
+                local cy = newRPos[i].y - origRPos[i].y
+                if (abs cx) > 0.001 or (abs cy) > 0.001 then
+                (
+                    local pPos   = origPelvisPos[i]
+                    local h_orig = sqrt ((pPos.x - origRPos[i].x)^2 + \
+                                        (pPos.y - origRPos[i].y)^2)
+                    local v_orig = pPos.z - origRPos[i].z
+                    local d_orig = sqrt (h_orig^2 + v_orig^2)
+                    local h_new  = sqrt ((pPos.x - newRPos[i].x)^2 + \
+                                        (pPos.y - newRPos[i].y)^2)
+                    if h_new < d_orig then
+                    (
+                        local v_new = sqrt (d_orig^2 - h_new^2)
+                        local adj   = v_new - v_orig
+                        if adj < bestAdj then bestAdj = adj
+                    )
+                )
+            )
+
+            pelvisCorr[i] = bestAdj
+        )
+
+        with animate on
+        (
+            for i = 1 to totalFrames do
+            (
+                if (abs pelvisCorr[i]) > 0.001 then
+                (
+                    sliderTime = startFrame + i - 1
+                    local curPos = pelvisNode.transform.pos
+                    move pelvisNode [0, 0, (origPelvisPos[i].z + pelvisCorr[i]) - curPos.z]
+                )
+            )
+        )
+        sliderTime = savedTime
     )
 )
 
@@ -318,7 +409,7 @@ FootSlideFixerTool = FootSlideFixerStruct()
 -- ============================================================
 -- Dialog
 -- ============================================================
-rollout FootSlideFixerDialog "{title}" width:460 height:301
+rollout FootSlideFixerDialog "{title}" width:460 height:325
 (
     group "{group_source}"
     (
@@ -347,10 +438,12 @@ rollout FootSlideFixerDialog "{title}" width:460 height:301
         spinner endSpn ""   pos:[355,180] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
     )
 
-    label statusLabel "" pos:[20,214] width:420 height:16 align:#center
-    progressBar fixProgress "" pos:[20,234] width:420 height:10 value:0 color:(color 80 200 120)
+    checkbox compensatePelvisCB "{cb_compensate}" pos:[20,214] width:420 checked:false
 
-    button applyBtn "{btn_apply}" pos:[20,254] width:420 height:36
+    label statusLabel "" pos:[20,238] width:420 height:16 align:#center
+    progressBar fixProgress "" pos:[20,258] width:420 height:10 value:0 color:(color 80 200 120)
+
+    button applyBtn "{btn_apply}" pos:[20,278] width:420 height:36
 
     on FootSlideFixerDialog open do
     (
@@ -458,19 +551,46 @@ rollout FootSlideFixerDialog "{title}" width:460 height:301
         local lCount          = 0
         local rCount          = 0
 
+        -- Pre-sample original positions for pelvis compensation
+        local pelvisNode    = undefined
+        local origPelvisPos = #()
+        local origLPos      = #()
+        local origRPos      = #()
+
+        if compensatePelvisCB.checked then
+        (
+            try ( pelvisNode = biped.getNode FootSlideFixerTool.bipedNode #pelvis ) catch()
+            if pelvisNode != undefined then
+            (
+                origPelvisPos = FootSlideFixerTool.samplePositions pelvisNode startF endF
+                if lFoot != undefined then origLPos = FootSlideFixerTool.samplePositions lFoot startF endF
+                if rFoot != undefined then origRPos = FootSlideFixerTool.samplePositions rFoot startF endF
+            )
+        )
+
         if lFoot != undefined then
         (
             lCount = FootSlideFixerTool.fixFoot lFoot thresh heightTolerance startF endF
-            fixProgress.value = 55
+            fixProgress.value = 45
             windows.processPostedMessages()
         )
 
         if rFoot != undefined then
         (
             rCount = FootSlideFixerTool.fixFoot rFoot thresh heightTolerance startF endF
+            fixProgress.value = 80
+            windows.processPostedMessages()
+        )
+
+        if compensatePelvisCB.checked and pelvisNode != undefined then
+        (
+            FootSlideFixerTool.compensatePelvis pelvisNode lFoot rFoot \\
+                origPelvisPos origLPos origRPos startF endF
             fixProgress.value = 100
             windows.processPostedMessages()
         )
+        else
+            fixProgress.value = 100
 
         if (lCount + rCount) == 0 then
             statusLabel.text = "{msg_no_segments}"

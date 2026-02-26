@@ -310,7 +310,7 @@ PelvisForwardDamperTool = PelvisForwardDamperStruct()
 -- ============================================================
 -- Dialog
 -- ============================================================
-rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:400
+rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:380
 (
     group "Source Bone"
     (
@@ -345,30 +345,12 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:400
         spinner endSpn ""   pos:[355,250] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
     )
 
-    group "Original Baseline"
-    (
-        label backupStatusLbl "No original locked" pos:[20,292] width:300 height:16 align:#left
-        button startFreshBtn "Start Fresh"         pos:[300,287] width:130 height:22
-    )
+    label statusLabel "" pos:[20,293] width:420 height:16 align:#center
+    progressBar damperProgress "" pos:[20,313] width:420 height:10 value:0 color:(color 80 200 120)
 
-    label statusLabel "" pos:[20,322] width:420 height:16 align:#center
-    progressBar damperProgress "" pos:[20,341] width:420 height:10 value:0 color:(color 80 200 120)
-
-    button createHelperBtn "Create Helper"    pos:[20,362]  width:130 height:36
-    button applyBtn        "Apply to Pelvis"  pos:[160,362] width:145 height:36
-    button deleteHelperBtn "Delete Helper"    pos:[315,362] width:125 height:36
-
-    -- --------------------------------------------------------
-    fn refreshBackupStatus =
-    (
-        if PelvisForwardDamperTool.pelvisNode == undefined then
-        (
-            backupStatusLbl.text = "No pelvis selected"
-            return false
-        )
-        backupStatusLbl.text = PelvisForwardDamperTool.backupStatus \\
-            PelvisForwardDamperTool.pelvisNode.name startSpn.value endSpn.value
-    )
+    button createHelperBtn "Create Helper"    pos:[20,333]  width:130 height:36
+    button applyBtn        "Apply to Pelvis"  pos:[160,333] width:145 height:36
+    button deleteHelperBtn "Delete Helper"    pos:[315,333] width:125 height:36
 
     on PelvisForwardDamperDialog open do
     (
@@ -385,7 +367,6 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:400
             startSpn.value = animationRange.start.frame as integer
             endSpn.value   = animationRange.end.frame as integer
         )
-        refreshBackupStatus()
     )
 
     on amountSlider changed val do
@@ -402,14 +383,12 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:400
         )
         else
             statusLabel.text = "No biped pelvis found - pick manually"
-        refreshBackupStatus()
     )
 
     on pelvisPickBtn picked obj do
     (
         PelvisForwardDamperTool.pelvisNode = obj
         pelvisEdit.text = obj.name
-        refreshBackupStatus()
     )
 
     on pelvisSelBtn pressed do
@@ -421,18 +400,6 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:400
         )
         PelvisForwardDamperTool.pelvisNode = selection[1]
         pelvisEdit.text = selection[1].name
-        refreshBackupStatus()
-    )
-
-    on startFreshBtn pressed do
-    (
-        if queryBox "Clear the locked original?\\nThe next Apply will lock the current pelvis state as the new baseline." \\
-            title:"Start Fresh" then
-        (
-            PelvisForwardDamperTool.clearBackupData()
-            statusLabel.text = "Backup cleared"
-            refreshBackupStatus()
-        )
     )
 
     on createHelperBtn pressed do
@@ -505,8 +472,6 @@ rollout PelvisForwardDamperDialog "Pelvis Forward Damper" width:460 height:400
             statusLabel.text = "Done - forward axis linearized " + amountSlider.value as string + "%"
         else
             statusLabel.text = "Failed"
-
-        refreshBackupStatus()
 
         sleep 0.5
         damperProgress.value = 0

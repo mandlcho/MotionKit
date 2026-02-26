@@ -254,7 +254,8 @@ struct FootSlideFixerStruct
 
     -- -------------------------------------------------------
     -- Apply corrections — XY only, Z left untouched
-    -- Uses pre-sampled positions to avoid ordering issues
+    -- Reads current pos at each frame before moving so Biped curve
+    -- interpolation from prior keys doesn't accumulate error
     -- -------------------------------------------------------
     fn applyCorrections footNode posArr corrections startFrame =
     (
@@ -267,8 +268,11 @@ struct FootSlideFixerStruct
                 if (abs corr.x) > 0.001 or (abs corr.y) > 0.001 then
                 (
                     sliderTime = startFrame + i - 1
-                    local p = posArr[i]
-                    footNode.pos = [p.x + corr.x, p.y + corr.y, p.z]
+                    local p          = posArr[i]
+                    local currentPos = footNode.transform.pos
+                    local dx = (p.x + corr.x) - currentPos.x
+                    local dy = (p.y + corr.y) - currentPos.y
+                    move footNode [dx, dy, 0]
                 )
             )
         )

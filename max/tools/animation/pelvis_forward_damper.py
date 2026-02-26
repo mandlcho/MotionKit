@@ -302,6 +302,10 @@ struct PelvisForwardDamperStruct
             append newPositions newPos
         )
 
+        -- First and last frame must stay exactly at the original position
+        newPositions[1]           = origPelvisPos[1]
+        newPositions[totalFrames] = origPelvisPos[totalFrames]
+
         return newPositions
     ),
 
@@ -398,9 +402,13 @@ struct PelvisForwardDamperStruct
         (
             for i = 1 to totalFrames do
             (
-                sliderTime = startFrame + i - 1
-                local delta = newPositions[i] - currentPos[i]
-                move pelvisNode delta
+                -- Leave first and last frame completely untouched
+                if i != 1 and i != totalFrames then
+                (
+                    sliderTime = startFrame + i - 1
+                    local delta = newPositions[i] - currentPos[i]
+                    move pelvisNode delta
+                )
             )
         )
 

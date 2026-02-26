@@ -212,8 +212,10 @@ struct FootSlideFixerStruct
 
     -- -------------------------------------------------------
     -- Build per-frame XY correction array
-    -- Blends smoothly at segment edges; segments at the
-    -- start/end of the range use full weight immediately
+    -- The entire plant segment is fully locked (weight = 1.0).
+    -- Blend zones extend OUTWARD into the surrounding swing frames
+    -- so the approach and departure are smooth without touching the
+    -- locked region itself.
     -- -------------------------------------------------------
     fn buildCorrectionArray posArr plantSegs blendFrames totalFrames =
     (
@@ -221,31 +223,42 @@ struct FootSlideFixerStruct
 
         for seg in plantSegs do
         (
-            local s         = seg[1]
-            local e         = seg[2]
-            local targetX   = posArr[s].x
-            local targetY   = posArr[s].y
+            local s       = seg[1]
+            local e       = seg[2]
+            local targetX = posArr[s].x
+            local targetY = posArr[s].y
 
+            -- Full correction inside the plant segment
             for i = s to e do
             (
-                local dx = targetX - posArr[i].x
-                local dy = targetY - posArr[i].y
+                corrections[i].x += targetX - posArr[i].x
+                corrections[i].y += targetY - posArr[i].y
+            )
 
-                -- Ramp-in: full weight if segment starts at frame 1
-                local blendIn = if s == 1 then 1.0 \
-                    else if (i - s) < blendFrames then ((i - s) as float / blendFrames) \
-                    else 1.0
+            -- Pre-blend: ramp 0→1 in the swing frames just before the segment
+            if s > 1 then
+            (
+                local preStart = if (s - blendFrames) < 1 then 1 else (s - blendFrames)
+                local span     = (s - preStart) as float
+                for i = preStart to (s - 1) do
+                (
+                    local w = (i - preStart + 1) as float / span
+                    corrections[i].x += (targetX - posArr[i].x) * w
+                    corrections[i].y += (targetY - posArr[i].y) * w
+                )
+            )
 
-                -- Ramp-out: full weight if segment ends at last frame
-                local blendOut = if e == totalFrames then 1.0 \
-                    else if (e - i) < blendFrames then ((e - i) as float / blendFrames) \
-                    else 1.0
-
-                local w = blendIn * blendOut
-
-                -- Accumulate (handles overlapping blend zones from adjacent segments)
-                corrections[i].x += dx * w
-                corrections[i].y += dy * w
+            -- Post-blend: ramp 1→0 in the swing frames just after the segment
+            if e < totalFrames then
+            (
+                local blendEnd = if (e + blendFrames) > totalFrames then totalFrames else (e + blendFrames)
+                local span     = (blendEnd - e) as float
+                for i = (e + 1) to blendEnd do
+                (
+                    local w = (blendEnd - i + 1) as float / span
+                    corrections[i].x += (targetX - posArr[i].x) * w
+                    corrections[i].y += (targetY - posArr[i].y) * w
+                )
             )
         )
 

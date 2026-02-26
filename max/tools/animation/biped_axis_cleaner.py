@@ -56,9 +56,6 @@ class BipedAxisCleanerDialog:
         btn_sel             = t('tools.biped_axis_cleaner.btn_sel')
         group_axis          = t('tools.biped_axis_cleaner.group_axis')
         lbl_axis_question   = t('tools.biped_axis_cleaner.lbl_axis_question')
-        group_amount        = t('tools.biped_axis_cleaner.group_amount')
-        lbl_amount          = t('tools.biped_axis_cleaner.lbl_amount')
-        lbl_amount_help     = t('tools.biped_axis_cleaner.lbl_amount_help')
         group_frame_range   = t('tools.biped_axis_cleaner.group_frame_range')
         cb_use_timeline     = t('tools.biped_axis_cleaner.cb_use_timeline')
         lbl_start           = t('tools.biped_axis_cleaner.lbl_start')
@@ -72,13 +69,13 @@ class BipedAxisCleanerDialog:
         err_no_helper           = t('tools.biped_axis_cleaner.err_no_helper')
         err_select_one          = t('tools.biped_axis_cleaner.err_select_one')
         confirm_apply_tpl       = t('tools.biped_axis_cleaner.confirm_apply')
+        msg_done                = t('tools.biped_axis_cleaner.msg_done')
         msg_detected_prefix     = t('tools.biped_axis_cleaner.msg_detected_prefix')
         msg_no_biped            = t('tools.biped_axis_cleaner.msg_no_biped')
         msg_creating            = t('tools.biped_axis_cleaner.msg_creating')
         msg_helper_created_sfx  = t('tools.biped_axis_cleaner.msg_helper_created_sfx')
         msg_failed_helper       = t('tools.biped_axis_cleaner.msg_failed_helper')
         msg_applying            = t('tools.biped_axis_cleaner.msg_applying')
-        msg_done_tpl            = t('tools.biped_axis_cleaner.msg_done')
         msg_failed              = t('tools.biped_axis_cleaner.msg_failed')
         msg_helper_deleted      = t('tools.biped_axis_cleaner.msg_helper_deleted')
 
@@ -329,7 +326,7 @@ BipedAxisCleanerTool = BipedAxisCleanerStruct()
 -- ============================================================
 -- Dialog
 -- ============================================================
-rollout BipedAxisCleanerDialog "{title}" width:460 height:355
+rollout BipedAxisCleanerDialog "{title}" width:460 height:301
 (
     group "{group_source}"
     (
@@ -346,30 +343,21 @@ rollout BipedAxisCleanerDialog "{title}" width:460 height:355
         radiobuttons forwardAxisRadio labels:#("X", "Y", "Z") pos:[20,120] default:2 columns:3
     )
 
-    group "{group_amount}"
-    (
-        label amountLbl "{lbl_amount}" pos:[20,165] width:60 align:#left
-        slider amountSlider ""         pos:[85,163] width:285 height:22 range:[0,100,100] type:#integer ticks:10
-        label amountValLbl "100%"      pos:[378,165] width:45 align:#left
-        label helpTxt "{lbl_amount_help}" \\
-            pos:[20,189] width:420 align:#left
-    )
-
     group "{group_frame_range}"
     (
-        checkbox useTimelineCB "{cb_use_timeline}" pos:[20,227] width:160 checked:true
-        label startLbl "{lbl_start}" pos:[195,227] width:40 align:#left
-        spinner startSpn "" pos:[238,225] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}] enabled:false
-        label endLbl "{lbl_end}"     pos:[320,227] width:35 align:#left
-        spinner endSpn ""   pos:[355,225] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
+        checkbox useTimelineCB "{cb_use_timeline}" pos:[20,173] width:160 checked:true
+        label startLbl "{lbl_start}" pos:[195,173] width:40 align:#left
+        spinner startSpn "" pos:[238,171] width:70 height:20 type:#integer range:[-100000,100000,{start_frame}] enabled:false
+        label endLbl "{lbl_end}"     pos:[320,173] width:35 align:#left
+        spinner endSpn ""   pos:[355,171] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
     )
 
-    label statusLabel "" pos:[20,268] width:420 height:16 align:#center
-    progressBar damperProgress "" pos:[20,288] width:420 height:10 value:0 color:(color 80 200 120)
+    label statusLabel "" pos:[20,214] width:420 height:16 align:#center
+    progressBar damperProgress "" pos:[20,234] width:420 height:10 value:0 color:(color 80 200 120)
 
-    button createHelperBtn "{btn_create_helper}" pos:[20,308]  width:130 height:36
-    button applyBtn        "{btn_apply}"         pos:[160,308] width:145 height:36
-    button deleteHelperBtn "{btn_delete_helper}" pos:[315,308] width:125 height:36
+    button createHelperBtn "{btn_create_helper}" pos:[20,254]  width:130 height:36
+    button applyBtn        "{btn_apply}"         pos:[160,254] width:145 height:36
+    button deleteHelperBtn "{btn_delete_helper}" pos:[315,254] width:125 height:36
 
     on BipedAxisCleanerDialog open do
     (
@@ -387,9 +375,6 @@ rollout BipedAxisCleanerDialog "{title}" width:460 height:355
             endSpn.value   = animationRange.end.frame as integer
         )
     )
-
-    on amountSlider changed val do
-        amountValLbl.text = val as string + "%"
 
     on autoDetectBtn pressed do
     (
@@ -469,8 +454,7 @@ rollout BipedAxisCleanerDialog "{title}" width:460 height:355
             return false
         )
 
-        local msg = substituteString "{confirm_apply_tpl}" "{{0}}" (amountSlider.value as string)
-        msg = substituteString msg "{{1}}" BipedAxisCleanerTool.pelvisNode.name
+        local msg = substituteString "{confirm_apply_tpl}" "{{0}}" BipedAxisCleanerTool.pelvisNode.name
         if not (queryBox msg title:"{title}") then return false
 
         statusLabel.text = "{msg_applying}"
@@ -480,7 +464,7 @@ rollout BipedAxisCleanerDialog "{title}" width:460 height:355
         local ok = BipedAxisCleanerTool.applyHelperToPelvis \\
             BipedAxisCleanerTool.pelvisNode \\
             forwardAxisRadio.state \\
-            amountSlider.value \\
+            100 \\
             startSpn.value \\
             endSpn.value
 
@@ -488,10 +472,7 @@ rollout BipedAxisCleanerDialog "{title}" width:460 height:355
         windows.processPostedMessages()
 
         if ok then
-        (
-            local doneMsg = substituteString "{msg_done_tpl}" "{{0}}" (amountSlider.value as string)
-            statusLabel.text = doneMsg
-        )
+            statusLabel.text = "{msg_done}"
         else
             statusLabel.text = "{msg_failed}"
 

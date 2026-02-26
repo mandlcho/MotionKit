@@ -429,9 +429,11 @@ class MenuBuilder:
             import core.logger
             import core.config
             import core.utils
+            import core.localization
             importlib.reload(core.logger)
             importlib.reload(core.config)
             importlib.reload(core.utils)
+            importlib.reload(core.localization)
 
             # Rebuild menu
             importlib.reload(sys.modules[__name__])

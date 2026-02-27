@@ -214,9 +214,10 @@ struct FootSlideFixerStruct
     -- -------------------------------------------------------
     -- Build per-frame XY correction array
     -- The entire plant segment is fully locked (weight = 1.0).
-    -- Blend zones extend OUTWARD into the surrounding swing frames
-    -- so the approach and departure are smooth without touching the
-    -- locked region itself.
+    -- Pre-blend ramps in over the preceding swing frames so
+    -- heel-strike approach is smooth.
+    -- No post-blend: the plant releases cleanly at segment end
+    -- so the foot's natural toe-off pivot is not disturbed.
     -- -------------------------------------------------------
     fn buildCorrectionArray posArr plantSegs blendFrames totalFrames =
     (
@@ -236,7 +237,7 @@ struct FootSlideFixerStruct
                 corrections[i].y += targetY - posArr[i].y
             )
 
-            -- Pre-blend: ramp 0→1 in the swing frames just before the segment
+            -- Pre-blend only: ramp 0→1 in the swing frames just before the segment
             if s > 1 then
             (
                 local preStart = if (s - blendFrames) < 1 then 1 else (s - blendFrames)
@@ -244,19 +245,6 @@ struct FootSlideFixerStruct
                 for i = preStart to (s - 1) do
                 (
                     local w = (i - preStart + 1) as float / span
-                    corrections[i].x += (targetX - posArr[i].x) * w
-                    corrections[i].y += (targetY - posArr[i].y) * w
-                )
-            )
-
-            -- Post-blend: ramp 1→0 in the swing frames just after the segment
-            if e < totalFrames then
-            (
-                local blendEnd = if (e + blendFrames) > totalFrames then totalFrames else (e + blendFrames)
-                local span     = (blendEnd - e) as float
-                for i = (e + 1) to blendEnd do
-                (
-                    local w = (blendEnd - i + 1) as float / span
                     corrections[i].x += (targetX - posArr[i].x) * w
                     corrections[i].y += (targetY - posArr[i].y) * w
                 )
@@ -438,7 +426,7 @@ rollout FootSlideFixerDialog "{title}" width:460 height:325
         spinner endSpn ""   pos:[355,180] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
     )
 
-    checkbox compensatePelvisCB "{cb_compensate}" pos:[20,214] width:420 checked:false
+    checkbox compensatePelvisCB "{cb_compensate}" pos:[20,214] width:420 checked:true
 
     label statusLabel "" pos:[20,238] width:420 height:16 align:#center
     progressBar fixProgress "" pos:[20,258] width:420 height:10 value:0 color:(color 80 200 120)
@@ -560,6 +548,7 @@ rollout FootSlideFixerDialog "{title}" width:460 height:325
         if compensatePelvisCB.checked then
         (
             try ( pelvisNode = biped.getNode FootSlideFixerTool.bipedNode #pelvis ) catch()
+            if pelvisNode == undefined then pelvisNode = FootSlideFixerTool.bipedNode
             if pelvisNode != undefined then
             (
                 origPelvisPos = FootSlideFixerTool.samplePositions pelvisNode startF endF

@@ -12,6 +12,17 @@ Workflow:
      Higher = looser (more frames treated as planted).
   3. Click Apply — XY corrections are written back to the foot bones
      with smooth blend transitions at the edge of each plant phase.
+
+Fix pipeline (per apply):
+  Phase 1 — computeFootFix: sample positions, detect plant segments,
+             build XY correction array (does NOT write any keys).
+  Phase 2 — clampCorrectionsByReach: scale back any correction that
+             would place the foot beyond the original 3-D pelvis reach.
+             Prevents h_new > d_orig which makes pelvis compensation
+             unsolvable and causes the IK pop.
+  Phase 3 — applyCorrections: write corrected keys.
+  Phase 4 — compensatePelvis: lower pelvis Z to maintain leg length.
+             pelvisCorr is smoothed before writing to remove jitter.
 """
 
 try:
@@ -121,12 +132,12 @@ struct FootSlideFixerStruct
                 if classOf obj == Biped_Object then
                 (
                     local n = toLower obj.name
-                    if lFoot == undefined and \
-                       ((findString n "l foot") != undefined or \
+                    if lFoot == undefined and \\
+                       ((findString n "l foot") != undefined or \\
                         (findString n "lfoot")  != undefined) then
                         lFoot = obj
-                    if rFoot == undefined and \
-                       ((findString n "r foot") != undefined or \
+                    if rFoot == undefined and \\
+                       ((findString n "r foot") != undefined or \\
                         (findString n "rfoot")  != undefined) then
                         rFoot = obj
                 )
@@ -154,8 +165,6 @@ struct FootSlideFixerStruct
 
     -- -------------------------------------------------------
     -- 3D velocity array — index 1 is always 0.0 (no predecessor)
-    -- Using full 3D distance: a planted foot has no XY *or* Z movement.
-    -- Correction is still XY-only; Z is only used here for detection.
     -- -------------------------------------------------------
     fn buildVelocityArray posArr =
     (
@@ -212,12 +221,19 @@ struct FootSlideFixerStruct
     ),
 
     -- -------------------------------------------------------
-    -- Build per-frame XY correction array
-    -- The entire plant segment is fully locked (weight = 1.0).
-    -- Pre-blend ramps in over the preceding swing frames so
-    -- heel-strike approach is smooth.
-    -- No post-blend: the plant releases cleanly at segment end
-    -- so the foot's natural toe-off pivot is not disturbed.
+    -- Build per-frame XY correction array.
+    --
+    -- Pre-blend  (frames BEFORE segment): ramp 0→1 pulling toward
+    --   the landing target so heel-strike approach is smooth.
+    --
+    -- Plant segment: full lock (weight = 1.0) throughout.
+    --
+    -- Post-blend (frames AFTER segment): fade the CONSTANT offset
+    --   that existed at the last plant frame.  Critical difference
+    --   from the old approach — we don't pull back toward targetX
+    --   each frame (which generated an increasing backward force
+    --   fighting the toe-off pivot).  Instead we let the residual
+    --   offset dissolve while the foot sweeps forward naturally.
     -- -------------------------------------------------------
     fn buildCorrectionArray posArr plantSegs blendFrames totalFrames =
     (
@@ -237,7 +253,7 @@ struct FootSlideFixerStruct
                 corrections[i].y += targetY - posArr[i].y
             )
 
-            -- Pre-blend only: ramp 0→1 in the swing frames just before the segment
+            -- Pre-blend: ramp 0→1 in the swing frames just before the segment
             if s > 1 then
             (
                 local preStart = if (s - blendFrames) < 1 then 1 else (s - blendFrames)
@@ -249,15 +265,104 @@ struct FootSlideFixerStruct
                     corrections[i].y += (targetY - posArr[i].y) * w
                 )
             )
+
+            -- Post-blend: fade the fixed offset from the last plant frame.
+            -- offsetX/Y is how far the foot had drifted from targetX/Y by
+            -- frame e (i.e. corrections[e]).  Applying this as a fading
+            -- constant means the foot starts its swing from the corrected
+            -- plant position and glides back to the original curve — no
+            -- backward force opposing toe-off.
+            if e < totalFrames then
+            (
+                local offsetX = corrections[e].x
+                local offsetY = corrections[e].y
+                if (abs offsetX) > 0.001 or (abs offsetY) > 0.001 then
+                (
+                    local postEnd = if (e + blendFrames) > totalFrames then totalFrames else (e + blendFrames)
+                    local span    = (postEnd - e) as float
+                    for i = (e + 1) to postEnd do
+                    (
+                        local w = 1.0 - ((i - e) as float / span)
+                        corrections[i].x += offsetX * w
+                        corrections[i].y += offsetY * w
+                    )
+                )
+            )
         )
 
         return corrections
     ),
 
     -- -------------------------------------------------------
-    -- Apply corrections — XY only, Z left untouched
-    -- Reads current pos at each frame before moving so Biped curve
-    -- interpolation from prior keys doesn't accumulate error
+    -- Clamp XY corrections so the corrected foot never exceeds
+    -- its original 3-D reach from the pelvis.
+    --
+    -- Root cause of the IK pop:
+    --   h_new > d_orig  →  compensatePelvis has no valid solution
+    --   →  pelvisCorr[i] = 0  →  leg IS stretched  →  Biped IK snaps
+    --
+    -- Fix: scale back any correction so that h_new <= d_orig * safetyFactor.
+    -- compensatePelvis then always finds sqrt(d_orig^2 - h_new^2) > 0
+    -- and the pelvis drops smoothly.
+    -- -------------------------------------------------------
+    fn clampCorrectionsByReach corrections footPosArr pelvisPosArr =
+    (
+        local safetyFactor = 0.97
+        for i = 1 to corrections.count do
+        (
+            if pelvisPosArr.count >= i then
+            (
+                local corr = corrections[i]
+                if (abs corr.x) > 0.001 or (abs corr.y) > 0.001 then
+                (
+                    local pPos   = pelvisPosArr[i]
+                    local fPos   = footPosArr[i]
+                    local h_orig = sqrt ((pPos.x - fPos.x)^2 + (pPos.y - fPos.y)^2)
+                    local v_orig = pPos.z - fPos.z
+                    local d_orig = sqrt (h_orig^2 + v_orig^2)
+                    local limit  = d_orig * safetyFactor
+
+                    local newFx  = fPos.x + corr.x
+                    local newFy  = fPos.y + corr.y
+                    local h_new  = sqrt ((pPos.x - newFx)^2 + (pPos.y - newFy)^2)
+
+                    if h_new > limit then
+                    (
+                        -- Scale the pelvis→foot vector to exactly 'limit'
+                        local vx    = newFx - pPos.x
+                        local vy    = newFy - pPos.y
+                        local scale = limit / h_new
+                        corrections[i] = [(pPos.x + vx * scale) - fPos.x, \\
+                                          (pPos.y + vy * scale) - fPos.y, \\
+                                          0.0]
+                    )
+                )
+            )
+        )
+    ),
+
+    -- -------------------------------------------------------
+    -- Simple moving-average smoothing (window = 2*halfWin + 1)
+    -- -------------------------------------------------------
+    fn smoothArray arr halfWin =
+    (
+        local out = for v in arr collect v
+        local n   = arr.count
+        for i = 1 to n do
+        (
+            local lo  = if (i - halfWin) < 1 then 1 else (i - halfWin)
+            local hi  = if (i + halfWin) > n then n else (i + halfWin)
+            local sum = 0.0
+            for j = lo to hi do sum += arr[j]
+            out[i] = sum / (hi - lo + 1)
+        )
+        return out
+    ),
+
+    -- -------------------------------------------------------
+    -- Apply corrections — XY only, Z left untouched.
+    -- Re-reads current pos at each frame so Biped spline
+    -- interpolation from earlier keys doesn't accumulate error.
     -- -------------------------------------------------------
     fn applyCorrections footNode posArr corrections startFrame =
     (
@@ -282,9 +387,10 @@ struct FootSlideFixerStruct
     ),
 
     -- -------------------------------------------------------
-    -- Fix a single foot — returns number of plant segments found
+    -- Compute foot fix — returns #(segCount, posArr, corrections).
+    -- Does NOT apply keys; caller should clamp then applyCorrections.
     -- -------------------------------------------------------
-    fn fixFoot footNode threshold heightTolerance startFrame endFrame =
+    fn computeFootFix footNode threshold heightTolerance startFrame endFrame =
     (
         local posArr      = this.samplePositions footNode startFrame endFrame
         local totalFrames = endFrame - startFrame + 1
@@ -294,31 +400,27 @@ struct FootSlideFixerStruct
         for i = 2 to posArr.count do
             if posArr[i].z < minZ then minZ = posArr[i].z
         local segments    = this.findPlantSegments velArr posArr minZ heightTolerance threshold 3
-        if segments.count == 0 then return 0
-
+        if segments.count == 0 then return #(0, posArr, #())
         local corrections = this.buildCorrectionArray posArr segments 4 totalFrames
-        this.applyCorrections footNode posArr corrections startFrame
-        return segments.count
+        return #(segments.count, posArr, corrections)
     ),
 
     -- -------------------------------------------------------
-    -- Compensate pelvis Z so corrected feet don't over-extend legs
-    -- Strategy: for each frame, maintain the original 3D distance
-    -- from pelvis to each foot by lowering the pelvis when a foot
-    -- correction has increased the horizontal (XY) separation.
-    -- Takes the most conservative (lowest) adjustment needed across
-    -- both feet so neither leg is overstretched.
+    -- Compensate pelvis Z so corrected feet don't over-extend legs.
+    -- Assumes clampCorrectionsByReach has already run so h_new < d_orig
+    -- is guaranteed, making sqrt(d_orig^2 - h_new^2) always valid.
+    -- pelvisCorr is smoothed before applying to remove jitter.
     -- -------------------------------------------------------
-    fn compensatePelvis pelvisNode lFoot rFoot \
-                        origPelvisPos origLPos origRPos \
+    fn compensatePelvis pelvisNode lFoot rFoot \\
+                        origPelvisPos origLPos origRPos \\
                         startFrame endFrame =
     (
         local totalFrames = endFrame - startFrame + 1
         local savedTime   = sliderTime
 
-        local newLPos = if lFoot != undefined then \
+        local newLPos = if lFoot != undefined then \\
             this.samplePositions lFoot startFrame endFrame else #()
-        local newRPos = if rFoot != undefined then \
+        local newRPos = if rFoot != undefined then \\
             this.samplePositions rFoot startFrame endFrame else #()
 
         local pelvisCorr = for i = 1 to totalFrames collect 0.0
@@ -335,11 +437,11 @@ struct FootSlideFixerStruct
                 if (abs cx) > 0.001 or (abs cy) > 0.001 then
                 (
                     local pPos   = origPelvisPos[i]
-                    local h_orig = sqrt ((pPos.x - origLPos[i].x)^2 + \
+                    local h_orig = sqrt ((pPos.x - origLPos[i].x)^2 + \\
                                         (pPos.y - origLPos[i].y)^2)
                     local v_orig = pPos.z - origLPos[i].z
                     local d_orig = sqrt (h_orig^2 + v_orig^2)
-                    local h_new  = sqrt ((pPos.x - newLPos[i].x)^2 + \
+                    local h_new  = sqrt ((pPos.x - newLPos[i].x)^2 + \\
                                         (pPos.y - newLPos[i].y)^2)
                     if h_new < d_orig then
                     (
@@ -358,11 +460,11 @@ struct FootSlideFixerStruct
                 if (abs cx) > 0.001 or (abs cy) > 0.001 then
                 (
                     local pPos   = origPelvisPos[i]
-                    local h_orig = sqrt ((pPos.x - origRPos[i].x)^2 + \
+                    local h_orig = sqrt ((pPos.x - origRPos[i].x)^2 + \\
                                         (pPos.y - origRPos[i].y)^2)
                     local v_orig = pPos.z - origRPos[i].z
                     local d_orig = sqrt (h_orig^2 + v_orig^2)
-                    local h_new  = sqrt ((pPos.x - newRPos[i].x)^2 + \
+                    local h_new  = sqrt ((pPos.x - newRPos[i].x)^2 + \\
                                         (pPos.y - newRPos[i].y)^2)
                     if h_new < d_orig then
                     (
@@ -375,6 +477,9 @@ struct FootSlideFixerStruct
 
             pelvisCorr[i] = bestAdj
         )
+
+        -- Smooth to remove frame-to-frame jitter in the pelvis correction
+        pelvisCorr = this.smoothArray pelvisCorr 2
 
         with animate on
         (
@@ -441,7 +546,7 @@ rollout FootSlideFixerDialog "{title}" width:460 height:325
         -- Pre-populate from Biped Axis Cleaner if the user already picked a pelvis
         try
         (
-            if BipedAxisCleanerTool != undefined and \
+            if BipedAxisCleanerTool != undefined and \\
                BipedAxisCleanerTool.pelvisNode != undefined then
             (
                 FootSlideFixerTool.bipedNode = BipedAxisCleanerTool.pelvisNode
@@ -518,7 +623,7 @@ rollout FootSlideFixerDialog "{title}" width:460 height:325
         catch()
 
         -- Get foot nodes
-        local feet = FootSlideFixerTool.getFootNodes FootSlideFixerTool.bipedNode
+        local feet  = FootSlideFixerTool.getFootNodes FootSlideFixerTool.bipedNode
         local lFoot = feet[1]
         local rFoot = feet[2]
 
@@ -539,47 +644,68 @@ rollout FootSlideFixerDialog "{title}" width:460 height:325
         local lCount          = 0
         local rCount          = 0
 
-        -- Pre-sample original positions for pelvis compensation
+        -- Always pre-sample pelvis positions — needed for reach clamping
+        -- even when pelvis compensation is disabled.
         local pelvisNode    = undefined
         local origPelvisPos = #()
         local origLPos      = #()
         local origRPos      = #()
 
-        if compensatePelvisCB.checked then
+        try ( pelvisNode = biped.getNode FootSlideFixerTool.bipedNode #pelvis ) catch()
+        if pelvisNode == undefined then pelvisNode = FootSlideFixerTool.bipedNode
+        if pelvisNode != undefined then
         (
-            try ( pelvisNode = biped.getNode FootSlideFixerTool.bipedNode #pelvis ) catch()
-            if pelvisNode == undefined then pelvisNode = FootSlideFixerTool.bipedNode
-            if pelvisNode != undefined then
-            (
-                origPelvisPos = FootSlideFixerTool.samplePositions pelvisNode startF endF
-                if lFoot != undefined then origLPos = FootSlideFixerTool.samplePositions lFoot startF endF
-                if rFoot != undefined then origRPos = FootSlideFixerTool.samplePositions rFoot startF endF
-            )
+            origPelvisPos = FootSlideFixerTool.samplePositions pelvisNode startF endF
+            if lFoot != undefined then origLPos = FootSlideFixerTool.samplePositions lFoot startF endF
+            if rFoot != undefined then origRPos = FootSlideFixerTool.samplePositions rFoot startF endF
         )
+
+        -- Phase 1: compute corrections (no keys written yet)
+        local lResult = #(0, #(), #())
+        local rResult = #(0, #(), #())
 
         if lFoot != undefined then
-        (
-            lCount = FootSlideFixerTool.fixFoot lFoot thresh heightTolerance startF endF
-            fixProgress.value = 45
-            windows.processPostedMessages()
-        )
+            lResult = FootSlideFixerTool.computeFootFix lFoot thresh heightTolerance startF endF
+        fixProgress.value = 30
+        windows.processPostedMessages()
 
         if rFoot != undefined then
+            rResult = FootSlideFixerTool.computeFootFix rFoot thresh heightTolerance startF endF
+        fixProgress.value = 50
+        windows.processPostedMessages()
+
+        lCount = lResult[1]
+        rCount = rResult[1]
+
+        -- Phase 2: clamp corrections so no foot goes beyond its original
+        --          3-D pelvis reach (prevents IK pop / overstretching)
+        if origPelvisPos.count > 0 then
         (
-            rCount = FootSlideFixerTool.fixFoot rFoot thresh heightTolerance startF endF
-            fixProgress.value = 80
-            windows.processPostedMessages()
+            if lResult[3].count > 0 then
+                FootSlideFixerTool.clampCorrectionsByReach lResult[3] lResult[2] origPelvisPos
+            if rResult[3].count > 0 then
+                FootSlideFixerTool.clampCorrectionsByReach rResult[3] rResult[2] origPelvisPos
         )
 
-        if compensatePelvisCB.checked and pelvisNode != undefined then
+        -- Phase 3: apply clamped corrections
+        if lResult[3].count > 0 then
+            FootSlideFixerTool.applyCorrections lFoot lResult[2] lResult[3] startF
+        fixProgress.value = 70
+        windows.processPostedMessages()
+
+        if rResult[3].count > 0 then
+            FootSlideFixerTool.applyCorrections rFoot rResult[2] rResult[3] startF
+        fixProgress.value = 85
+        windows.processPostedMessages()
+
+        -- Phase 4: pelvis compensation (optional — checkbox)
+        if compensatePelvisCB.checked and pelvisNode != undefined and origPelvisPos.count > 0 then
         (
             FootSlideFixerTool.compensatePelvis pelvisNode lFoot rFoot \\
                 origPelvisPos origLPos origRPos startF endF
-            fixProgress.value = 100
-            windows.processPostedMessages()
         )
-        else
-            fixProgress.value = 100
+        fixProgress.value = 100
+        windows.processPostedMessages()
 
         if (lCount + rCount) == 0 then
             statusLabel.text = "{msg_no_segments}"

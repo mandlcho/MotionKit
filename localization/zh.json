@@ -176,6 +176,7 @@
       "msg_preset_saved": "已保存预设: {0}",
       "msg_done": "完成！已传输 {0} 帧，{1} 个骨骼。",
       "msg_cancelled": "已被用户取消。",
+      "msg_restored": "重定向失败 — 已恢复原始动画。",
       "msg_failed": "重定向失败。"
     },
     "foot_slide_fixer": {

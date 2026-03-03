@@ -368,25 +368,46 @@ def _cb_retarget():
         local success = false
         local frameCount = 0
         local boneCount = 0
+        local newNodes = #()
 
-        -- Phase 1: Import FBX
-        --   Wrapped in try/catch because some FBX files contain embedded
-        --   MaxScript (e.g. ShaDu virus) that triggers security exceptions.
-        --   Max blocks the malicious code but throws an error — the import
-        --   itself still succeeds, so we catch and continue.
-        local origObjs = for obj in objects collect obj
-        FBXImporterSetParam "Animation" true
-        FBXImporterSetParam "Skin" false
-        FBXImporterSetParam "Shape" false
-        try ( importFile "{escaped_fbx}" #noPrompt using:FBXIMP ) catch()
-        local newNodes = for obj in objects where (findItem origObjs obj) == 0 collect obj
-
-        if newNodes.count == 0 then
+        -- Failsafe: save current Biped animation to a temp .bip file
+        -- so we can restore it if the retarget fails mid-way.
+        local bipBackupPath = ""
+        local bipRootForBackup = undefined
+        try
         (
-            messageBox "{t('tools.fbx_retarget.err_import_failed')}" title:"MotionKit"
+            for obj in objects do
+            (
+                if obj.name == "{escaped_biped}" then
+                (
+                    bipRootForBackup = obj
+                    exit
+                )
+            )
+            if bipRootForBackup != undefined then
+            (
+                bipBackupPath = (getDir #temp) + "\\\\motionkit_retarget_backup.bip"
+                biped.saveBipFile bipRootForBackup bipBackupPath
+            )
         )
-        else
+        catch()
+
+        try
         (
+            -- Phase 1: Import FBX
+            --   try/catch: some FBX files have embedded MaxScript (ShaDu virus)
+            --   that triggers security exceptions. Max blocks the malicious code
+            --   but throws — the import itself still succeeds.
+            local origObjs = for obj in objects collect obj
+            FBXImporterSetParam "Animation" true
+            FBXImporterSetParam "Skin" false
+            FBXImporterSetParam "Shape" false
+            try ( importFile "{escaped_fbx}" #noPrompt using:FBXIMP ) catch()
+            newNodes = for obj in objects where (findItem origObjs obj) == 0 collect obj
+
+            if newNodes.count == 0 then
+                throw "FBX import returned no nodes"
+
             -- Build source node lookup by name
             local srcNames  = #({src_names_ms})
             local bodyParts = #({body_parts_ms})
@@ -404,139 +425,149 @@ def _cb_retarget():
             )
 
             if bipRoot == undefined then
+                throw "Could not find Biped: {escaped_biped}"
+
+            -- Figure mode guard
+            local inFigure = false
+            try ( inFigure = biped.getFigureMode bipRoot ) catch()
+            if inFigure then
+                throw "{t('tools.fbx_retarget.err_figure_mode')}"
+
+            -- Build mapping: #(#(srcNode, tgtNode), ...)
+            local pairs = #()
+            for i = 1 to srcNames.count do
             (
-                messageBox "Could not find Biped: {escaped_biped}" title:"MotionKit"
-            )
-            else
-            (
-                -- Figure mode guard
-                local inFigure = false
-                try ( inFigure = biped.getFigureMode bipRoot ) catch()
-                if inFigure then
+                local srcNode = undefined
+                for n in newNodes do
                 (
-                    messageBox "{t('tools.fbx_retarget.err_figure_mode')}" title:"MotionKit"
+                    if n.name == srcNames[i] then
+                    (
+                        srcNode = n
+                        exit
+                    )
                 )
-                else
+
+                local tgtNode = undefined
+                try
                 (
-                    -- Build mapping: #(#(srcNode, tgtNode), ...)
-                    local pairs = #()
-                    for i = 1 to srcNames.count do
+                    if links[i] == -1 then
+                        tgtNode = biped.getNode bipRoot (bodyParts[i] as name)
+                    else if links[i] == 0 then
+                        tgtNode = biped.getNode bipRoot (bodyParts[i] as name)
+                    else
+                        tgtNode = biped.getNode bipRoot (bodyParts[i] as name) link:links[i]
+                )
+                catch()
+
+                if srcNode != undefined and tgtNode != undefined then
+                    append pairs #(srcNode, tgtNode)
+            )
+
+            boneCount = pairs.count
+
+            FBXRetargetDialog.statusLabel.text = "Mapping " + (boneCount as string) + " bones..."
+            FBXRetargetDialog.retargetProgress.value = 15
+            windows.processPostedMessages()
+
+            -- Phase 2: Compute rest-pose offsets at frame 0
+            local offsets = #()
+            local savedTime = sliderTime
+            sliderTime = 0
+
+            for p in pairs do
+            (
+                local srcRest = p[1].transform.rotation
+                local tgtRest = p[2].transform.rotation
+                local offset  = tgtRest * (inverse srcRest)
+                append offsets offset
+            )
+
+            FBXRetargetDialog.retargetProgress.value = 20
+            windows.processPostedMessages()
+
+            -- Phase 3: Transfer animation frame by frame
+            local totalFrames = {end_frame} - {start_frame} + 1
+            local cancelled = false
+
+            with undo "FBX Retarget" on
+            (
+                with animate on
+                (
+                    for f = {start_frame} to {end_frame} do
                     (
-                        -- Find source node
-                        local srcNode = undefined
-                        for n in newNodes do
+                        if keyboard.escPressed then
                         (
-                            if n.name == srcNames[i] then
-                            (
-                                srcNode = n
-                                exit
-                            )
+                            cancelled = true
+                            exit
                         )
 
-                        -- Find target biped node
-                        local tgtNode = undefined
-                        try
+                        sliderTime = f
+
+                        for i = 1 to pairs.count do
                         (
-                            if links[i] == -1 then
-                                tgtNode = biped.getNode bipRoot (bodyParts[i] as name)
-                            else if links[i] == 0 then
-                                tgtNode = biped.getNode bipRoot (bodyParts[i] as name)
-                            else
-                                tgtNode = biped.getNode bipRoot (bodyParts[i] as name) link:links[i]
+                            local srcNode = pairs[i][1]
+                            local tgtNode = pairs[i][2]
+                            local srcTM   = srcNode.transform
+
+                            local srcRot  = srcTM.rotation
+                            local finalRot = srcRot * offsets[i]
+                            try ( biped.setTransform tgtNode #rotation finalRot true ) catch()
+
+                            local srcPos = srcTM.pos
+                            try ( biped.setTransform tgtNode #pos srcPos true ) catch()
                         )
-                        catch()
 
-                        if srcNode != undefined and tgtNode != undefined then
-                            append pairs #(srcNode, tgtNode)
-                    )
-
-                    boneCount = pairs.count
-
-                    FBXRetargetDialog.statusLabel.text = "Mapping " + (boneCount as string) + " bones..."
-                    FBXRetargetDialog.retargetProgress.value = 15
-                    windows.processPostedMessages()
-
-                    -- Phase 3: Compute rest-pose offsets at frame 0
-                    local offsets = #()
-                    local savedTime = sliderTime
-                    sliderTime = 0
-
-                    for p in pairs do
-                    (
-                        local srcRest = p[1].transform.rotation
-                        local tgtRest = p[2].transform.rotation
-                        local offset  = tgtRest * (inverse srcRest)
-                        append offsets offset
-                    )
-
-                    FBXRetargetDialog.retargetProgress.value = 20
-                    windows.processPostedMessages()
-
-                    -- Phase 4: Transfer animation frame by frame
-                    local totalFrames = {end_frame} - {start_frame} + 1
-                    local cancelled = false
-
-                    theHold.Begin()
-
-                    with animate on
-                    (
-                        for f = {start_frame} to {end_frame} do
+                        -- Progress update every 10 frames
+                        if mod (f - {start_frame}) 10 == 0 then
                         (
-                            if keyboard.escPressed then
-                            (
-                                cancelled = true
-                                exit
-                            )
-
-                            sliderTime = f
-
-                            for i = 1 to pairs.count do
-                            (
-                                local srcNode = pairs[i][1]
-                                local tgtNode = pairs[i][2]
-                                local srcTM   = srcNode.transform
-
-                                -- Rotation: apply rest-pose offset
-                                local srcRot  = srcTM.rotation
-                                local finalRot = srcRot * offsets[i]
-                                try ( biped.setTransform tgtNode #rotation finalRot true ) catch()
-
-                                -- Position: transfer world position
-                                local srcPos = srcTM.pos
-                                try ( biped.setTransform tgtNode #pos srcPos true ) catch()
-                            )
-
-                            -- Progress
                             local pct = 20 + (80.0 * (f - {start_frame}) / totalFrames) as integer
                             if pct > 100 then pct = 100
                             FBXRetargetDialog.retargetProgress.value = pct
-                            if mod (f - {start_frame}) 10 == 0 then
-                                windows.processPostedMessages()
+                            windows.processPostedMessages()
                         )
                     )
-
-                    if cancelled then
-                    (
-                        theHold.Cancel()
-                        FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_cancelled')}"
-                    )
-                    else
-                    (
-                        theHold.Accept "FBX Retarget"
-                        frameCount = totalFrames
-                        success = true
-                    )
-
-                    sliderTime = savedTime
                 )
             )
 
-            -- Phase 5: Cleanup imported FBX nodes
-            if FBXRetargetDialog.cleanupCB.checked then
+            sliderTime = savedTime
+
+            if cancelled then
+                FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_cancelled')}"
+            else
             (
-                for n in newNodes do
-                    try (delete n) catch()
+                frameCount = totalFrames
+                success = true
             )
+        )
+        catch
+        (
+            local errMsg = getCurrentException()
+
+            -- Restore Biped from backup if we have one
+            if bipBackupPath != "" and bipRootForBackup != undefined then
+            (
+                try
+                (
+                    biped.loadBipFile bipRootForBackup bipBackupPath
+                    FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_restored')}"
+                )
+                catch
+                (
+                    FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_failed')}"
+                )
+            )
+            else
+                FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_failed')}"
+
+            messageBox errMsg title:"MotionKit"
+        )
+
+        -- Phase 4: Cleanup — always runs, even after errors
+        if FBXRetargetDialog.cleanupCB.checked and newNodes.count > 0 then
+        (
+            for n in newNodes do
+                try (delete n) catch()
+            gc light:true
         )
 
         if success then
@@ -546,6 +577,10 @@ def _cb_retarget():
             doneMsg = substituteString doneMsg "{{1}}" (boneCount as string)
             FBXRetargetDialog.statusLabel.text = doneMsg
         )
+
+        -- Clean up temp backup file
+        if bipBackupPath != "" then
+            try ( deleteFile bipBackupPath ) catch()
 
         FBXRetargetDialog.retargetProgress.value = 0
     )

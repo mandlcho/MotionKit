@@ -264,6 +264,7 @@
       "msg_preset_saved": "Preset saved: {0}",
       "msg_done": "Done! {0} frames transferred for {1} bones.",
       "msg_cancelled": "Cancelled by user.",
+      "msg_restored": "Retarget failed — original animation restored.",
       "msg_failed": "Retarget failed."
     },
     "biped_axis_cleaner": {

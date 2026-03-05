@@ -469,23 +469,12 @@ def _cb_retarget():
             FBXRetargetDialog.retargetProgress.value = 15
             windows.processPostedMessages()
 
-            -- Phase 2: Compute rest-pose offsets at frame 0
-            local offsets = #()
             local savedTime = sliderTime
-            sliderTime = 0
 
-            for p in pairs do
-            (
-                local srcRest = p[1].transform.rotation
-                local tgtRest = p[2].transform.rotation
-                local offset  = tgtRest * (inverse srcRest)
-                append offsets offset
-            )
-
-            FBXRetargetDialog.retargetProgress.value = 20
-            windows.processPostedMessages()
-
-            -- Phase 3: Transfer animation frame by frame
+            -- Phase 2: Transfer animation frame by frame
+            --   Direct world-space copy — no offset compensation needed
+            --   because the Biped originally drove these bones, so their
+            --   world transforms should match 1:1.
             local totalFrames = {end_frame} - {start_frame} + 1
             local cancelled = false
 
@@ -509,12 +498,8 @@ def _cb_retarget():
                             local tgtNode = pairs[i][2]
                             local srcTM   = srcNode.transform
 
-                            local srcRot  = srcTM.rotation
-                            local finalRot = srcRot * offsets[i]
-                            try ( biped.setTransform tgtNode #rotation finalRot true ) catch()
-
-                            local srcPos = srcTM.pos
-                            try ( biped.setTransform tgtNode #pos srcPos true ) catch()
+                            try ( biped.setTransform tgtNode #rotation srcTM.rotation true ) catch()
+                            try ( biped.setTransform tgtNode #pos srcTM.pos true ) catch()
                         )
 
                         -- Progress update every 10 frames

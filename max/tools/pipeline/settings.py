@@ -112,8 +112,7 @@ rollout MotionKitSettingsRollout "{title}" width:520 height:300
         button btnLoadWorkspaces "{load_workspaces}" pos:[20,210] width:155 height:26
         button btnTestConnection "{test_connection}" pos:[185,210] width:155 height:26
 
-        label lblStatusDot "●" pos:[20,246] width:15 align:#left
-        label lblStatus "{status} {status_not_connected}" pos:[40,246] width:455 align:#left
+        label lblStatus "● {status} {status_not_connected}" pos:[20,246] width:475 align:#left
     )
 
     -- Buttons
@@ -121,10 +120,9 @@ rollout MotionKitSettingsRollout "{title}" width:520 height:300
     button btnApplyClose "{save_close}" width:115 height:30 pos:[295, 262]
     button btnCancel "{cancel}" width:85 height:30 pos:[420, 262]
 
-    -- Initialize status dot color (red = not connected)
     on MotionKitSettingsRollout open do
     (
-        lblStatusDot.color = (color 220 60 60)
+        -- initialized
     )
 
     -- Event handlers
@@ -152,7 +150,7 @@ rollout MotionKitSettingsRollout "{title}" width:520 height:300
         if server == "" or user == "" or workspace == "(Not loaded)" then
         (
             messageBox "{error_fill_all}" title:"{title}"
-            lblStatusDot.color = (color 220 60 60)  -- Red
+            lblStatus.text = "● {status} {status_not_connected}"
         )
         else
         (
@@ -161,8 +159,7 @@ rollout MotionKitSettingsRollout "{title}" width:520 height:300
             python.execute ("import os; os.environ['P4USER'] = '" + user + "'")
             python.execute ("import os; os.environ['P4CLIENT'] = '" + workspace + "'")
 
-            lblStatus.text = "{status} {status_connected}"
-            lblStatusDot.color = (color 60 220 60)  -- Green
+            lblStatus.text = "✓ {status} {status_connected}"
             local msg = substituteString "{p4_configured}" "{{0}}" server
             msg = substituteString msg "{{1}}" user
             msg = substituteString msg "{{2}}" workspace
@@ -173,9 +170,9 @@ rollout MotionKitSettingsRollout "{title}" width:520 height:300
     on btnSave pressed do
     (
         local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
+        local langChanged = langCode != "{current_language}"
         python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + langCode + "')")
-        local langChanged = python.evaluate ("max.tools.pipeline.settings._lang_changed")
-        if langChanged == true then
+        if langChanged then
         (
             messageBox "{saved_reload_msg}" title:"{title}"
         )
@@ -188,9 +185,9 @@ rollout MotionKitSettingsRollout "{title}" width:520 height:300
     on btnApplyClose pressed do
     (
         local langCode = if ddlLanguage.selection == 1 then "en" else (if ddlLanguage.selection == 2 then "zh" else "ko")
+        local langChanged = langCode != "{current_language}"
         python.execute ("import max.tools.pipeline.settings; max.tools.pipeline.settings._save_settings('" + edtServer.text + "', '" + edtUser.text + "', '" + ddlWorkspace.selected + "', '" + langCode + "')")
-        local langChanged = python.evaluate ("max.tools.pipeline.settings._lang_changed")
-        if langChanged == true then
+        if langChanged then
         (
             messageBox "{saved_reload_msg}" title:"{title}"
         )

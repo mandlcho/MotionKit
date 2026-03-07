@@ -1,0 +1,26 @@
+{
+  "name": "munin",
+  "version": "1.0",
+  "mappings": {
+    "Hips": "pelvis",
+    "Spine": "spine_01",
+    "Spine1": "spine_02",
+    "Spine2": "spine_03",
+    "Neck": "neck_01",
+    "Head": "head",
+    "LeftShoulder": "clavicle_l",
+    "LeftArm": "clavicle_l",
+    "LeftForeArm": "upperarm_l",
+    "LeftHand": "lowerarm_l",
+    "RightShoulder": "clavicle_r",
+    "RightArm": "clavicle_r",
+    "RightForeArm": "upperarm_r",
+    "RightHand": "lowerarm_r",
+    "LeftUpLeg": "thigh_correctiveRoot_l",
+    "LeftLeg": "calf_l",
+    "LeftFoot": "ik_foot_l",
+    "RightUpLeg": "thigh_correctiveRoot_r",
+    "RightLeg": "calf_r",
+    "RightFoot": "foot_r"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "3dsMax_Biped_Default",
+  "version": "1.0",
+  "mappings": {
+    "Reference": "Bip001",
+    "Hips": "Bip001 Pelvis",
+    "Spine": "Bip001 Spine",
+    "Spine1": "Bip001 Spine1",
+    "Spine2": "Bip001 Spine2",
+    "Neck": "Bip001 Neck",
+    "Head": "Bip001 Head",
+    "LeftShoulder": "Bip001 L Clavicle",
+    "LeftArm": "Bip001 L UpperArm",
+    "LeftForeArm": "Bip001 L Forearm",
+    "LeftHand": "Bip001 L Hand",
+    "RightShoulder": "Bip001 R Clavicle",
+    "RightArm": "Bip001 R UpperArm",
+    "RightForeArm": "Bip001 R Forearm",
+    "RightHand": "Bip001 R Hand",
+    "LeftUpLeg": "Bip001 L Thigh",
+    "LeftLeg": "Bip001 L Calf",
+    "LeftFoot": "Bip001 L Foot",
+    "LeftToeBase": "Bip001 L Toe0",
+    "RightUpLeg": "Bip001 R Thigh",
+    "RightLeg": "Bip001 R Calf",
+    "RightFoot": "Bip001 R Foot",
+    "RightToeBase": "Bip001 R Toe0"
+  }
+}

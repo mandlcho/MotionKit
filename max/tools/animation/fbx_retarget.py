@@ -3,27 +3,18 @@ FBX Retarget to Biped Tool for MotionKit
 
 Imports FBX bone animation and retargets it onto a 3ds Max Biped character.
 
-Workflow:
-  1. Select FBX file(s) — default path from config, or browse file/folder.
-  2. Pick the target Biped from a dropdown of scene Bipeds.
-  3. Auto-detect or manually configure bone name mapping.
-     Save/load mapping presets for reuse across different source skeletons.
-  4. Click Retarget — animation is transferred frame-by-frame using
-     rest-pose offset compensation for correct results even when
-     source and target have different rest poses.
-
-Transfer pipeline:
-  Phase 1 — importFBX: import FBX as scene nodes (no skin, animation only).
-  Phase 2 — buildMapping: match source FBX bones to Biped nodes via
-             auto-detection or preset, with manual override support.
-  Phase 3 — computeOffsets: at reference frame, compute rotation offset
-             per bone pair so different rest poses transfer correctly.
-  Phase 4 — transferAnimation: per-frame loop writing transforms via
-             biped.setTransform (world space).
-  Phase 5 — cleanup: delete imported FBX nodes.
+Transfer uses a proxy-bone ASCII FBX round-trip approach (inspired by
+BsRetargetTools) to bypass biped.setTransform limitations:
+  1. Import source FBX (merge mode).
+  2. Create temporary Point helper proxies constrained to source bones.
+  3. Bake proxy animation, export as ASCII FBX.
+  4. Strip proxy name prefix from the ASCII FBX text.
+  5. Re-import modified FBX in merge mode — Max's native FBX importer
+     writes animation onto Biped controllers via its internal C++ codepath.
 """
 
 import json
+import os
 from pathlib import Path
 
 try:
@@ -308,7 +299,7 @@ def _cb_save_preset():
 
 
 def _cb_retarget():
-    """Main retarget execution — import FBX, build mapping, transfer animation."""
+    """Main retarget: proxy-bone ASCII FBX round-trip approach."""
     # Validation
     if not _state["fbx_files"]:
         rt.messageBox(t('tools.fbx_retarget.err_no_fbx'), title="MotionKit")
@@ -338,8 +329,7 @@ def _cb_retarget():
 
     biped_name = _state["selected_biped"]
 
-    # Build the MaxScript mapping arrays from Python state
-    # We need: source bone names and corresponding biped body part info
+    # Build mapping arrays for MaxScript
     mapping_pairs = []
     for slot, src_bone in _state["mapping"].items():
         if slot in BIPED_SLOT_MAP:
@@ -350,7 +340,6 @@ def _cb_retarget():
         rt.messageBox(t('tools.fbx_retarget.err_no_mapping'), title="MotionKit")
         return
 
-    # Build MaxScript arrays for source names and biped targets
     src_names_ms = ", ".join([f'"{p[0]}"' for p in mapping_pairs])
     body_parts_ms = ", ".join([f'"{p[1]}"' for p in mapping_pairs])
     links_ms = ", ".join([str(p[2]) if p[2] is not None else "-1" for p in mapping_pairs])
@@ -358,20 +347,27 @@ def _cb_retarget():
     escaped_fbx = fbx_path.replace("\\", "\\\\")
     escaped_biped = biped_name.replace("\\", "\\\\")
 
+    PROXY_PREFIX = "__MK__"
+    temp_dir = str(rt.execute('getDir #temp'))
+    temp_fbx = os.path.join(temp_dir, "motionkit_retarget_proxy.fbx")
+    escaped_temp_fbx = temp_fbx.replace("\\", "\\\\")
+
     # Status update
     rt.execute(f'FBXRetargetDialog.statusLabel.text = "{t("tools.fbx_retarget.msg_importing")}"')
     rt.execute('FBXRetargetDialog.retargetProgress.value = 5')
     rt.execute('windows.processPostedMessages()')
 
-    maxscript = f'''
+    # =====================================================================
+    # MaxScript Block 1: Import FBX, create proxies, constrain, bake, export
+    # =====================================================================
+    ms_phase1 = f'''
     (
-        local success = false
-        local frameCount = 0
+        local PROXY_PREFIX = "{PROXY_PREFIX}"
         local boneCount = 0
+        local proxyNodes = #()
         local newNodes = #()
 
-        -- Failsafe: save current Biped animation to a temp .bip file
-        -- so we can restore it if the retarget fails mid-way.
+        -- Failsafe: backup Biped animation
         local bipBackupPath = ""
         local bipRootForBackup = undefined
         try
@@ -388,71 +384,71 @@ def _cb_retarget():
             (
                 bipBackupPath = (getDir #temp) + "\\\\motionkit_retarget_backup.bip"
                 biped.saveBipFile bipRootForBackup bipBackupPath
+                print "[FBX Retarget] Biped backup saved"
             )
         )
         catch()
 
         try
         (
-            -- Phase 1: Import FBX
-            --   try/catch: some FBX files have embedded MaxScript (ShaDu virus)
-            --   that triggers security exceptions. Max blocks the malicious code
-            --   but throws — the import itself still succeeds.
-            local origObjs = for obj in objects collect obj
+            -- ==========================================
+            -- Phase 1: Import source FBX (merge mode)
+            -- ==========================================
             FBXImporterSetParam "Animation" true
             FBXImporterSetParam "Skin" false
             FBXImporterSetParam "Shape" false
-            try ( importFile "{escaped_fbx}" #noPrompt using:FBXIMP ) catch()
+            FBXImporterSetParam "Mode" #merge
+
+            local origObjs = for obj in objects collect obj
+
+            try ( importFile "{escaped_fbx}" #noPrompt using:FBXIMP )
+            catch ( print ("[FBX Retarget] Import exception: " + (getCurrentException())) )
+
             newNodes = for obj in objects where (findItem origObjs obj) == 0 collect obj
+            print ("[FBX Retarget] New nodes after import: " + (newNodes.count as string))
 
-            if newNodes.count == 0 then
-                throw "FBX import returned no nodes"
+            -- ==========================================
+            -- Phase 2: Find source bones & Biped nodes
+            -- ==========================================
+            FBXRetargetDialog.statusLabel.text = "Matching bones..."
+            FBXRetargetDialog.retargetProgress.value = 10
+            windows.processPostedMessages()
 
-            -- Build source node lookup by name
             local srcNames  = #({src_names_ms})
             local bodyParts = #({body_parts_ms})
             local links     = #({links_ms})
 
-            -- Find the target biped root
             local bipRoot = undefined
             for obj in objects do
             (
-                if obj.name == "{escaped_biped}" then
-                (
-                    bipRoot = obj
-                    exit
-                )
+                if obj.name == "{escaped_biped}" then ( bipRoot = obj ; exit )
             )
-
             if bipRoot == undefined then
                 throw "Could not find Biped: {escaped_biped}"
 
-            -- Figure mode guard
             local inFigure = false
             try ( inFigure = biped.getFigureMode bipRoot ) catch()
             if inFigure then
                 throw "{t('tools.fbx_retarget.err_figure_mode')}"
 
-            -- Build mapping: #(#(srcNode, tgtNode), ...)
             local pairs = #()
+            local pairBodyParts = #()
+            local bipedNodeNames = #()
+
             for i = 1 to srcNames.count do
             (
                 local srcNode = undefined
                 for n in newNodes do
                 (
-                    if n.name == srcNames[i] then
-                    (
-                        srcNode = n
-                        exit
-                    )
+                    if n.name == srcNames[i] then ( srcNode = n ; exit )
                 )
+                if srcNode == undefined then
+                    srcNode = getNodeByName srcNames[i]
 
                 local tgtNode = undefined
                 try
                 (
-                    if links[i] == -1 then
-                        tgtNode = biped.getNode bipRoot (bodyParts[i] as name)
-                    else if links[i] == 0 then
+                    if links[i] == -1 or links[i] == 0 then
                         tgtNode = biped.getNode bipRoot (bodyParts[i] as name)
                     else
                         tgtNode = biped.getNode bipRoot (bodyParts[i] as name) link:links[i]
@@ -460,123 +456,301 @@ def _cb_retarget():
                 catch()
 
                 if srcNode != undefined and tgtNode != undefined then
+                (
                     append pairs #(srcNode, tgtNode)
+                    append pairBodyParts bodyParts[i]
+                    append bipedNodeNames tgtNode.name
+                    print ("[FBX Retarget] Pair: " + srcNode.name + " -> " + tgtNode.name)
+                )
+                else
+                    print ("[FBX Retarget] SKIP " + srcNames[i] + " src:" + ((srcNode != undefined) as string) + " tgt:" + ((tgtNode != undefined) as string))
             )
 
             boneCount = pairs.count
+            print ("[FBX Retarget] Total pairs: " + (boneCount as string))
+            if boneCount == 0 then
+                throw "No bone pairs matched. Check preset bone names."
 
-            FBXRetargetDialog.statusLabel.text = "Mapping " + (boneCount as string) + " bones..."
+            -- ==========================================
+            -- Phase 3: Create proxy Point helpers
+            -- ==========================================
+            FBXRetargetDialog.statusLabel.text = "Creating proxies..."
             FBXRetargetDialog.retargetProgress.value = 15
             windows.processPostedMessages()
 
-            local savedTime = sliderTime
-
-            -- Phase 2: Transfer animation frame by frame
-            --   Direct world-space copy — no offset compensation needed
-            --   because the Biped originally drove these bones, so their
-            --   world transforms should match 1:1.
-            local totalFrames = {end_frame} - {start_frame} + 1
-            local cancelled = false
-
-            with undo "FBX Retarget" on
+            for i = 1 to pairs.count do
             (
-                with animate on
+                local srcNode = pairs[i][1]
+                local proxyName = PROXY_PREFIX + bipedNodeNames[i]
+                local p = Point name:proxyName
+                p.size = 0.5
+                p.centermarker = false
+                p.axistripod = false
+                p.cross = false
+                p.box = false
+                p.transform = srcNode.transform
+                append proxyNodes p
+            )
+
+            print ("[FBX Retarget] Created " + (proxyNodes.count as string) + " proxies")
+
+            -- ==========================================
+            -- Phase 4: Constrain proxies to source bones
+            -- ==========================================
+            FBXRetargetDialog.statusLabel.text = "Setting up constraints..."
+            FBXRetargetDialog.retargetProgress.value = 20
+            windows.processPostedMessages()
+
+            for i = 1 to pairs.count do
+            (
+                local srcNode = pairs[i][1]
+                local proxy = proxyNodes[i]
+
+                -- Orientation constraint
+                local oriCtrl = Orientation_Constraint()
+                proxy.rotation.controller = oriCtrl
+                oriCtrl.appendTarget srcNode 100.0
+                oriCtrl.relative = true
+
+                -- Position constraint (all bones — needed for proxy FBX export)
+                local posCtrl = Position_Constraint()
+                proxy.pos.controller = posCtrl
+                posCtrl.appendTarget srcNode 100.0
+                posCtrl.relative = true
+            )
+
+            -- ==========================================
+            -- Phase 5: Two-pass bake proxy animation
+            -- ==========================================
+            FBXRetargetDialog.statusLabel.text = "Sampling animation..."
+            FBXRetargetDialog.retargetProgress.value = 25
+            windows.processPostedMessages()
+
+            local savedTime = sliderTime
+            local totalFrames = {end_frame} - {start_frame} + 1
+
+            -- Pass 1: Sample constrained transforms
+            local allTfm = #()
+            for f = {start_frame} to {end_frame} do
+            (
+                if keyboard.escPressed then throw "Cancelled"
+                sliderTime = f
+                local frameTfm = #()
+                for i = 1 to proxyNodes.count do
+                    append frameTfm (copy proxyNodes[i].transform)
+                append allTfm frameTfm
+
+                if mod (f - {start_frame}) 10 == 0 then
                 (
-                    for f = {start_frame} to {end_frame} do
+                    local pct = 25 + (20.0 * (f - {start_frame}) / totalFrames) as integer
+                    if pct > 100 then pct = 100
+                    FBXRetargetDialog.retargetProgress.value = pct
+                    windows.processPostedMessages()
+                )
+            )
+
+            print ("[FBX Retarget] Sampled " + (totalFrames as string) + " frames")
+
+            -- Pass 2: Remove constraints, assign clean controllers, bake keys
+            FBXRetargetDialog.statusLabel.text = "Baking keys..."
+            FBXRetargetDialog.retargetProgress.value = 50
+            windows.processPostedMessages()
+
+            for i = 1 to proxyNodes.count do
+            (
+                local proxy = proxyNodes[i]
+                proxy.rotation.controller = Euler_XYZ()
+                proxy.pos.controller = Bezier_Position()
+            )
+
+            for f = {start_frame} to {end_frame} do
+            (
+                if keyboard.escPressed then throw "Cancelled"
+                sliderTime = f
+                local frameIdx = f - {start_frame} + 1
+
+                with animate on at time f
+                (
+                    for i = 1 to proxyNodes.count do
                     (
-                        if keyboard.escPressed then
-                        (
-                            cancelled = true
-                            exit
-                        )
-
-                        sliderTime = f
-
-                        for i = 1 to pairs.count do
-                        (
-                            local srcNode = pairs[i][1]
-                            local tgtNode = pairs[i][2]
-                            local srcTM   = srcNode.transform
-
-                            try ( biped.setTransform tgtNode #rotation srcTM.rotation true ) catch()
-                            try ( biped.setTransform tgtNode #pos srcTM.pos true ) catch()
-                        )
-
-                        -- Progress update every 10 frames
-                        if mod (f - {start_frame}) 10 == 0 then
-                        (
-                            local pct = 20 + (80.0 * (f - {start_frame}) / totalFrames) as integer
-                            if pct > 100 then pct = 100
-                            FBXRetargetDialog.retargetProgress.value = pct
-                            windows.processPostedMessages()
-                        )
+                        local proxy = proxyNodes[i]
+                        local tfm = allTfm[frameIdx][i]
+                        proxy.transform = tfm
                     )
+                )
+
+                if mod (f - {start_frame}) 10 == 0 then
+                (
+                    local pct = 50 + (10.0 * (f - {start_frame}) / totalFrames) as integer
+                    if pct > 100 then pct = 100
+                    FBXRetargetDialog.retargetProgress.value = pct
+                    windows.processPostedMessages()
                 )
             )
 
             sliderTime = savedTime
 
-            if cancelled then
-                FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_cancelled')}"
-            else
+            -- ==========================================
+            -- Phase 6: Export proxies as ASCII FBX
+            -- ==========================================
+            FBXRetargetDialog.statusLabel.text = "Exporting temp FBX..."
+            FBXRetargetDialog.retargetProgress.value = 65
+            windows.processPostedMessages()
+
+            select proxyNodes
+
+            FBXExporterSetParam "Animation" true
+            FBXExporterSetParam "Skin" false
+            FBXExporterSetParam "Shape" false
+            FBXExporterSetParam "ASCII" true
+            FBXExporterSetParam "BakeAnimation" true
+            FBXExporterSetParam "BakeFrameStart" {start_frame}
+            FBXExporterSetParam "BakeFrameEnd" {end_frame}
+            FBXExporterSetParam "BakeFrameStep" 1
+
+            exportFile "{escaped_temp_fbx}" #noPrompt selectedOnly:true using:FBXEXP
+            print "[FBX Retarget] Proxy FBX exported"
+
+            -- ==========================================
+            -- Phase 7: Clean up proxies + source nodes
+            -- ==========================================
+            FBXRetargetDialog.statusLabel.text = "Cleaning up..."
+            FBXRetargetDialog.retargetProgress.value = 70
+            windows.processPostedMessages()
+
+            for p in proxyNodes do
+                try (delete p) catch()
+
+            if FBXRetargetDialog.cleanupCB.checked and newNodes.count > 0 then
             (
-                frameCount = totalFrames
-                success = true
+                for n in newNodes do try (delete n) catch()
             )
+
+            gc light:true
+            clearSelection()
+
+            print "[FBX Retarget] Scene cleanup done"
         )
         catch
         (
             local errMsg = getCurrentException()
+            print ("[FBX Retarget] Phase 1-7 FAILED: " + errMsg)
 
-            -- Restore Biped from backup if we have one
+            -- Clean up any proxies that were created
+            for p in proxyNodes do try (delete p) catch()
+            if newNodes.count > 0 then
+                for n in newNodes do try (delete n) catch()
+            gc light:true
+
+            -- Restore Biped from backup
             if bipBackupPath != "" and bipRootForBackup != undefined then
             (
-                try
-                (
-                    biped.loadBipFile bipRootForBackup bipBackupPath
-                    FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_restored')}"
-                )
-                catch
-                (
-                    FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_failed')}"
-                )
+                try ( biped.loadBipFile bipRootForBackup bipBackupPath ) catch()
+                try ( deleteFile bipBackupPath ) catch()
             )
-            else
-                FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_failed')}"
 
+            FBXRetargetDialog.statusLabel.text = "{t('tools.fbx_retarget.msg_failed')}"
+            FBXRetargetDialog.retargetProgress.value = 0
             messageBox errMsg title:"MotionKit"
         )
 
-        -- Phase 4: Cleanup — always runs, even after errors
-        if FBXRetargetDialog.cleanupCB.checked and newNodes.count > 0 then
-        (
-            for n in newNodes do
-                try (delete n) catch()
-            gc light:true
-        )
-
-        if success then
-        (
-            local doneMsg = "{t('tools.fbx_retarget.msg_done')}"
-            doneMsg = substituteString doneMsg "{{0}}" (frameCount as string)
-            doneMsg = substituteString doneMsg "{{1}}" (boneCount as string)
-            FBXRetargetDialog.statusLabel.text = doneMsg
-        )
-
-        -- Clean up temp backup file
-        if bipBackupPath != "" then
-            try ( deleteFile bipBackupPath ) catch()
-
-        FBXRetargetDialog.retargetProgress.value = 0
+        -- Return values for Python
+        #(boneCount, bipBackupPath)
     )
     '''
 
     try:
-        rt.execute(maxscript)
+        result = rt.execute(ms_phase1)
     except Exception as e:
-        logger.error(f"FBX Retarget failed: {str(e)}")
+        logger.error(f"FBX Retarget phase 1 failed: {str(e)}")
         rt.execute(f'FBXRetargetDialog.statusLabel.text = "{t("tools.fbx_retarget.msg_failed")}"')
         rt.execute('FBXRetargetDialog.retargetProgress.value = 0')
+        return
+
+    # Extract results
+    bone_count = 0
+    bip_backup_path = ""
+    if result and hasattr(result, 'Count') and result.Count >= 2:
+        bone_count = int(result[0])
+        bip_backup_path = str(result[1])
+
+    if bone_count == 0:
+        # Phase 1 failed — error already shown
+        return
+
+    # =====================================================================
+    # Python: Strip proxy prefix from ASCII FBX
+    # =====================================================================
+    rt.execute('FBXRetargetDialog.statusLabel.text = "Renaming bones in FBX..."')
+    rt.execute('FBXRetargetDialog.retargetProgress.value = 75')
+    rt.execute('windows.processPostedMessages()')
+
+    try:
+        with open(temp_fbx, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        content = content.replace(PROXY_PREFIX, "")
+
+        with open(temp_fbx, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        print(f"[FBX Retarget] Stripped '{PROXY_PREFIX}' from FBX ({len(content)} chars)")
+    except Exception as e:
+        logger.error(f"FBX text replacement failed: {str(e)}")
+        rt.messageBox(f"Failed to process temp FBX file:\n{str(e)}", title="MotionKit")
+        _cleanup_retarget(temp_fbx, bip_backup_path)
+        return
+
+    # =====================================================================
+    # MaxScript Block 2: Re-import modified FBX onto Biped
+    # =====================================================================
+    rt.execute('FBXRetargetDialog.statusLabel.text = "Applying to Biped..."')
+    rt.execute('FBXRetargetDialog.retargetProgress.value = 80')
+    rt.execute('windows.processPostedMessages()')
+
+    ms_phase2 = f'''
+    (
+        FBXImporterSetParam "Mode" #merge
+        FBXImporterSetParam "Animation" true
+        FBXImporterSetParam "Skin" false
+        FBXImporterSetParam "Shape" false
+
+        try ( importFile "{escaped_temp_fbx}" #noPrompt using:FBXIMP )
+        catch ( print ("[FBX Retarget] Re-import exception: " + (getCurrentException())) )
+
+        print "[FBX Retarget] Re-import complete"
+        true
+    )
+    '''
+
+    try:
+        rt.execute(ms_phase2)
+    except Exception as e:
+        logger.error(f"FBX re-import failed: {str(e)}")
+
+    # =====================================================================
+    # Cleanup and finish
+    # =====================================================================
+    total_frames = end_frame - start_frame + 1
+    _cleanup_retarget(temp_fbx, bip_backup_path)
+
+    done_msg = t('tools.fbx_retarget.msg_done').replace("{0}", str(total_frames)).replace("{1}", str(bone_count))
+    rt.execute(f'FBXRetargetDialog.statusLabel.text = "{done_msg}"')
+    rt.execute('FBXRetargetDialog.retargetProgress.value = 100')
+
+
+def _cleanup_retarget(temp_fbx_path, bip_backup_path):
+    """Remove temp files created during retarget."""
+    try:
+        if os.path.exists(temp_fbx_path):
+            os.remove(temp_fbx_path)
+    except OSError:
+        pass
+    try:
+        if bip_backup_path and os.path.exists(bip_backup_path):
+            os.remove(bip_backup_path)
+    except OSError:
+        pass
 
 
 def _update_mapping_ui():

@@ -2150,9 +2150,9 @@ def _show_file_selection_dialog(start_frame, end_frame, export_path):
 
         logger.info(f"Found {len(max_files)} Max files")
 
-        # Escape paths for Python string parsing (double backslashes)
-        export_path_escaped = export_path.replace('\\', '\\\\')
-        current_max_path_escaped = current_max_path.replace('\\', '\\\\')
+        # Use forward slashes to avoid backslash escaping issues in nested strings
+        export_path_escaped = export_path.replace('\\', '/')
+        current_max_path_escaped = current_max_path.replace('\\', '/')
 
         # Show file selection dialog via MaxScript
         maxscript = f'''
@@ -2240,7 +2240,7 @@ rollout FileSelectionDialog "Select Files to Export" width:420 height:600
         )
 
         -- Call Python function to export selected files
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_selected_files({start_frame}, {end_frame}, r'{export_path_escaped}', r'{current_max_path_escaped}', '" + filesStr + "')")
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._export_selected_files({start_frame}, {end_frame}, '{export_path_escaped}', '{current_max_path_escaped}', '" + filesStr + "')")
 
         destroyDialog FileSelectionDialog
     )
@@ -2381,7 +2381,7 @@ rollout FileSelectionDialog "Select Files to Export (Multi-Take Mode)" width:420
         )
 
         -- Call Python function for multi-take batch export
-        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._batch_export_with_multitake({start_frame}, {end_frame}, r'{export_path_escaped}', '" + filesStr + "')")
+        python.execute ("import max.tools.animation.fbx_exporter; max.tools.animation.fbx_exporter._batch_export_with_multitake({start_frame}, {end_frame}, '{export_path_escaped}', '" + filesStr + "')")
 
         destroyDialog FileSelectionDialog
     )

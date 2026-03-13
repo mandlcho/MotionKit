@@ -1710,6 +1710,13 @@ rollout MotionKitAnimExporter "{title}" width:500 height:430
     -- Export Current button
     on btnExportCurrent pressed do
     (
+        -- Refresh frame range from timeline if "Use Timeline" is checked
+        if useTimelineCB.checked then
+        (
+            startSpn.value = animationRange.start.frame as integer
+            endSpn.value = animationRange.end.frame as integer
+        )
+
         -- Check if multi-take export is enabled
         if enableMultiTakeCB.checked then
         (
@@ -1746,6 +1753,13 @@ rollout MotionKitAnimExporter "{title}" width:500 height:430
     -- Export Selected button
     on btnExportSelected pressed do
     (
+        -- Refresh frame range from timeline if "Use Timeline" is checked
+        if useTimelineCB.checked then
+        (
+            startSpn.value = animationRange.start.frame as integer
+            endSpn.value = animationRange.end.frame as integer
+        )
+
         -- Check if multi-take export is enabled
         if enableMultiTakeCB.checked then
         (
@@ -1774,6 +1788,13 @@ rollout MotionKitAnimExporter "{title}" width:500 height:430
     -- Export All button
     on btnExportAll pressed do
     (
+        -- Refresh frame range from timeline if "Use Timeline" is checked
+        if useTimelineCB.checked then
+        (
+            startSpn.value = animationRange.start.frame as integer
+            endSpn.value = animationRange.end.frame as integer
+        )
+
         -- Check if multi-take export is enabled
         if enableMultiTakeCB.checked then
         (

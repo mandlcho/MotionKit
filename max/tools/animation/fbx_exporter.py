@@ -487,11 +487,12 @@ def _export_multi_takes(take_indices, export_path, all_takes=False):
                 rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
                 
                 exported_files.append(export_file)
-                logger.info(f"Exported: {export_file}")
-                
+                logger.info(f"Exported frames {take['start_frame']}-{take['end_frame']}: {export_file}")
+                print(f"[FBX Exporter] Exported: frames {take['start_frame']}-{take['end_frame']}  ->  {export_file}")
+
             finally:
                 rt.animationRange = rt.interval(original_start, original_end)
-        
+
         _update_progress(100, "Multi-take export complete!")
         logger.info(f"Multi-take export complete: {len(exported_files)} files exported")
         
@@ -1289,11 +1290,12 @@ def _batch_export_with_multitake(start_frame, end_frame, export_path, selected_f
                             rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
                             
                             all_exported_files.append(export_file)
-                            logger.info(f"Exported: {export_file}")
-                            
+                            logger.info(f"Exported frames {take['start_frame']}-{take['end_frame']}: {export_file}")
+                            print(f"[FBX Exporter] Exported: frames {take['start_frame']}-{take['end_frame']}  ->  {export_file}")
+
                         finally:
                             rt.animationRange = rt.interval(original_start, original_end)
-                    
+
                     except Exception as e:
                         logger.error(f"Failed to export take '{take['name']}': {str(e)}")
                         continue
@@ -1349,11 +1351,12 @@ def _batch_export_with_multitake(start_frame, end_frame, export_path, selected_f
                     rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
                     
                     all_exported_files.append(export_file)
-                    logger.info(f"Exported: {export_file}")
-                    
+                    logger.info(f"Exported frames {start_frame}-{end_frame}: {export_file}")
+                    print(f"[FBX Exporter] Exported: frames {start_frame}-{end_frame}  ->  {export_file}")
+
                 finally:
                     rt.animationRange = rt.interval(original_start, original_end)
-        
+
         # Restore original file
         if current_max_name and current_max_name != max_files[-1]:
             try:
@@ -2123,7 +2126,8 @@ def _export_current_file(start_frame, end_frame, export_path):
             rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
 
             _update_progress(100, "Export complete!")
-            logger.info(f"Exported: {export_file}")
+            logger.info(f"Exported frames {start_frame}-{end_frame}: {export_file}")
+            print(f"[FBX Exporter] Exported: frames {start_frame}-{end_frame}  ->  {export_file}")
 
             # Show completion notification
             # _show_export_notification([export_file])
@@ -2530,7 +2534,8 @@ def _export_selected_files(start_frame, end_frame, export_path, source_directory
                     rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
 
                     exported_files.append(export_file)
-                    logger.info(f"Exported: {export_file}")
+                    logger.info(f"Exported frames {start_frame}-{end_frame}: {export_file}")
+                    print(f"[FBX Exporter] Exported: frames {start_frame}-{end_frame}  ->  {export_file}")
 
                 finally:
                     rt.animationRange = rt.interval(original_start, original_end)
@@ -2686,7 +2691,8 @@ def _batch_export_directory(start_frame, end_frame, export_path):
                     rt.exportFile(export_file, rt.name("noPrompt"), selectedOnly=True, using=rt.FBXEXP)
 
                     exported_files.append(export_file)
-                    logger.info(f"Exported: {export_file}")
+                    logger.info(f"Exported frames {start_frame}-{end_frame}: {export_file}")
+                    print(f"[FBX Exporter] Exported: frames {start_frame}-{end_frame}  ->  {export_file}")
 
                 finally:
                     rt.animationRange = rt.interval(original_start, original_end)
@@ -2836,7 +2842,8 @@ def _export_animation(name, start_frame, end_frame, objects_str):
             logger.info("Silent export command executed without errors.")
 
             _update_progress(100, "Export complete!")
-            logger.info(f"Export completed for: {export_file}")
+            logger.info(f"Exported frames {start_frame}-{end_frame}: {export_file}")
+            print(f"[FBX Exporter] Exported: frames {start_frame}-{end_frame}  ->  {export_file}")
 
             # Show export notification
             # try:

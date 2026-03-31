@@ -20,19 +20,19 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		pickbutton btnPickBone "Pick Object" width:160 height:30
 		label lblSelectedBone "Selected: None" align:#left offset:[5,5]
 	)
-	
+
 	group "Axis Selection"
 	(
 		checkbox chkX "X" checked:false across:3 offset:[10,5]
 		checkbox chkY "Y" checked:false offset:[10,5]
 		checkbox chkZ "Z" checked:true offset:[10,5]
 	)
-	
+
 	group "Settings"
 	(
 		checkbox chkAutoUpdate "Auto-Update While Scrubbing" checked:true offset:[5,5]
 	)
-	
+
 	group "Speed Information"
 	(
 		label lblCurrentFrame "Current Frame: --" align:#left offset:[5,5]
@@ -40,177 +40,78 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 		edittext txtSpeedY "Y-Speed:" readonly:true fieldwidth:120 offset:[0,5]
 		edittext txtSpeedZ "Z-Speed:" readonly:true fieldwidth:120 offset:[0,5]
 	)
-	
-	group "Root Smoothing"
+
+	group "Curve Preview"
 	(
-		label lblRootHelp "Smooth root animation to target speed:" align:#left offset:[5,5]
-		spinner spnTargetSpeed "Target Speed (m/s):" range:[-100,100,10] type:#float fieldwidth:60 offset:[0,5]
-		spinner spnBlendFrames "Blend Frames:" range:[1,200,30] type:#integer fieldwidth:60 offset:[0,5]
-		button btnCalcBlend "Auto" width:40 height:16 offset:[0,-3] across:2 align:#right tooltip:"Calculate optimal blend frames"
-		label lblBlendInfo "" align:#left offset:[0,-3]
-		button btnPreview "Preview" width:160 height:30 offset:[0,5]
-		button btnApply "Apply" width:75 height:30 offset:[0,5] across:2 enabled:false
-		button btnCancel "Cancel" width:75 height:30 offset:[0,5] enabled:false
+		-- Animator-friendly names, engine curve family in parentheses
+		dropdownlist ddlPreviewMode "" \
+			items:#( \
+				"Movement Path  (Root Loc)", \
+				"Turning / Rotation  (Root Rot)", \
+				"Movement Speed  (Root Vec)" \
+			) \
+			width:168 offset:[-5,5]
+		button btnGeneratePreview "Generate Curve Preview" width:160 height:28 offset:[0,5]
+		button btnClearPreview "Clear Preview" width:160 height:22 offset:[0,5] enabled:false
+		label lblPreviewStatus "" align:#left offset:[5,3]
 	)
-	
+
 	-- Variables
-	local selectedBone = undefined
-	local lastFrame = -1
-	local isCallbackActive = false
+	local selectedBone      = undefined
+	local lastFrame         = -1
+	local isCallbackActive  = false
 	local transformCallback = undefined
-	local previewHelper = undefined  -- Point helper for preview
-	local previewData = #()  -- Stored calculated positions for apply
-	local previewStartFrame = 0
-	local previewEndFrame = 0
-	
-	-- Check if an object is a Biped node
-	function isBipedObject obj =
-	(
-		try
-		(
-			return (classof obj.controller == BipSlave_Control or \
-					classof obj.controller == Vertical_Horizontal_Turn or \
-					classof obj.controller == Bip_Float or \
-					(classof obj.controller == subAnim and classof obj == Biped_Object))
-		)
-		catch
-		(
-			return false
-		)
-	)
-	
-	-- Set world position on a standard (non-Biped) object
-	function setWorldPos obj f pos =
-	(
-		at time f
-		(
-			animate on
-			(
-				in coordsys world obj.pos = pos
-			)
-		)
-	)
-	
-	-- Format speed value: round near-zero, limit decimal places
+	local curvePreviewHelper = undefined
+
+	-- Format speed value
 	function formatSpeed val =
 	(
-		if abs val < 0.001 then
-			return "0.0 m/s"
-		
-		-- Round to 4 decimal places
+		if abs val < 0.001 then return "0.0 m/s"
 		local rounded = (floor (val * 10000 + 0.5)) / 10000.0
 		return (rounded as string) + " m/s"
 	)
-	
-	-- Calculate Speed Function
+
+	-- Calculate Speed
 	function calculateSpeed =
 	(
-		if selectedBone == undefined or not isValidNode selectedBone then
-			return()
-		
-		local currentF = sliderTime.frame as integer
-		local fps = frameRate as float
-		local timeDelta = 1.0 / fps
-		local conversionFactor = 100.0  -- for centimeters to meters
-		
-		-- Calculate current frame speed
+		if selectedBone == undefined or not isValidNode selectedBone then return()
+
+		local currentF         = sliderTime.frame as integer
+		local fps              = frameRate as float
+		local timeDelta        = 1.0 / fps
+		local conversionFactor = 100.0
+
 		if currentF < animationRange.end.frame then
 		(
-			-- Normal case: calculate speed from current to next frame
 			local pos1 = in coordsys world selectedBone.transform.pos
-			
 			at time (currentF + 1)
 			(
 				local pos2 = in coordsys world selectedBone.transform.pos
-				
-				-- Calculate X speed
-				if chkX.checked then
-				(
-					local speedX = (pos2.x - pos1.x) / timeDelta
-					local speedXMS = speedX / conversionFactor
-					txtSpeedX.text = formatSpeed speedXMS
-				)
-				else
-				(
-					txtSpeedX.text = "--"
-				)
-				
-				-- Calculate Y speed
-				if chkY.checked then
-				(
-					local speedY = (pos2.y - pos1.y) / timeDelta
-					local speedYMS = speedY / conversionFactor
-					txtSpeedY.text = formatSpeed speedYMS
-				)
-				else
-				(
-					txtSpeedY.text = "--"
-				)
-				
-				-- Calculate Z speed
-				if chkZ.checked then
-				(
-					local speedZ = (pos2.z - pos1.z) / timeDelta
-					local speedZMS = speedZ / conversionFactor
-					txtSpeedZ.text = formatSpeed speedZMS
-				)
-				else
-				(
-					txtSpeedZ.text = "--"
-				)
+				if chkX.checked then txtSpeedX.text = formatSpeed ((pos2.x - pos1.x) / timeDelta / conversionFactor)
+				else txtSpeedX.text = "--"
+				if chkY.checked then txtSpeedY.text = formatSpeed ((pos2.y - pos1.y) / timeDelta / conversionFactor)
+				else txtSpeedY.text = "--"
+				if chkZ.checked then txtSpeedZ.text = formatSpeed ((pos2.z - pos1.z) / timeDelta / conversionFactor)
+				else txtSpeedZ.text = "--"
 			)
-			
 			lblCurrentFrame.text = "Current Frame: " + (currentF as string)
 		)
 		else if currentF == animationRange.end.frame and currentF > animationRange.start.frame then
 		(
-			-- On last frame: show speed coming INTO this frame (from previous frame)
 			at time (currentF - 1)
 			(
 				local pos1 = in coordsys world selectedBone.transform.pos
-				
 				at time currentF
 				(
 					local pos2 = in coordsys world selectedBone.transform.pos
-					
-					-- Calculate X speed
-					if chkX.checked then
-					(
-						local speedX = (pos2.x - pos1.x) / timeDelta
-						local speedXMS = speedX / conversionFactor
-						txtSpeedX.text = (formatSpeed speedXMS) + " (into last)"
-					)
-					else
-					(
-						txtSpeedX.text = "--"
-					)
-					
-					-- Calculate Y speed
-					if chkY.checked then
-					(
-						local speedY = (pos2.y - pos1.y) / timeDelta
-						local speedYMS = speedY / conversionFactor
-						txtSpeedY.text = (formatSpeed speedYMS) + " (into last)"
-					)
-					else
-					(
-						txtSpeedY.text = "--"
-					)
-					
-					-- Calculate Z speed
-					if chkZ.checked then
-					(
-						local speedZ = (pos2.z - pos1.z) / timeDelta
-						local speedZMS = speedZ / conversionFactor
-						txtSpeedZ.text = (formatSpeed speedZMS) + " (into last)"
-					)
-					else
-					(
-						txtSpeedZ.text = "--"
-					)
+					if chkX.checked then txtSpeedX.text = (formatSpeed ((pos2.x - pos1.x) / timeDelta / conversionFactor)) + " (into last)"
+					else txtSpeedX.text = "--"
+					if chkY.checked then txtSpeedY.text = (formatSpeed ((pos2.y - pos1.y) / timeDelta / conversionFactor)) + " (into last)"
+					else txtSpeedY.text = "--"
+					if chkZ.checked then txtSpeedZ.text = (formatSpeed ((pos2.z - pos1.z) / timeDelta / conversionFactor)) + " (into last)"
+					else txtSpeedZ.text = "--"
 				)
 			)
-			
 			lblCurrentFrame.text = "Current Frame: " + (currentF as string) + " (LAST)"
 		)
 		else
@@ -221,8 +122,8 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 			if chkZ.checked then txtSpeedZ.text = "N/A"
 		)
 	)
-	
-	-- Redraw callback function
+
+	-- Redraw callback
 	function updateCallback =
 	(
 		local currentF = sliderTime.frame as integer
@@ -232,24 +133,233 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 			boneSpeedRollout.calculateSpeed()
 		)
 	)
-	
+
+	-- Clear curve preview helper
+	function clearCurvePreview =
+	(
+		if curvePreviewHelper != undefined then
+		(
+			try
+			(
+				curvePreviewHelper.showTrajectory = false
+				delete curvePreviewHelper
+			)
+			catch()
+			curvePreviewHelper = undefined
+		)
+		btnClearPreview.enabled = false
+		btnGeneratePreview.text = "Generate Curve Preview"
+		lblPreviewStatus.text = ""
+	)
+
+	-- Generate curve preview helper
+	function generateCurvePreview =
+	(
+		if selectedBone == undefined or not isValidNode selectedBone then
+		(
+			messageBox "Please pick an object first!" title:"Curve Preview"
+			return()
+		)
+
+		-- Clean up existing
+		if curvePreviewHelper != undefined then
+		(
+			try (delete curvePreviewHelper) catch()
+			curvePreviewHelper = undefined
+		)
+
+		local startF    = animationRange.start.frame as integer
+		local endF      = animationRange.end.frame as integer
+		local fps       = frameRate as float
+		local modeIndex = ddlPreviewMode.selection
+
+		-- Graph origin = bone's world position at first frame
+		local graphOrigin = at time startF (in coordsys world selectedBone.transform.pos)
+
+		-- Graph time axis: runs along the character's direction of travel
+		-- so the curve always lies beside the path, never across it.
+		-- For rotation-only clips (minimal displacement) fall back to the
+		-- bone's local facing direction at startF.
+		local posEnd    = at time endF (in coordsys world selectedBone.transform.pos)
+		local moveDelta = posEnd - graphOrigin
+		local graphForward
+
+		if (length moveDelta) > 0.1 then
+			graphForward = normalize moveDelta
+		else
+			-- No meaningful translation — use the bone's local X axis (facing dir)
+			graphForward = at time startF (normalize selectedBone.transform.row1)
+
+		-- Value axis is always world Z (up), so the graph always reads
+		-- upright regardless of which direction the character faces.
+		local graphUp = [0, 0, 1]
+
+		-- Each frame advances 5cm along graphForward (time axis)
+		local frameSpacing = 5.0
+
+		-- Create Point helper (orange = preview)
+		curvePreviewHelper = Point()
+		curvePreviewHelper.size = 3
+		curvePreviewHelper.centermarker = true
+		curvePreviewHelper.axistripod   = false
+		curvePreviewHelper.cross        = true
+		curvePreviewHelper.box          = false
+		curvePreviewHelper.wirecolor    = color 255 180 0
+
+		-- ----------------------------------------------------------------
+		-- MODE 1: Movement Path  (Root Loc)
+		-- Keys the helper at the bone's exact world position each frame.
+		-- The trajectory draws the 3D path the character travels through
+		-- space — directly equivalent to the _RootLoc curve in-engine.
+		-- ----------------------------------------------------------------
+		if modeIndex == 1 then
+		(
+			curvePreviewHelper.name = "_CurvePreview_RootLoc"
+
+			for f = startF to endF do
+			(
+				local bonePos = at time f (in coordsys world selectedBone.transform.pos)
+				at time f animate on (in coordsys world curvePreviewHelper.pos = bonePos)
+			)
+
+			lblPreviewStatus.text = "Path: " + ((endF - startF + 1) as string) + " frames keyed"
+		)
+
+		-- ----------------------------------------------------------------
+		-- MODE 2: Turning / Rotation  (Root Rot)
+		-- Plots accumulated yaw (rotation around world Z) as a 2D graph.
+		--   graphForward axis = time (frame index × spacing)
+		--   world Z axis      = total degrees turned since frame 0
+		-- Yaw is unwrapped so a continuous spin plots as a smooth slope,
+		-- not a sawtooth. Equivalent to the _RootRot curve in-engine.
+		-- ----------------------------------------------------------------
+		else if modeIndex == 2 then
+		(
+			curvePreviewHelper.name = "_CurvePreview_RootRot"
+
+			-- 1 degree = 1 cm on the value axis
+			local rotScale = 1.0
+
+			local prevYaw        = 0.0
+			local accumulatedYaw = 0.0
+
+			for f = startF to endF do
+			(
+				local q          = at time f (in coordsys world selectedBone.transform.rotation)
+				local eu         = quatToEuler q
+				local currentYaw = eu.z  -- Z Euler = yaw in Max's Z-up world
+
+				if f == startF then
+				(
+					prevYaw        = currentYaw
+					accumulatedYaw = 0.0
+				)
+				else
+				(
+					local delta = currentYaw - prevYaw
+					if delta >  180 then delta -= 360
+					if delta < -180 then delta += 360
+					accumulatedYaw += delta
+					prevYaw = currentYaw
+				)
+
+				local fwdComp = ((f - startF) as float * frameSpacing) * graphForward
+				local upComp  = (accumulatedYaw * rotScale) * graphUp
+				local gPos    = graphOrigin + fwdComp + upComp
+				at time f animate on (in coordsys world curvePreviewHelper.pos = gPos)
+			)
+
+			lblPreviewStatus.text = "Rotation: forward=time  up=yaw (deg)"
+		)
+
+		-- ----------------------------------------------------------------
+		-- MODE 3: Movement Speed  (Root Vec)
+		-- Plots per-frame speed as a 2D graph.
+		--   graphForward axis = time (frame index × spacing)
+		--   world Z axis      = speed (always positive, reads upward)
+		-- Single axis checked → that axis's speed magnitude.
+		-- Multiple axes checked → XYZ magnitude (total speed).
+		-- Equivalent to the _Vec velocity curve in-engine.
+		-- ----------------------------------------------------------------
+		else
+		(
+			curvePreviewHelper.name = "_CurvePreview_RootVec"
+
+			-- 30 cm per m/s keeps the graph roughly square for a typical
+			-- 5 m/s run over 30 frames, readable without zooming
+			local speedScale = 30.0
+
+			local axisCount = 0
+			if chkX.checked then axisCount += 1
+			if chkY.checked then axisCount += 1
+			if chkZ.checked then axisCount += 1
+
+			for f = startF to endF do
+			(
+				local speedVal = 0.0
+
+				if f < endF then
+				(
+					local pos1 = at time f     (in coordsys world selectedBone.transform.pos)
+					local pos2 = at time (f+1) (in coordsys world selectedBone.transform.pos)
+					local inv  = fps / 100.0  -- cm/frame → m/s
+
+					local vx = (pos2.x - pos1.x) * inv
+					local vy = (pos2.y - pos1.y) * inv
+					local vz = (pos2.z - pos1.z) * inv
+
+					if axisCount == 1 then
+					(
+						-- abs: speed is always positive so the graph reads
+						-- upward regardless of which world direction the
+						-- character moves in
+						if      chkX.checked then speedVal = abs vx
+						else if chkY.checked then speedVal = abs vy
+						else                      speedVal = abs vz
+					)
+					else
+					(
+						local sumSq = 0.0
+						if chkX.checked then sumSq += vx * vx
+						if chkY.checked then sumSq += vy * vy
+						if chkZ.checked then sumSq += vz * vz
+						speedVal = sqrt sumSq
+					)
+				)
+
+				local fwdComp = ((f - startF) as float * frameSpacing) * graphForward
+				local upComp  = (speedVal * speedScale) * graphUp
+				local gPos    = graphOrigin + fwdComp + upComp
+				at time f animate on (in coordsys world curvePreviewHelper.pos = gPos)
+			)
+
+			lblPreviewStatus.text = "Speed: forward=time  up=m/s"
+		)
+
+		curvePreviewHelper.showTrajectory = true
+		select curvePreviewHelper
+
+		btnClearPreview.enabled = true
+		btnGeneratePreview.text = "Regenerate"
+
+		format "Curve preview created: %\n" curvePreviewHelper.name
+	)
+
 	-- Pick Bone Handler
 	on btnPickBone picked obj do
 	(
 		if isValidNode obj then
 		(
-			-- Remove old transform callback if exists
 			if transformCallback != undefined then
 			(
 				try (deleteChangeHandler transformCallback) catch()
 				transformCallback = undefined
 			)
-			
+
 			selectedBone = obj
 			lblSelectedBone.text = "Selected: " + obj.name
 			btnPickBone.text = obj.name
-			
-			-- Register transform callback if auto-update is enabled
+
 			if chkAutoUpdate.checked then
 			(
 				try
@@ -261,8 +371,7 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 				)
 				catch()
 			)
-			
-			-- Always calculate immediately when bone is picked
+
 			calculateSpeed()
 		)
 		else
@@ -270,459 +379,29 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 			messageBox "Please select a valid object!"
 		)
 	)
-	
+
 	-- Axis checkbox handlers
-	on chkX changed state do
+	on chkX changed state do ( if selectedBone != undefined then calculateSpeed() )
+	on chkY changed state do ( if selectedBone != undefined then calculateSpeed() )
+	on chkZ changed state do ( if selectedBone != undefined then calculateSpeed() )
+
+	-- Curve Preview handlers
+	on btnGeneratePreview pressed do ( generateCurvePreview() )
+	on btnClearPreview pressed do
 	(
-		if selectedBone != undefined then calculateSpeed()
-	)
-	
-	on chkY changed state do
-	(
-		if selectedBone != undefined then calculateSpeed()
-	)
-	
-	on chkZ changed state do
-	(
-		if selectedBone != undefined then calculateSpeed()
-	)
-	
-	-- Calculate optimal blend frames based on speed difference
-	function calcOptimalBlendFrames =
-	(
-		if selectedBone == undefined or not isValidNode selectedBone then return 30
-		
-		local targetSpeedMS = spnTargetSpeed.value
-		local fps = frameRate as float
-		local targetCmPerFrame = (targetSpeedMS * 100.0) / fps
-		local endFrame = animationRange.end.frame as integer
-		
-		-- Get current speed at end of animation (last few frames)
-		local posEnd = at time endFrame (in coordsys world selectedBone.transform.pos)
-		local posPrev = at time (endFrame - 1) (in coordsys world selectedBone.transform.pos)
-		
-		-- Find max speed difference across selected axes
-		local maxDiff = 0.0
-		if chkX.checked then
-		(
-			local diff = abs (targetCmPerFrame - (posEnd.x - posPrev.x))
-			if diff > maxDiff then maxDiff = diff
-		)
-		if chkY.checked then
-		(
-			local diff = abs (targetCmPerFrame - (posEnd.y - posPrev.y))
-			if diff > maxDiff then maxDiff = diff
-		)
-		if chkZ.checked then
-		(
-			local diff = abs (targetCmPerFrame - (posEnd.z - posPrev.z))
-			if diff > maxDiff then maxDiff = diff
-		)
-		
-		-- Maximum acceleration = 5% of target speed per frame
-		-- This keeps the curve gentle
-		local maxAccel = abs (targetCmPerFrame * 0.05)
-		if maxAccel < 0.01 then maxAccel = 0.01  -- safety floor
-		
-		-- Minimum frames needed = speedDifference / maxAcceleration
-		local minFrames = (ceil (maxDiff / maxAccel)) as integer
-		
-		-- Clamp to available range
-		local maxAvailable = endFrame - animationRange.start.frame - 1
-		if minFrames < 5 then minFrames = 5
-		if minFrames > maxAvailable then minFrames = maxAvailable
-		if minFrames > 200 then minFrames = 200
-		
-		return minFrames
-	)
-	
-	-- Clean up preview helper
-	function cleanupPreview =
-	(
-		if previewHelper != undefined then
-		(
-			try
-			(
-				-- Disable motion trail before deleting
-				previewHelper.showTrajectory = false
-				delete previewHelper
-			)
-			catch()
-			previewHelper = undefined
-		)
-		previewData = #()
-		btnApply.enabled = false
-		btnCancel.enabled = false
-		btnPreview.text = "Preview"
-	)
-	
-	-- Calculate smoothed positions (shared between preview and apply)
-	function calculateSmoothedPositions =
-	(
-		if selectedBone == undefined or not isValidNode selectedBone then
-		(
-			format "ERROR: No valid object selected\n"
-			return #()
-		)
-		if not chkX.checked and not chkY.checked and not chkZ.checked then
-		(
-			format "ERROR: No axes selected\n"
-			return #()
-		)
-		
-		local targetSpeedMS = spnTargetSpeed.value
-		local blendFrames = spnBlendFrames.value as integer
-		local endFrame = animationRange.end.frame as integer
-		local startFrame = endFrame - blendFrames
-		
-		format "Calculating: startFrame=% endFrame=% blendFrames=% animStart=%\n" startFrame endFrame blendFrames animationRange.start.frame
-		
-		if startFrame < (animationRange.start.frame + 1) then
-		(
-			format "ERROR: Not enough frames (startFrame % < animStart+1 %)\n" startFrame (animationRange.start.frame + 1)
-			return #()
-		)
-		
-		local fps = frameRate as float
-		local targetCmPerFrame = (targetSpeedMS * 100.0) / fps
-		
-		-- Get current speed at start of blend range (speed INTO startFrame)
-		local posBeforeStart = at time (startFrame - 1) (in coordsys world selectedBone.transform.pos)
-		local posAtStart = at time startFrame (in coordsys world selectedBone.transform.pos)
-		local origSpeedX = posAtStart.x - posBeforeStart.x
-		local origSpeedY = posAtStart.y - posBeforeStart.y
-		local origSpeedZ = posAtStart.z - posBeforeStart.z
-		
-		-- FIXED last frame position
-		local lastFramePos = at time endFrame (in coordsys world selectedBone.transform.pos)
-		
-		-- Target speed is applied to the single selected axis
-		local targetX = targetCmPerFrame
-		local targetY = targetCmPerFrame
-		local targetZ = targetCmPerFrame
-		
-		-- Debug
-		local origMsX = origSpeedX / 100.0 * fps
-		local origMsY = origSpeedY / 100.0 * fps
-		local origMsZ = origSpeedZ / 100.0 * fps
-		format "\n=== Root Smoothing Calculation ===\n"
-		format "End frame: % [FIXED pos: %]\n" endFrame lastFramePos
-		format "Blend: frame % to frame % (% frames)\n" startFrame (endFrame - 1) blendFrames
-		format "Current speed at blend start: X=% Y=% Z=% m/s\n" origMsX origMsY origMsZ
-		format "Target speed per axis: X=% Y=% Z=% cm/frame\n" targetX targetY targetZ
-		
-		-- Pure backward extrapolation from fixed endFrame
-		-- Speed ramps linearly from origSpeed (step 1) to targetSpeed (step N)
-		local numSteps = blendFrames
-		local results = #()
-		
-		local curX = lastFramePos.x
-		local curY = lastFramePos.y
-		local curZ = lastFramePos.z
-		
-		-- Walk backward from endFrame
-		local backwardPositions = #()
-		for step = numSteps to 1 by -1 do
-		(
-			local t = step as float / numSteps as float
-			
-			-- Lerp speed per axis: at step 1 (earliest) use origSpeed, at step N (latest) use target
-			local speedX = origSpeedX + (targetX - origSpeedX) * t
-			local speedY = origSpeedY + (targetY - origSpeedY) * t
-			local speedZ = origSpeedZ + (targetZ - origSpeedZ) * t
-			
-			-- Clamp: never let speed cross zero on selected axes
-			-- Maintain minimum speed in that axis's target direction
-			if chkX.checked and targetX != 0 then
-			(
-				local minX = abs targetX * 0.05
-				if minX < 0.001 then minX = 0.001
-				if targetX > 0 and speedX < minX then speedX = minX
-				if targetX < 0 and speedX > -minX then speedX = -minX
-			)
-			if chkY.checked and targetY != 0 then
-			(
-				local minY = abs targetY * 0.05
-				if minY < 0.001 then minY = 0.001
-				if targetY > 0 and speedY < minY then speedY = minY
-				if targetY < 0 and speedY > -minY then speedY = -minY
-			)
-			if chkZ.checked and targetZ != 0 then
-			(
-				local minZ = abs targetZ * 0.05
-				if minZ < 0.001 then minZ = 0.001
-				if targetZ > 0 and speedZ < minZ then speedZ = minZ
-				if targetZ < 0 and speedZ > -minZ then speedZ = -minZ
-			)
-			
-			-- Step backward
-			curX = curX - speedX
-			curY = curY - speedY
-			curZ = curZ - speedZ
-			
-			local f = startFrame + step - 1
-			
-			-- For unselected axes, keep original position
-			local origPos = at time f (in coordsys world selectedBone.transform.pos)
-			local finalX = origPos.x
-			local finalY = origPos.y
-			local finalZ = origPos.z
-			
-			if chkX.checked then finalX = curX
-			if chkY.checked then finalY = curY
-			if chkZ.checked then finalZ = curZ
-			
-			append backwardPositions #(f, finalX, finalY, finalZ)
-		)
-		
-		-- Reverse to ascending frame order
-		for i = backwardPositions.count to 1 by -1 do
-			append results backwardPositions[i]
-		
-		-- Add the fixed last frame
-		append results #(endFrame, lastFramePos.x, lastFramePos.y, lastFramePos.z)
-		
-		-- Store frame range for apply
-		previewStartFrame = startFrame
-		previewEndFrame = endFrame
-		
-		return results
-	)
-	
-	-- Create or update preview helper with motion trail
-	function createPreview =
-	(
-		if selectedBone == undefined or not isValidNode selectedBone then
-		(
-			messageBox "Please select an object first!" title:"Root Smoothing"
-			return false
-		)
-		
-		if (isBipedObject selectedBone) then
-		(
-			messageBox "Smoothing is not supported for Biped objects.\nYou can still use the speed display to check Biped speeds." title:"Root Smoothing"
-			return false
-		)
-		
-		-- Only allow one axis for smoothing
-		local axisCount = 0
-		if chkX.checked then axisCount = axisCount + 1
-		if chkY.checked then axisCount = axisCount + 1
-		if chkZ.checked then axisCount = axisCount + 1
-		
-		if axisCount > 1 then
-		(
-			messageBox "Please select only ONE axis for smoothing.\nSmooth each axis individually for best results.\n\nMultiple axes can still be selected for speed display." title:"Root Smoothing"
-			return false
-		)
-		
-		if axisCount == 0 then
-		(
-			messageBox "Please select at least one axis (X, Y, or Z) to smooth!" title:"Root Smoothing"
-			return false
-		)
-		
-		local blendFrames = spnBlendFrames.value as integer
-		local endFrame = animationRange.end.frame as integer
-		local startFrame = endFrame - blendFrames
-		
-		if startFrame < (animationRange.start.frame + 1) then
-		(
-			messageBox "Not enough frames for blending! Reduce blend frames or extend timeline." title:"Root Smoothing"
-			return false
-		)
-		
-		-- Calculate positions
-		format "Creating preview for: % (class: %)\n" selectedBone.name (classof selectedBone)
-		format "isBiped: %\n" (isBipedObject selectedBone)
-		previewData = calculateSmoothedPositions()
-		format "Preview data count: %\n" previewData.count
-		if previewData.count == 0 then
-		(
-			messageBox "Failed to calculate positions. Check MAXScript Listener for details." title:"Root Smoothing"
-			return false
-		)
-		
-		-- Clean up old preview if exists
-		if previewHelper != undefined then
-		(
-			try (delete previewHelper) catch()
-			previewHelper = undefined
-		)
-		
-		-- Create Point helper
-		previewHelper = Point()
-		previewHelper.name = "_RootSmooth_Preview"
-		previewHelper.wirecolor = color 0 255 0  -- green
-		previewHelper.size = 5
-		previewHelper.centermarker = true
-		previewHelper.axistripod = false
-		previewHelper.cross = true
-		previewHelper.box = false
-		
-		-- Key the preview helper at every frame
-		-- First, key frames BEFORE the blend range to match bone position
-		for f = animationRange.start.frame to (startFrame - 1) do
-		(
-			local bonePos = at time f (in coordsys world selectedBone.transform.pos)
-			at time f
-			(
-				animate on
-				(
-					in coordsys world previewHelper.pos = bonePos
-				)
-			)
-		)
-		
-		-- Key the blended frames
-		for i = 1 to previewData.count do
-		(
-			local f = previewData[i][1]
-			local px = previewData[i][2]
-			local py = previewData[i][3]
-			local pz = previewData[i][4]
-			
-			at time f
-			(
-				animate on
-				(
-					in coordsys world previewHelper.pos = [px, py, pz]
-				)
-			)
-		)
-		
-		-- Enable motion trail on the preview helper
-		previewHelper.showTrajectory = true
-		
-		-- Also enable trajectory on bone for comparison
-		selectedBone.showTrajectory = true
-		
-		-- Select the preview helper so user can see it
-		select previewHelper
-		
-		-- Enable Apply/Cancel buttons
-		btnApply.enabled = true
-		btnCancel.enabled = true
-		btnPreview.text = "Update Preview"
-		
-		format "Preview created: %\n" previewHelper.name
-		format "Green = preview path, adjust settings and click Update Preview.\n"
-		format "Click Apply to transfer to bone, or Cancel to discard.\n"
-		
-		return true
-	)
-	
-	-- Apply preview positions to the actual object
-	function applyPreview =
-	(
-		if selectedBone == undefined or not isValidNode selectedBone then return false
-		if previewData.count == 0 then return false
-		if (isBipedObject selectedBone) then
-		(
-			messageBox "Smoothing is not supported for Biped objects." title:"Root Smoothing"
-			return false
-		)
-		
-		format "Applying % frames to: % (class: %)\n" (previewData.count - 1) selectedBone.name (classof selectedBone)
-		
-		with undo on
-		(
-			-- Apply all calculated positions (skip last frame - it's fixed)
-			for i = 1 to (previewData.count - 1) do
-			(
-				local f = previewData[i][1]
-				local px = previewData[i][2]
-				local py = previewData[i][3]
-				local pz = previewData[i][4]
-				
-				setWorldPos selectedBone f [px, py, pz]
-				
-				if i == 1 or i == (previewData.count - 1) then
-					format "  Applied frame %: [%, %, %]\n" f px py pz
-			)
-		)
-		
-		-- Clean up preview
-		selectedBone.showTrajectory = false
-		cleanupPreview()
-		
-		-- Re-select the bone
-		select selectedBone
-		
-		-- Recalculate speed display
-		calculateSpeed()
-		
-		local targetSpeedMS = spnTargetSpeed.value
-		local blendFrames = spnBlendFrames.value as integer
-		format "Applied! Root smoothed to % m/s over % frames.\n" targetSpeedMS blendFrames
-		messageBox ("Root smoothed to " + (targetSpeedMS as string) + " m/s over " + (blendFrames as string) + " frames.\nLast frame position preserved.") title:"Root Smoothing Applied"
-		
-		return true
-	)
-	
-	-- Auto-calculate blend frames button
-	on btnCalcBlend pressed do
-	(
-		local optimal = calcOptimalBlendFrames()
-		spnBlendFrames.value = optimal
-		lblBlendInfo.text = "(recommended: " + (optimal as string) + ")"
-	)
-	
-	-- Update recommendation when target speed changes
-	on spnTargetSpeed changed val do
-	(
-		if selectedBone != undefined then
-		(
-			local optimal = calcOptimalBlendFrames()
-			lblBlendInfo.text = "(recommended: " + (optimal as string) + ")"
-		)
-	)
-	
-	-- Preview Button
-	on btnPreview pressed do
-	(
-		-- Warn if blend frames is too low
-		local optimal = calcOptimalBlendFrames()
-		if spnBlendFrames.value < optimal then
-		(
-			local msg = "Blend frames (" + (spnBlendFrames.value as string) + ") is below recommended (" + (optimal as string) + ").\nThis may cause erratic positions.\n\nContinue anyway?"
-			if not (queryBox msg title:"Root Smoothing Warning") then return()
-		)
-		createPreview()
-	)
-	
-	-- Apply Button
-	on btnApply pressed do
-	(
-		applyPreview()
-	)
-	
-	-- Cancel Button
-	on btnCancel pressed do
-	(
-		selectedBone.showTrajectory = false
-		cleanupPreview()
+		clearCurvePreview()
 		if selectedBone != undefined then select selectedBone
-		format "Preview cancelled.\n"
 	)
-	
+
 	-- Auto-Update Toggle
 	on chkAutoUpdate changed state do
 	(
 		if state then
 		(
-			-- Enable auto-update for timeline scrubbing
 			if not isCallbackActive then
 			(
-				try
-				(
-					registerRedrawViewsCallback updateCallback
-					isCallbackActive = true
-				)
-				catch()
+				try ( registerRedrawViewsCallback updateCallback; isCallbackActive = true ) catch()
 			)
-			
-			-- Enable auto-update for bone transforms
 			if selectedBone != undefined and transformCallback == undefined then
 			(
 				try
@@ -734,49 +413,27 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 				)
 				catch()
 			)
-			
 			calculateSpeed()
 		)
 		else
 		(
-			-- Disable auto-update for timeline scrubbing
 			if isCallbackActive then
 			(
-				try
-				(
-					unregisterRedrawViewsCallback updateCallback
-					isCallbackActive = false
-				)
-				catch()
+				try ( unregisterRedrawViewsCallback updateCallback; isCallbackActive = false ) catch()
 			)
-			
-			-- Disable auto-update for bone transforms
 			if transformCallback != undefined then
 			(
-				try
-				(
-					deleteChangeHandler transformCallback
-					transformCallback = undefined
-				)
-				catch()
+				try ( deleteChangeHandler transformCallback; transformCallback = undefined ) catch()
 			)
 		)
 	)
-	
+
 	-- Initialize on open
 	on boneSpeedRollout open do
 	(
-		-- Enable auto-update by default
 		if chkAutoUpdate.checked then
 		(
-			try
-			(
-				registerRedrawViewsCallback updateCallback
-				isCallbackActive = true
-			)
-			catch()
-			
-			-- Also enable transform callback if bone is selected
+			try ( registerRedrawViewsCallback updateCallback; isCallbackActive = true ) catch()
 			if selectedBone != undefined then
 			(
 				try
@@ -790,39 +447,21 @@ rollout boneSpeedRollout "Bone Axis Speed Calculator"
 			)
 		)
 	)
-	
+
 	-- Cleanup on close
 	on boneSpeedRollout close do
 	(
-		-- Clean up preview if active
-		cleanupPreview()
-		
-		if selectedBone != undefined then
-		(
-			try (selectedBone.showTrajectory = false) catch()
-		)
-		
+		clearCurvePreview()
 		if isCallbackActive then
 		(
-			try
-			(
-				unregisterRedrawViewsCallback updateCallback
-				isCallbackActive = false
-			)
-			catch()
+			try ( unregisterRedrawViewsCallback updateCallback; isCallbackActive = false ) catch()
 		)
-		
 		if transformCallback != undefined then
 		(
-			try
-			(
-				deleteChangeHandler transformCallback
-				transformCallback = undefined
-			)
-			catch()
+			try ( deleteChangeHandler transformCallback; transformCallback = undefined ) catch()
 		)
 	)
 )
 
 -- Create Dialog and store reference
-global boneSpeedDialog = createDialog boneSpeedRollout 200 530
+global boneSpeedDialog = createDialog boneSpeedRollout 200 510

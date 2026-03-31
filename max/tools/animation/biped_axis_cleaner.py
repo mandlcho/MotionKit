@@ -230,6 +230,8 @@ struct BipedAxisCleanerStruct
         -- Bake a fully linearized path on all three axes.
         -- X, Y, Z each interpolate independently from their
         -- first-frame value to their last-frame value.
+        -- Use [x,y,z] array literal — avoids point3 multiline
+        -- construction which can silently return undefined in rt.execute.
         with animate on
         (
             for i = 1 to totalFrames do
@@ -238,13 +240,12 @@ struct BipedAxisCleanerStruct
                     (i - 1) as float / (totalFrames - 1) as float
                 else 0.0
 
-                local newPos = point3 \\
-                    (p0.x + (p1.x - p0.x) * lerpT) \\
-                    (p0.y + (p1.y - p0.y) * lerpT) \\
-                    (p0.z + (p1.z - p0.z) * lerpT)
+                local nx = p0.x + (p1.x - p0.x) * lerpT
+                local ny = p0.y + (p1.y - p0.y) * lerpT
+                local nz = p0.z + (p1.z - p0.z) * lerpT
 
                 sliderTime = startFrame + i - 1
-                newHelper.pos = newPos
+                newHelper.pos = [nx, ny, nz]
             )
         )
         sliderTime = savedTime
@@ -295,29 +296,32 @@ struct BipedAxisCleanerStruct
         local wY = amountY / 100.0
         local wZ = amountZ / 100.0
 
-        -- Blend each axis independently toward the linearized target
+        -- Blend each axis independently toward the linearized target.
+        -- Use [x,y,z] array literal — avoids point3 multiline
+        -- construction which can silently return undefined in rt.execute.
         local targetPos = #()
         for i = 1 to totalFrames do
         (
             local orig   = origPos[i]
             local helper = helperPos[i]
-            local blended = point3 \\
-                (orig.x + (helper.x - orig.x) * wX) \\
-                (orig.y + (helper.y - orig.y) * wY) \\
-                (orig.z + (helper.z - orig.z) * wZ)
-            append targetPos blended
+            local bx = orig.x + (helper.x - orig.x) * wX
+            local by = orig.y + (helper.y - orig.y) * wY
+            local bz = orig.z + (helper.z - orig.z) * wZ
+            append targetPos [bx, by, bz]
         )
 
-        -- Delta from current pelvis to blended target
-        local currentPos = this.samplePositions pelvisNode startFrame endFrame
         sliderTime = savedTime
 
+        -- Re-read the pelvis position at each frame inside the loop.
+        -- Biped curve fitting from prior keys shifts interpolated values,
+        -- so a pre-sampled snapshot goes stale after the first move.
         with animate on
         (
             for i = 1 to totalFrames do
             (
                 sliderTime = startFrame + i - 1
-                local delta = targetPos[i] - currentPos[i]
+                local curPos = pelvisNode.transform.pos
+                local delta  = targetPos[i] - curPos
                 move pelvisNode delta
             )
         )

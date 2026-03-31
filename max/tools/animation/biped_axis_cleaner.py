@@ -304,10 +304,10 @@ struct BipedAxisCleanerStruct
         (
             local orig   = origPos[i]
             local helper = helperPos[i]
-            local bx = orig.x + (helper.x - orig.x) * wX
-            local by = orig.y + (helper.y - orig.y) * wY
-            local bz = orig.z + (helper.z - orig.z) * wZ
-            append targetPos [bx, by, bz]
+            local blendX = orig.x + (helper.x - orig.x) * wX
+            local blendY = orig.y + (helper.y - orig.y) * wY
+            local blendZ = orig.z + (helper.z - orig.z) * wZ
+            append targetPos [blendX, blendY, blendZ]
         )
 
         sliderTime = savedTime

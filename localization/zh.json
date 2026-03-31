@@ -179,6 +179,9 @@
       "msg_restored": "重定向失败 — 已恢复原始动画。",
       "msg_failed": "重定向失败。"
     },
+    "bone_speed_calculator": {
+      "name": "骨骼速度计算器"
+    },
     "foot_slide_fixer": {
       "name": "脚部滑步修复",
       "title": "脚部滑步修复",

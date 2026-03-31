@@ -127,6 +127,9 @@
       "info_selected": "언리얼로 보내기 - {0}개 객체 선택됨\\n\\n이 기능에는 언리얼 엔진 설정이 필요합니다.",
       "error": "오류: {0}"
     },
+    "bone_speed_calculator": {
+      "name": "본 속도 계산기"
+    },
     "build_retarget_map": {
       "name": "리타겟 맵 생성",
       "title": "리타겟 맵 생성 - MotionKit",

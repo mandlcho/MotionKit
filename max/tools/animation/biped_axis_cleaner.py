@@ -3,14 +3,14 @@ Biped Axis Cleaner Tool for MotionKit
 
 Workflow:
   1. "Create Helper" — bakes the pelvis world position to a Dummy helper,
-     then replaces the forward axis with two linear keys (first and last frame).
-     The other two axes retain all original keys; only the chosen forward axis is flattened.
+     then replaces ALL three axes with two linear keys (first and last frame).
+     The helper represents the 100% fully-linearized target path.
   2. Inspect the helper in the viewport.
-  3. "Apply to Pelvis" — bakes the helper's modified position back to the pelvis
-     using the Amount slider to blend between original and fully linearized.
+  3. Set per-axis blend weights (0 = keep original, 100 = fully linearized).
+  4. "Apply to Pelvis" — blends each axis independently toward the helper.
 
   On first Apply the original pelvis positions are locked in a hidden backup dummy
-  so the Amount slider is non-destructive across multiple applies.
+  so the weights are non-destructive across multiple applies.
 """
 
 try:
@@ -60,6 +60,8 @@ class BipedAxisCleanerDialog:
         cb_use_timeline     = t('tools.biped_axis_cleaner.cb_use_timeline')
         lbl_start           = t('tools.biped_axis_cleaner.lbl_start')
         lbl_end             = t('tools.biped_axis_cleaner.lbl_end')
+        group_weights       = t('tools.biped_axis_cleaner.group_weights')
+        lbl_weight_hint     = t('tools.biped_axis_cleaner.lbl_weight_hint')
         btn_create_helper   = t('tools.biped_axis_cleaner.btn_create_helper')
         btn_apply           = t('tools.biped_axis_cleaner.btn_apply')
         btn_delete_helper   = t('tools.biped_axis_cleaner.btn_delete_helper')
@@ -189,11 +191,13 @@ struct BipedAxisCleanerStruct
     ),
 
     -- -------------------------------------------------------
-    -- Helper — visible dummy with linearized forward axis
+    -- Helper — visible dummy with ALL axes linearized
+    -- This is the 100% target; per-axis blend weights are
+    -- applied at Apply time, not baked into the helper.
     -- -------------------------------------------------------
     fn helperNodeName = "BipedAxisCleaner_Helper",
 
-    fn createHelper pelvisNode axisIndex startFrame endFrame =
+    fn createHelper pelvisNode startFrame endFrame =
     (
         if pelvisNode == undefined then
         (
@@ -215,37 +219,29 @@ struct BipedAxisCleanerStruct
         else
             this.samplePositions pelvisNode startFrame endFrame
 
-        -- Get forward value at first and last frame
-        local startFwd = if axisIndex == 1 then origPos[1].x
-                         else if axisIndex == 2 then origPos[1].y
-                         else origPos[1].z
-
-        local endFwd   = if axisIndex == 1 then origPos[totalFrames].x
-                         else if axisIndex == 2 then origPos[totalFrames].y
-                         else origPos[totalFrames].z
+        -- First and last world positions
+        local p0 = origPos[1]
+        local p1 = origPos[totalFrames]
 
         -- Create the helper
         local newHelper = Dummy name:(this.helperNodeName()) boxsize:[8,8,8]
         newHelper.wirecolor = (color 80 200 255)
 
-        -- Bake in a single pass:
-        -- The two non-forward axes come straight from the original positions.
-        -- The forward axis is replaced with a linear interpolation between
-        -- the first and last frame values.
+        -- Bake a fully linearized path on all three axes.
+        -- X, Y, Z each interpolate independently from their
+        -- first-frame value to their last-frame value.
         with animate on
         (
             for i = 1 to totalFrames do
             (
-                local t = if totalFrames > 1 then
+                local lerpT = if totalFrames > 1 then
                     (i - 1) as float / (totalFrames - 1) as float
                 else 0.0
 
-                local linearFwd = startFwd + (endFwd - startFwd) * t
-                local origP     = origPos[i]
-
-                local newPos = if axisIndex == 1 then point3 linearFwd origP.y origP.z
-                               else if axisIndex == 2 then point3 origP.x linearFwd origP.z
-                               else point3 origP.x origP.y linearFwd
+                local newPos = point3 \\
+                    (p0.x + (p1.x - p0.x) * lerpT) \\
+                    (p0.y + (p1.y - p0.y) * lerpT) \\
+                    (p0.z + (p1.z - p0.z) * lerpT)
 
                 sliderTime = startFrame + i - 1
                 newHelper.pos = newPos
@@ -263,10 +259,12 @@ struct BipedAxisCleanerStruct
     ),
 
     -- -------------------------------------------------------
-    -- Apply helper positions back to the pelvis
-    -- amount (0-100): 0 = no change, 100 = fully linearized
+    -- Apply helper positions back to the pelvis with
+    -- independent per-axis blend weights (0-100 each).
+    --   0   = keep original movement on that axis
+    --   100 = fully linearized on that axis
     -- -------------------------------------------------------
-    fn applyHelperToPelvis pelvisNode axisIndex amount startFrame endFrame =
+    fn applyHelperToPelvis pelvisNode amountX amountY amountZ startFrame endFrame =
     (
         if pelvisNode == undefined then
         (
@@ -289,17 +287,25 @@ struct BipedAxisCleanerStruct
         if backup == undefined then
             backup = this.createBackup pelvisNode startFrame endFrame
 
-        -- Helper = linearized target; backup = original
+        -- Helper = fully linearized target; backup = original
         local helperPos = this.samplePositions helperNode startFrame endFrame
         local origPos   = this.samplePositions backup     startFrame endFrame
 
-        -- Blend between original and helper
-        local blendWeight = amount / 100.0
+        local wX = amountX / 100.0
+        local wY = amountY / 100.0
+        local wZ = amountZ / 100.0
+
+        -- Blend each axis independently toward the linearized target
         local targetPos = #()
         for i = 1 to totalFrames do
         (
-            local t = origPos[i] + (helperPos[i] - origPos[i]) * blendWeight
-            append targetPos t
+            local orig   = origPos[i]
+            local helper = helperPos[i]
+            local blended = point3 \\
+                (orig.x + (helper.x - orig.x) * wX) \\
+                (orig.y + (helper.y - orig.y) * wY) \\
+                (orig.z + (helper.z - orig.z) * wZ)
+            append targetPos blended
         )
 
         -- Delta from current pelvis to blended target
@@ -326,7 +332,7 @@ BipedAxisCleanerTool = BipedAxisCleanerStruct()
 -- ============================================================
 -- Dialog
 -- ============================================================
-rollout BipedAxisCleanerDialog "{title}" width:460 height:301
+rollout BipedAxisCleanerDialog "{title}" width:460 height:370
 (
     group "{group_source}"
     (
@@ -352,12 +358,23 @@ rollout BipedAxisCleanerDialog "{title}" width:460 height:301
         spinner endSpn ""   pos:[355,171] width:70 height:20 type:#integer range:[-100000,100000,{end_frame}] enabled:false
     )
 
-    label statusLabel "" pos:[20,214] width:420 height:16 align:#center
-    progressBar damperProgress "" pos:[20,234] width:420 height:10 value:0 color:(color 80 200 120)
+    group "{group_weights}"
+    (
+        label weightHintLbl "{lbl_weight_hint}" pos:[20,223] width:420 align:#center
+        label lblWX "X" pos:[52,248]  width:20 align:#right
+        spinner spnWeightX "" pos:[75,246]  width:75 height:20 type:#integer range:[0,100,0]
+        label lblWY "Y" pos:[182,248] width:20 align:#right
+        spinner spnWeightY "" pos:[205,246] width:75 height:20 type:#integer range:[0,100,100]
+        label lblWZ "Z" pos:[312,248] width:20 align:#right
+        spinner spnWeightZ "" pos:[335,246] width:75 height:20 type:#integer range:[0,100,0]
+    )
 
-    button createHelperBtn "{btn_create_helper}" pos:[20,254]  width:130 height:36
-    button applyBtn        "{btn_apply}"         pos:[160,254] width:145 height:36
-    button deleteHelperBtn "{btn_delete_helper}" pos:[315,254] width:125 height:36
+    label statusLabel "" pos:[20,283] width:420 height:16 align:#center
+    progressBar damperProgress "" pos:[20,303] width:420 height:10 value:0 color:(color 80 200 120)
+
+    button createHelperBtn "{btn_create_helper}" pos:[20,323]  width:130 height:36
+    button applyBtn        "{btn_apply}"         pos:[160,323] width:145 height:36
+    button deleteHelperBtn "{btn_delete_helper}" pos:[315,323] width:125 height:36
 
     on BipedAxisCleanerDialog open do
     (
@@ -374,6 +391,16 @@ rollout BipedAxisCleanerDialog "{title}" width:460 height:301
             startSpn.value = animationRange.start.frame as integer
             endSpn.value   = animationRange.end.frame as integer
         )
+    )
+
+    -- When the forward axis changes, snap weights to match:
+    -- the selected forward axis goes to 100, others reset to 0.
+    -- This is a convenience default — weights are still fully editable.
+    on forwardAxisRadio changed state do
+    (
+        spnWeightX.value = if state == 1 then 100 else 0
+        spnWeightY.value = if state == 2 then 100 else 0
+        spnWeightZ.value = if state == 3 then 100 else 0
     )
 
     on autoDetectBtn pressed do
@@ -420,7 +447,6 @@ rollout BipedAxisCleanerDialog "{title}" width:460 height:301
 
         local result = BipedAxisCleanerTool.createHelper \\
             BipedAxisCleanerTool.pelvisNode \\
-            forwardAxisRadio.state \\
             startSpn.value \\
             endSpn.value
 
@@ -463,8 +489,9 @@ rollout BipedAxisCleanerDialog "{title}" width:460 height:301
 
         local ok = BipedAxisCleanerTool.applyHelperToPelvis \\
             BipedAxisCleanerTool.pelvisNode \\
-            forwardAxisRadio.state \\
-            100 \\
+            spnWeightX.value \\
+            spnWeightY.value \\
+            spnWeightZ.value \\
             startSpn.value \\
             endSpn.value
 

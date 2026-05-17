@@ -47,6 +47,10 @@
             {
                 "name": "Pipeline",
                 "enabled": false
+            },
+            {
+                "name": "Cloth",
+                "enabled": true
             }
         ]
     },

@@ -24,6 +24,7 @@
     "debug": "Debug",
     "pipeline": "Pipeline",
     "unreal_engine": "Unreal Engine",
+    "cloth": "Cloth",
     "language": "Language",
     "settings": "Settings...",
     "reload": "Reload MotionKit",

@@ -9,7 +9,8 @@ import maya.cmds as cmds
 import maya.utils
 
 MENU_ID = "vtxToolsMenu"
-_tool   = None
+_tool    = None
+_snapper = None
 _build_tries = 0
 _MAX_BUILD_TRIES = 20
 
@@ -30,8 +31,11 @@ def build_menu():
         cmds.deleteUI(MENU_ID)
 
     cmds.menu(MENU_ID, label="Vtx Tools", parent="MayaWindow", tearOff=False)
-    cmds.menuItem(label="Open",   command=lambda *_: open_tool())
-    cmds.menuItem(label="Reload", command=lambda *_: reload_tool())
+    cmds.menuItem(label="Vtx Copy Paste — Open",   command=lambda *_: open_tool())
+    cmds.menuItem(label="Vtx Copy Paste — Reload", command=lambda *_: reload_tool())
+    cmds.menuItem(divider=True)
+    cmds.menuItem(label="Blendshape Snapper — Open",   command=lambda *_: open_snapper())
+    cmds.menuItem(label="Blendshape Snapper — Reload", command=lambda *_: reload_snapper())
     print("[vtxTools] menu built")
 
 
@@ -72,3 +76,38 @@ def reload_tool():
     _tool = vtx_copy_paste.VtxCopyPaste()
     _tool.show()
     print("[vtxTools] reloaded")
+
+
+def open_snapper():
+    global _snapper
+    import blendshape_snapper
+
+    if _snapper is not None:
+        try:
+            if _snapper.isVisible():
+                _snapper.raise_()
+                _snapper.activateWindow()
+                return
+        except RuntimeError:
+            pass
+
+    _snapper = blendshape_snapper.BlendshapeSnapper()
+    _snapper.show()
+
+
+def reload_snapper():
+    global _snapper
+    import blendshape_snapper
+
+    if _snapper is not None:
+        try:
+            _snapper.close()
+            _snapper.deleteLater()
+        except RuntimeError:
+            pass
+        _snapper = None
+
+    importlib.reload(blendshape_snapper)
+    _snapper = blendshape_snapper.BlendshapeSnapper()
+    _snapper.show()
+    print("[vtxTools] blendshapeSnapper reloaded")

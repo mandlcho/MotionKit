@@ -53,14 +53,9 @@ _SECTION_STYLE = "color:#555; font-size:9px; letter-spacing:1px;"
 # ---------------------------------------------------------------------------
 
 def _scene_cameras():
-    """Return list of (transform_name, shape_fullpath) for all non-default cameras."""
-    skip = {"perspShape", "topShape", "frontShape", "sideShape",
-            "leftShape", "rightShape", "bottomShape", "backShape"}
+    """Return list of (transform_name, shape_fullpath) for all cameras."""
     result = []
     for shape in (cmds.ls(type="camera", long=True) or []):
-        short = shape.split("|")[-1].split(":")[-1]
-        if short in skip:
-            continue
         parents = cmds.listRelatives(shape, parent=True, fullPath=True) or []
         if not parents:
             continue
@@ -82,35 +77,52 @@ def _capture(camera_transform, output_path):
     """
     Playblast a single PNG from camera_transform.
     output_path should have no extension — playblast appends .####.png.
-    Returns the written file path.
     """
-    panels = cmds.getPanel(type="modelPanel") or []
-    panel = next(
-        (p for p in panels
-         if cmds.modelEditor(p, q=True, camera=True) == camera_transform),
-        panels[0] if panels else None,
-    )
-    if not panel:
-        raise RuntimeError("No model panel available for playblast.")
+    window = cmds.window(widthHeight=(1920, 1080))
+    cmds.paneLayout()
+    panel = cmds.modelPanel(camera=camera_transform)
+    editor = cmds.modelPanel(panel, query=True, modelEditor=True)
+    cmds.modelEditor(editor, edit=True,
+                     displayAppearance="smoothShaded",
+                     displayTextures=True,
+                     allObjects=True)
+    cmds.showWindow(window)
 
     current = cmds.currentTime(query=True)
-    pb_kwargs = dict(
-        filename=output_path,
-        format="image",
-        compression="png",
-        startTime=current,
-        endTime=current,
-        widthHeight=[1920, 1080],
-        percent=100,
-        quality=100,
-        viewer=False,
-        offScreen=True,
-        forceOverwrite=True,
-        clearCache=True,
-        showOrnaments=False,
-        editorPanelName=panel,
-    )
-    cmds.playblast(**pb_kwargs)
+    try:
+        cmds.playblast(
+            startTime=current,
+            endTime=current,
+            format="image",
+            compression="png",
+            filename=output_path,
+            widthHeight=[1920, 1080],
+            percent=100,
+            quality=100,
+            viewer=False,
+            offScreen=True,
+            forceOverwrite=True,
+            clearCache=True,
+        )
+    finally:
+        cmds.deleteUI(window)
+
+
+def _active_viewport_camera():
+    """
+    Return the camera transform currently active in the viewport.
+    Tries the focused panel first, then falls back to the first visible modelPanel.
+    Returns None if no model panel is found.
+    """
+    panel = cmds.getPanel(withFocus=True)
+    if panel and cmds.getPanel(typeOf=panel) == "modelPanel":
+        return cmds.modelEditor(panel, query=True, camera=True)
+
+    for p in (cmds.getPanel(visiblePanels=True) or []):
+        if cmds.getPanel(typeOf=p) == "modelPanel":
+            return cmds.modelEditor(p, query=True, camera=True)
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -247,6 +259,26 @@ class BlendshapeSnapper(QtWidgets.QDialog):
         out_row.addWidget(browse)
         root.addLayout(out_row)
 
+        # ── Filename for Capture Current ─────────────────────────────────────
+        fname_row = QtWidgets.QHBoxLayout()
+        fname_row.setSpacing(4)
+        fname_lbl = QtWidgets.QLabel("CAPTURE FILENAME")
+        fname_lbl.setStyleSheet(_SECTION_STYLE)
+        root.addWidget(fname_lbl)
+        self._fname_field = QtWidgets.QLineEdit("capture_current")
+        self._fname_field.setFixedHeight(26)
+        self._fname_field.setStyleSheet(_FIELD_STYLE)
+        self._fname_field.setToolTip("Filename (no extension) for Capture Current")
+        root.addWidget(self._fname_field)
+
+        root.addSpacing(2)
+
+        # ── Buttons ──────────────────────────────────────────────────────────
+        capture_btn = _btn("Capture Current", "#2d4f7a", "#3a6aaa", "#1f3a5a")
+        capture_btn.setToolTip("Capture the active viewport as-is, no blendshape changes")
+        capture_btn.clicked.connect(self._capture_current)
+        root.addWidget(capture_btn)
+
         root.addSpacing(2)
 
         snap_btn = _btn("Snap", "#2d6b3a", "#3a9050", "#1f5028")
@@ -328,6 +360,34 @@ class BlendshapeSnapper(QtWidgets.QDialog):
         if folder:
             self._out_field.setText(folder)
 
+    # ── capture current ──────────────────────────────────────────────────────
+
+    def _capture_current(self):
+        """Capture the active viewport as-is, with no blendshape changes."""
+        out_dir = self._out_field.text().strip()
+        if not out_dir:
+            self._set_status("set an output folder", "#c87050")
+            return
+        os.makedirs(out_dir, exist_ok=True)
+
+        cam = _active_viewport_camera()
+        if not cam:
+            self._set_status("no active viewport found", "#c87050")
+            return
+
+        fname = self._fname_field.text().strip() or "capture_current"
+        output_path = os.path.join(out_dir, fname)
+
+        try:
+            self._set_status(f"capturing from {cam}…")
+            QtWidgets.QApplication.processEvents()
+            _capture(cam, output_path)
+            self._set_status(f"captured → {out_dir}", "#8fc87a")
+            self._log(f"capture_current [{cam}] → {output_path}")
+        except Exception as e:
+            self._set_status(f"error: {e}", "#c87050")
+            self._log(f"ERROR capture_current: {e}")
+
     # ── snap ─────────────────────────────────────────────────────────────────
 
     def _snap(self):
@@ -377,3 +437,18 @@ class BlendshapeSnapper(QtWidgets.QDialog):
 
     def _log(self, msg):
         print(f"[blendshapeSnapper] {msg}")
+
+
+# ---------------------------------------------------------------------------
+# Launch helper
+# ---------------------------------------------------------------------------
+
+def show():
+    app = QtWidgets.QApplication.instance()
+    for w in app.topLevelWidgets():
+        if w.objectName() == "BlendshapeSnapperWin":
+            w.close()
+            w.deleteLater()
+    win = BlendshapeSnapper()
+    win.setObjectName("BlendshapeSnapperWin")
+    win.show()

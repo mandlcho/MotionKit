@@ -79,20 +79,8 @@ def reload_tool():
 
 
 def open_snapper():
-    global _snapper
     import blendshape_snapper
-
-    if _snapper is not None:
-        try:
-            if _snapper.isVisible():
-                _snapper.raise_()
-                _snapper.activateWindow()
-                return
-        except RuntimeError:
-            pass
-
-    _snapper = blendshape_snapper.BlendshapeSnapper()
-    _snapper.show()
+    blendshape_snapper.show()
 
 
 def reload_snapper():

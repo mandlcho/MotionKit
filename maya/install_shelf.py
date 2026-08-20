@@ -52,4 +52,10 @@ _btn("VtxCP",  "Vtx Copy Paste — 顶点复制粘贴",
      "import vtx_copy_paste; vtx_copy_paste.VtxCopyPaste().show()",
      bg=(0.35, 0.22, 0.35))
 
+cmds.separator(style="shelf", horizontal=False, parent=SHELF_NAME)
+
+_btn("CleanScn", "Scene Cleaner — 删除未知节点和插件引用，修复无法保存的场景",
+     "import scene_cleaner; importlib.reload(scene_cleaner); scene_cleaner.show()",
+     bg=(0.40, 0.18, 0.18))
+
 print("[MotionKit] shelf installed")

@@ -73,11 +73,8 @@ def _set_weight(bs_node, target, value):
     cmds.setAttr(f"{bs_node}.{target}", value)
 
 
-def _capture(camera_transform, output_path):
-    """
-    Playblast a single PNG from camera_transform.
-    output_path should have no extension — playblast appends .####.png.
-    """
+def _create_capture_viewport(camera_transform):
+    """Create a temporary model panel configured for image capture."""
     window = cmds.window(widthHeight=(1920, 1080))
     cmds.paneLayout()
     panel = cmds.modelPanel(camera=camera_transform)
@@ -87,25 +84,31 @@ def _capture(camera_transform, output_path):
                      displayTextures=True,
                      allObjects=True)
     cmds.showWindow(window)
+    return window, panel
 
+
+def _capture(panel, output_path):
+    """
+    Playblast a single PNG from an existing model panel.
+
+    output_path should have no extension — playblast appends .####.png.
+    """
     current = cmds.currentTime(query=True)
-    try:
-        cmds.playblast(
-            startTime=current,
-            endTime=current,
-            format="image",
-            compression="png",
-            filename=output_path,
-            widthHeight=[1920, 1080],
-            percent=100,
-            quality=100,
-            viewer=False,
-            offScreen=True,
-            forceOverwrite=True,
-            clearCache=True,
-        )
-    finally:
-        cmds.deleteUI(window)
+    cmds.playblast(
+        startTime=current,
+        endTime=current,
+        format="image",
+        compression="png",
+        filename=output_path,
+        widthHeight=[1920, 1080],
+        percent=100,
+        quality=100,
+        viewer=False,
+        offScreen=True,
+        forceOverwrite=True,
+        clearCache=True,
+        editorPanelName=panel,
+    )
 
 
 def _active_viewport_camera():
@@ -378,15 +381,20 @@ class BlendshapeSnapper(QtWidgets.QDialog):
         fname = self._fname_field.text().strip() or "capture_current"
         output_path = os.path.join(out_dir, fname)
 
+        window = None
         try:
             self._set_status(f"capturing from {cam}…")
             QtWidgets.QApplication.processEvents()
-            _capture(cam, output_path)
+            window, panel = _create_capture_viewport(cam)
+            _capture(panel, output_path)
             self._set_status(f"captured → {out_dir}", "#8fc87a")
             self._log(f"capture_current [{cam}] → {output_path}")
         except Exception as e:
             self._set_status(f"error: {e}", "#c87050")
             self._log(f"ERROR capture_current: {e}")
+        finally:
+            if window:
+                cmds.deleteUI(window)
 
     # ── snap ─────────────────────────────────────────────────────────────────
 
@@ -408,19 +416,28 @@ class BlendshapeSnapper(QtWidgets.QDialog):
             return
 
         errors = []
-        for i, (bs_node, target) in enumerate(checked, 1):
-            self._set_status(f"[{i}/{len(checked)}] {target}…")
-            QtWidgets.QApplication.processEvents()
-            self._log(f"snapping {target}")
-            try:
-                _set_weight(bs_node, target, 1.0)
-                cmds.refresh(force=True)
-                _capture(cam_transform, os.path.join(out_dir, target))
-            except Exception as e:
-                errors.append(f"{target}: {e}")
-                self._log(f"ERROR {target}: {e}")
-            finally:
-                _set_weight(bs_node, target, 0.0)
+        try:
+            window, panel = _create_capture_viewport(cam_transform)
+        except Exception as e:
+            self._set_status(f"error creating capture viewport: {e}", "#c87050")
+            self._log(f"ERROR creating capture viewport: {e}")
+            return
+
+        try:
+            for i, (bs_node, target) in enumerate(checked, 1):
+                self._set_status(f"[{i}/{len(checked)}] {target}…")
+                self._log(f"snapping {target}")
+                try:
+                    _set_weight(bs_node, target, 1.0)
+                    cmds.refresh(force=True)
+                    _capture(panel, os.path.join(out_dir, target))
+                except Exception as e:
+                    errors.append(f"{target}: {e}")
+                    self._log(f"ERROR {target}: {e}")
+                finally:
+                    _set_weight(bs_node, target, 0.0)
+        finally:
+            cmds.deleteUI(window)
 
         msg = f"done — {len(checked) - len(errors)} snaps → {out_dir}"
         if errors:

@@ -130,7 +130,8 @@ class BatchRemoveRef(QtWidgets.QDialog):
             self._set_status(f"[{i+1}/{len(files)}] {os.path.basename(path)}...")
             print(f"[BatchRef] opening: {path}")
             try:
-                cmds.file(path, open=True, force=True, loadReferenceDepth="all")
+                # Reference nodes can be removed without loading their contents.
+                cmds.file(path, open=True, force=True, loadReferenceDepth="none")
             except Exception as e:
                 print(f"[BatchRef] ERROR opening: {e}")
                 continue

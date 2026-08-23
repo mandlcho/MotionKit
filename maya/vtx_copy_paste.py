@@ -1,7 +1,7 @@
 import maya.cmds as cmds
 import maya.api.OpenMaya as om2
 from maya import OpenMayaUI as omui
-from PySide2 import QtWidgets, QtCore, QtGui
+from PySide2 import QtWidgets, QtCore
 import shiboken2
 import json, os
 
@@ -112,17 +112,11 @@ class VtxCopyPaste(QtWidgets.QDialog):
 
         del_row = QtWidgets.QHBoxLayout()
         del_row.setSpacing(6)
-        recall_btn = QtWidgets.QPushButton("Select")
-        recall_btn.setFixedHeight(26)
-        recall_btn.setStyleSheet(BTN.format(bg="#2d4a2d", hv="#3a6a3a", pr="#1f331f"))
-        recall_btn.clicked.connect(self._recall_selected_item)
-
         delete_btn = QtWidgets.QPushButton("Delete")
         delete_btn.setFixedHeight(26)
         delete_btn.setStyleSheet(BTN.format(bg="#4a2020", hv="#6a2a2a", pr="#331515"))
         delete_btn.clicked.connect(self._delete_selection)
 
-        del_row.addWidget(recall_btn)
         del_row.addWidget(delete_btn)
         root.addLayout(del_row)
 
@@ -252,10 +246,12 @@ class VtxCopyPaste(QtWidgets.QDialog):
         fn = om2.MFnMesh(target_dag)
         applied = 0
         try:
+            points = fn.getPoints(om2.MSpace.kObject)
             for idx, pt in self._verts:
                 if idx < fn.numVertices:
-                    fn.setPoint(idx, pt, om2.MSpace.kObject)
+                    points[idx] = pt
                     applied += 1
+            fn.setPoints(points, om2.MSpace.kObject)
             fn.updateSurface()
             frame = cmds.currentTime(q=True)
             self._set_cp_status(
@@ -363,11 +359,6 @@ class VtxCopyPaste(QtWidgets.QDialog):
             cmds.select(components)
         except Exception as e:
             print(f"[vtxSel] recall error: {e}")
-
-    def _recall_selected_item(self):
-        items = self._sel_list.selectedItems()
-        if items:
-            self._recall_selection(items[0])
 
     def _delete_selection(self):
         row = self._sel_list.currentRow()

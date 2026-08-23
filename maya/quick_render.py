@@ -3,6 +3,7 @@ Hugin Tool — Save + Playblast
 Run to open. Requires audio node in scene and cameras: front_before, front_after.
 """
 
+import glob
 import os
 import shutil
 import subprocess
@@ -59,10 +60,7 @@ class HuginTool(QtWidgets.QDialog):
         self._status.setStyleSheet("color:#555; font-size:10px;")
         root.addWidget(self._status)
 
-        line = QtWidgets.QFrame()
-        line.setFrameShape(QtWidgets.QFrame.HLine)
-        line.setStyleSheet("color:#2a2a2a;")
-        root.addWidget(line)
+        root.addWidget(_divider())
 
         # character subfolder
         char_row = QtWidgets.QHBoxLayout()
@@ -222,7 +220,7 @@ class HuginTool(QtWidgets.QDialog):
         self._log(f"audio node: {node}  |  file: {filepath}  |  name: {name}")
         return node, name
 
-    def _save_dir(self, name):
+    def _save_dir(self):
         char = self._char_field.text().strip() or "Hugin"
         d = os.path.join(os.path.expanduser("~"), "Desktop", "BeforeAfter", char)
         os.makedirs(d, exist_ok=True)
@@ -245,6 +243,27 @@ class HuginTool(QtWidgets.QDialog):
         self._log(f"audio offset: {start}  last key: {end}  → frame range {start}–{end}")
         return start, end
 
+    def _render_context(self, audio_node):
+        """Collect settings shared by every camera rendered from the scene."""
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            winget_path = os.path.expanduser(
+                r"~\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe")
+            if os.path.exists(winget_path):
+                ffmpeg = winget_path
+
+        audio_file = cmds.getAttr(audio_node + ".filename") or None
+        context = {
+            "audio_file": audio_file,
+            "available_formats": cmds.playblast(query=True, format=True) or [],
+            "ffmpeg": ffmpeg,
+            "fps": mel.eval("currentTimeUnitToFPS()"),
+            "sound_flag": {"sound": audio_node},
+        }
+        self._log(f"ffmpeg: {ffmpeg or 'NOT FOUND — will use maya encoder'}")
+        self._log(f"audio node: {audio_node}  file: {audio_file}")
+        return context
+
     # ── Save ─────────────────────────────────────────────────────────────────
 
     def _save(self):
@@ -253,7 +272,7 @@ class HuginTool(QtWidgets.QDialog):
         if not audio:
             self._set_status("no audio node in scene", "#c87050")
             return
-        path = os.path.join(self._save_dir(name), name + ".ma")
+        path = os.path.join(self._save_dir(), name + ".ma")
         self._log(f"saving to: {path}")
         try:
             cmds.file(rename=path)
@@ -283,96 +302,70 @@ class HuginTool(QtWidgets.QDialog):
                 continue
         return panels[0] if panels else None
 
-    def _playblast_camera(self, camera, camera_shape, output_path, start, end):
+    def _playblast_camera(self, camera, camera_shape, output_path, start, end,
+                          context):
         if not cmds.objExists(camera_shape):
             self._log(f"ERROR: camera shape not found: {camera_shape}")
             self._set_status(f"camera not found: {camera}", "#c87050")
             return False
 
-        # prefer qt (mov container), fall back to avi
-        available_formats = cmds.playblast(query=True, format=True) or []
-        # check ffmpeg — also probe known WinGet install location
-        ffmpeg = shutil.which("ffmpeg")
-        if not ffmpeg:
-            winget_path = os.path.expanduser(
-                r"~\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe")
-            if os.path.exists(winget_path):
-                ffmpeg = winget_path
-        self._log(f"ffmpeg: {ffmpeg or 'NOT FOUND — will use maya encoder'}")
-
-        # wire audio
-        audio_nodes = cmds.ls(type="audio")
-        audio_file  = None
-        sound_flag  = {}
-        if audio_nodes:
-            sound_flag = {"sound": audio_nodes[0]}
-            audio_file = cmds.getAttr(audio_nodes[0] + ".filename") or None
-            self._log(f"audio node: {audio_nodes[0]}  file: {audio_file}")
-        else:
-            self._log("no audio node — playblast will be silent")
-
         panel = self._find_panel_for_camera(camera_shape)
         self._log(f"using panel: {panel}  camera: {cmds.modelEditor(panel, q=True, camera=True) if panel else 'none'}")
 
         try:
-            if ffmpeg:
-                tmp_dir  = tempfile.mkdtemp(prefix="qr_pb_")
-                seq_path = os.path.join(tmp_dir, "frame")
-                self._log(f"PNG sequence dir: {tmp_dir}")
-                self._log(f"playblasting PNGs  frames {start}–{end}")
-                pb_kwargs = dict(
-                    filename=seq_path,
-                    format="image",
-                    compression="png",
-                    sequenceTime=False,
-                    clearCache=True,
-                    viewer=False,
-                    showOrnaments=False,
-                    offScreen=True,
-                    percent=100,
-                    quality=100,
-                    widthHeight=[1920, 1080],
-                    startTime=start,
-                    endTime=end,
-                    forceOverwrite=True,
-                )
-                if panel:
-                    pb_kwargs["editorPanelName"] = panel
-                cmds.playblast(**pb_kwargs)
-                import glob as _glob
-                written = sorted(_glob.glob(seq_path + ".*.png"))
-                self._log(f"PNG frames written: {len(written)}")
-                if not written:
-                    shutil.rmtree(tmp_dir, ignore_errors=True)
-                    raise RuntimeError("playblast produced no PNG frames")
+            if context["ffmpeg"]:
+                with tempfile.TemporaryDirectory(prefix="qr_pb_") as tmp_dir:
+                    seq_path = os.path.join(tmp_dir, "frame")
+                    self._log(f"PNG sequence dir: {tmp_dir}")
+                    self._log(f"playblasting PNGs  frames {start}–{end}")
+                    pb_kwargs = dict(
+                        filename=seq_path,
+                        format="image",
+                        compression="png",
+                        sequenceTime=False,
+                        clearCache=True,
+                        viewer=False,
+                        showOrnaments=False,
+                        offScreen=True,
+                        percent=100,
+                        quality=100,
+                        widthHeight=[1920, 1080],
+                        startTime=start,
+                        endTime=end,
+                        forceOverwrite=True,
+                    )
+                    if panel:
+                        pb_kwargs["editorPanelName"] = panel
+                    cmds.playblast(**pb_kwargs)
+                    written = sorted(glob.glob(seq_path + ".*.png"))
+                    self._log(f"PNG frames written: {len(written)}")
+                    if not written:
+                        raise RuntimeError("playblast produced no PNG frames")
 
-                # detect actual first frame number from written files
-                first_frame = int(written[0].rsplit(".", 2)[-2])
-                self._log(f"first PNG frame number: {first_frame}")
+                    first_frame = int(written[0].rsplit(".", 2)[-2])
+                    self._log(f"first PNG frame number: {first_frame}")
 
-                out_mp4 = output_path + ".mp4"
-                fps     = mel.eval("currentTimeUnitToFPS()")
-                ff_cmd  = [ffmpeg, "-y",
-                           "-framerate", str(fps),
-                           "-start_number", str(first_frame),
-                           "-i", seq_path + ".%04d.png"]
-                if audio_file and os.path.exists(audio_file):
-                    ff_cmd += ["-i", audio_file, "-shortest"]
-                ff_cmd += ["-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                           "-pix_fmt", "yuv420p",
-                           "-c:a", "aac", "-b:a", "128k", out_mp4]
-                self._log("ffmpeg: " + " ".join(ff_cmd))
-                result = subprocess.run(ff_cmd, capture_output=True, text=True)
-                shutil.rmtree(tmp_dir, ignore_errors=True)
-                if result.returncode != 0:
-                    self._log(f"ffmpeg stderr: {result.stderr[-500:]}")
-                    raise RuntimeError(f"ffmpeg failed (code {result.returncode})")
-                size_mb = os.path.getsize(out_mp4) / (1024 * 1024)
-                self._log(f"encode OK → {out_mp4}  ({size_mb:.1f} MB)")
+                    out_mp4 = output_path + ".mp4"
+                    ff_cmd = [context["ffmpeg"], "-y",
+                              "-framerate", str(context["fps"]),
+                              "-start_number", str(first_frame),
+                              "-i", seq_path + ".%04d.png"]
+                    audio_file = context["audio_file"]
+                    if audio_file and os.path.exists(audio_file):
+                        ff_cmd += ["-i", audio_file, "-shortest"]
+                    ff_cmd += ["-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                               "-pix_fmt", "yuv420p",
+                               "-c:a", "aac", "-b:a", "128k", out_mp4]
+                    self._log("ffmpeg: " + " ".join(ff_cmd))
+                    result = subprocess.run(ff_cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        self._log(f"ffmpeg stderr: {result.stderr[-500:]}")
+                        raise RuntimeError(f"ffmpeg failed (code {result.returncode})")
+                    size_mb = os.path.getsize(out_mp4) / (1024 * 1024)
+                    self._log(f"encode OK → {out_mp4}  ({size_mb:.1f} MB)")
 
             else:
-                available_formats = cmds.playblast(query=True, format=True) or []
-                if "qt" in available_formats:
+                if "qt" in context["available_formats"]:
                     fmt, ext, compression = "qt", "mov", "H.264"
                 else:
                     fmt, ext, compression = "avi", "avi", "MS-CRAM"
@@ -392,7 +385,7 @@ class HuginTool(QtWidgets.QDialog):
                     startTime=start,
                     endTime=end,
                     forceOverwrite=True,
-                    **sound_flag,
+                    **context["sound_flag"],
                 )
                 self._log(f"playblast OK → {output_path}.{ext}")
 
@@ -416,10 +409,9 @@ class HuginTool(QtWidgets.QDialog):
             self._set_status("set a valid folder first", "#c87050")
             return
 
-        import glob as _glob
         ma_files = sorted(
-            _glob.glob(os.path.join(folder, "*.ma")) +
-            _glob.glob(os.path.join(folder, "*.mb"))
+            glob.glob(os.path.join(folder, "*.ma")) +
+            glob.glob(os.path.join(folder, "*.mb"))
         )
         if not ma_files:
             self._set_status("no .ma/.mb files found in folder", "#c87050")
@@ -453,8 +445,9 @@ class HuginTool(QtWidgets.QDialog):
                 self._log(f"no audio in {ma_path}, skipping")
                 continue
 
-            save_dir = self._save_dir(name)
+            save_dir = self._save_dir()
             start, end = self._frame_range(audio)
+            context = self._render_context(audio)
             cmds.playbackOptions(minTime=start, maxTime=end,
                                  animationStartTime=start, animationEndTime=end)
 
@@ -471,7 +464,8 @@ class HuginTool(QtWidgets.QDialog):
                 cam_label, shape = match
                 self._log(f"  playblasting {cam_label}")
                 out = os.path.join(save_dir, f"{name}_{base_name}")
-                ok = self._playblast_camera(cam_label, shape, out, start, end)
+                ok = self._playblast_camera(
+                    cam_label, shape, out, start, end, context)
                 if ok:
                     total_ok += 1
 
@@ -485,8 +479,9 @@ class HuginTool(QtWidgets.QDialog):
             self._set_status("no audio node in scene", "#c87050")
             return
 
-        save_dir = self._save_dir(name)
+        save_dir = self._save_dir()
         start, end = self._frame_range(audio)
+        context = self._render_context(audio)
 
         self._log(f"setting frame range: {start} → {end}")
         cmds.playbackOptions(minTime=start, maxTime=end,
@@ -504,7 +499,8 @@ class HuginTool(QtWidgets.QDialog):
             self._log(f"--- camera: {cam} ---")
             self._set_status(f"playblasting {cam}...")
             out = os.path.join(save_dir, f"{name}_{cam.replace(':', '_')}")
-            ok  = self._playblast_camera(cam, shape, out, start, end)
+            ok = self._playblast_camera(
+                cam, shape, out, start, end, context)
             results.append(("✓" if ok else "✗") + f" {cam}")
 
         self._log("--- done: " + "  |  ".join(results) + " ---")

@@ -7,13 +7,12 @@ Exports all animated blendshape weight curves to a JSON file.
 import json
 import maya.cmds as cmds
 from maya import OpenMayaUI as omui
-from PySide2 import QtWidgets, QtCore
-import shiboken2
+from qt_compat import TOOL_WINDOW_FLAG, QtCore, QtWidgets, wrapInstance
 
 
 def _maya_main_window():
     ptr = omui.MQtUtil.mainWindow()
-    return shiboken2.wrapInstance(int(ptr), QtWidgets.QWidget)
+    return wrapInstance(int(ptr), QtWidgets.QWidget)
 
 
 def _get_blendshape_nodes():
@@ -74,7 +73,7 @@ class ExportUI(QtWidgets.QDialog):
         super(ExportUI, self).__init__(parent or _maya_main_window())
         self.setWindowTitle('BS Anim Export')
         self.setFixedWidth(400)
-        self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool)
+        self.setWindowFlags(self.windowFlags() | TOOL_WINDOW_FLAG)
         self._build()
 
     def _build(self):

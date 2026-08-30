@@ -7,13 +7,12 @@ selected camera, save to disk, reset weight to 0.
 import os
 import maya.cmds as cmds
 from maya import OpenMayaUI as omui
-from PySide2 import QtWidgets, QtCore
-import shiboken2
+from qt_compat import TOOL_WINDOW_FLAG, QtCore, QtWidgets, wrapInstance
 
 
 def _maya_main_window():
     ptr = omui.MQtUtil.mainWindow()
-    return shiboken2.wrapInstance(int(ptr), QtWidgets.QWidget)
+    return wrapInstance(int(ptr), QtWidgets.QWidget)
 
 
 def _divider():
@@ -138,7 +137,7 @@ class BlendshapeSnapper(QtWidgets.QDialog):
         super().__init__(parent or _maya_main_window())
         self.setWindowTitle("Blendshape Snapper")
         self.setFixedWidth(360)
-        self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool)
+        self.setWindowFlags(self.windowFlags() | TOOL_WINDOW_FLAG)
         self._checkboxes = []   # list of (bs_node, target, QCheckBox)
         self._build_ui()
         self._refresh_cameras()

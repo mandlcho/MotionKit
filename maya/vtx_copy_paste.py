@@ -1,14 +1,13 @@
 import maya.cmds as cmds
 import maya.api.OpenMaya as om2
 from maya import OpenMayaUI as omui
-from PySide2 import QtWidgets, QtCore
-import shiboken2
+from qt_compat import TOOL_WINDOW_FLAG, USER_ROLE, QtCore, QtWidgets, wrapInstance
 import json, os
 
 
 def _maya_main_window():
     ptr = omui.MQtUtil.mainWindow()
-    return shiboken2.wrapInstance(int(ptr), QtWidgets.QWidget)
+    return wrapInstance(int(ptr), QtWidgets.QWidget)
 
 
 SAVE_DIR  = os.path.join(os.path.expanduser("~"), "Documents", "vtx_bs")
@@ -37,7 +36,7 @@ class VtxCopyPaste(QtWidgets.QDialog):
 
         self.setWindowTitle("Vtx Tools")
         self.setFixedWidth(300)
-        self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool)
+        self.setWindowFlags(self.windowFlags() | TOOL_WINDOW_FLAG)
         self._build_ui()
         self.adjustSize()
         self._load_from_file()
@@ -305,7 +304,7 @@ class VtxCopyPaste(QtWidgets.QDialog):
             for entry in data:
                 self._saved_sels.append(entry)
                 item = QtWidgets.QListWidgetItem(f"{entry['name']}   —   {entry['info']}")
-                item.setData(QtCore.Qt.UserRole, len(self._saved_sels) - 1)
+                item.setData(USER_ROLE, len(self._saved_sels) - 1)
                 self._sel_list.addItem(item)
         except Exception as e:
             print(f"[vtxSel] load error: {e}")
@@ -336,7 +335,7 @@ class VtxCopyPaste(QtWidgets.QDialog):
 
         self._saved_sels.append(entry)
         item = QtWidgets.QListWidgetItem(f"{name}   —   {info}")
-        item.setData(QtCore.Qt.UserRole, len(self._saved_sels) - 1)
+        item.setData(USER_ROLE, len(self._saved_sels) - 1)
         self._sel_list.addItem(item)
         self._sel_name.clear()
         self._filter_list(self._search.text())
@@ -345,7 +344,7 @@ class VtxCopyPaste(QtWidgets.QDialog):
     def _recall_selection(self, item):
         if item is None:
             return
-        entry = self._saved_sels[item.data(QtCore.Qt.UserRole)]
+        entry = self._saved_sels[item.data(USER_ROLE)]
 
         target = None
         active = cmds.ls(sl=True, o=True)
@@ -367,5 +366,5 @@ class VtxCopyPaste(QtWidgets.QDialog):
         self._sel_list.takeItem(row)
         self._saved_sels.pop(row)
         for i in range(self._sel_list.count()):
-            self._sel_list.item(i).setData(QtCore.Qt.UserRole, i)
+            self._sel_list.item(i).setData(USER_ROLE, i)
         self._write_to_file()

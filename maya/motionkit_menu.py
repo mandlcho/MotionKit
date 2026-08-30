@@ -1,6 +1,7 @@
 """Build the MotionKit menu in Maya's main menu bar."""
 
 import importlib
+import sys
 
 import maya.cmds as cmds
 import maya.utils
@@ -10,6 +11,47 @@ MENU_ID = "motionKitMenu"
 MENU_LABEL = "MotionKit"
 _build_tries = 0
 _MAX_BUILD_TRIES = 20
+
+# Add future tools here. A branch has ``children``; a tool has ``module`` and
+# optionally ``class_name`` when it does not expose a module-level show().
+MENU_STRUCTURE = (
+    {
+        "label": "Animation",
+        "children": (),
+    },
+    {
+        "label": "Rigging",
+        "children": (
+            {
+                "label": "Blendshape Tools",
+                "children": (
+                    {"label": "Animation Export", "module": "bs_anim_export"},
+                    {"label": "Animation Import", "module": "bs_anim_import"},
+                    {"label": "Snapper", "module": "blendshape_snapper"},
+                    {
+                        "label": "Vertex Copy Paste",
+                        "module": "vtx_copy_paste",
+                        "class_name": "VtxCopyPaste",
+                    },
+                ),
+            },
+            {
+                "label": "Bone Tools",
+                "children": (),
+            },
+        ),
+    },
+    {
+        "label": "Validation",
+        "children": (
+            {"label": "Scene Cleaner", "module": "scene_cleaner"},
+        ),
+    },
+    {
+        "label": "P4",
+        "children": (),
+    },
+)
 
 
 def build_menu():
@@ -28,18 +70,43 @@ def build_menu():
         cmds.deleteUI(MENU_ID)
 
     menu = cmds.menu(MENU_ID, label=MENU_LABEL, parent="MayaWindow", tearOff=False)
-    blendshape_menu = cmds.menuItem(label="Blendshape", subMenu=True, parent=menu)
-    _add_tool(blendshape_menu, "Animation Export", "bs_anim_export")
-    _add_tool(blendshape_menu, "Animation Import", "bs_anim_import")
-    _add_tool(blendshape_menu, "Snapper", "blendshape_snapper")
-
-    utilities_menu = cmds.menuItem(label="Utilities", subMenu=True, parent=menu)
-    _add_tool(utilities_menu, "Vertex Copy Paste", "vtx_copy_paste", "VtxCopyPaste")
-    _add_tool(utilities_menu, "Scene Cleaner", "scene_cleaner")
+    _add_entries(menu, MENU_STRUCTURE)
 
     cmds.menuItem(divider=True, parent=menu)
-    cmds.menuItem(label="Rebuild Menu", parent=menu, command=lambda *_: build_menu())
+    cmds.menuItem(label="Reload Menu", parent=menu, command=lambda *_: reload_menu())
     print("[MotionKit] menu built")
+
+
+def reload_menu():
+    """Reload this module and rebuild the menu for tool development."""
+    module = importlib.reload(sys.modules[__name__])
+    module.build_menu()
+
+
+def _add_entries(parent, entries):
+    """Recursively add menu branches and tools from the menu definition."""
+    for entry in entries:
+        module_name = entry.get("module")
+        if module_name:
+            _add_tool(
+                parent,
+                entry["label"],
+                module_name,
+                entry.get("class_name"),
+            )
+            continue
+
+        submenu = cmds.menuItem(
+            label=entry["label"],
+            subMenu=True,
+            parent=parent,
+            tearOff=False,
+        )
+        children = entry.get("children", ())
+        if children:
+            _add_entries(submenu, children)
+        else:
+            cmds.menuItem(label="No tools yet", parent=submenu, enable=False)
 
 
 def _add_tool(parent, label, module_name, class_name=None):

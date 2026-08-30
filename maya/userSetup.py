@@ -1,11 +1,10 @@
 """
-userSetup.py
-Place this file (or merge its contents) into your Maya scripts directory.
-Builds the MotionKit shelf on startup.
+MotionKit's Maya startup entry point.
+
+Place this file (or merge its contents) into Maya's scripts directory.
 """
 
-import maya.utils
+from startup import start
 
-from shelf_builder import build_shelf
 
-maya.utils.executeDeferred(build_shelf)
+start()
